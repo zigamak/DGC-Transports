@@ -267,19 +267,20 @@
                         <span class="detail-label">🔢 Vehicle Number</span>
                         <span class="detail-value"><?= htmlspecialchars($booking['trip']['vehicle_number']) ?></span>
                     </div>
+                    <?php if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])): ?>
                     <div class="detail-item" style="grid-column: 1 / -1;">
                         <span class="detail-label">👨‍✈️ Driver</span>
                         <span class="detail-value"><?= htmlspecialchars($booking['trip']['driver_name']) ?></span>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Seats -->
                 <div class="seats-section">
                     <h4 style="margin: 0 0 10px 0; color: #1f2937;">🪑 Your Seat(s)</h4>
                     <div class="seats-container">
-                        <?php foreach ($booking['selected_seats'] as $seat): ?>
-                            <span class="seat-badge">Seat <?= $seat ?></span>
-                        <?php endforeach; ?>
+                        <!-- Fixed: Use seat_number from booking data -->
+                        <span class="seat-badge">Seat <?= htmlspecialchars($booking['seat_number']) ?></span>
                     </div>
                 </div>
             </div>
@@ -300,6 +301,18 @@
                         <span class="detail-label">Phone</span>
                         <span class="detail-value"><?= htmlspecialchars($booking['phone']) ?></span>
                     </div>
+                    <?php if (isset($booking['emergency_contact']) && !empty($booking['emergency_contact'])): ?>
+                    <div class="detail-item">
+                        <span class="detail-label">Emergency Contact</span>
+                        <span class="detail-value"><?= htmlspecialchars($booking['emergency_contact']) ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (isset($booking['special_requests']) && !empty($booking['special_requests'])): ?>
+                    <div class="detail-item">
+                        <span class="detail-label">Special Requests</span>
+                        <span class="detail-value"><?= htmlspecialchars($booking['special_requests']) ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -307,7 +320,7 @@
             <div class="payment-summary">
                 <h3 style="color: #1f2937; margin: 0 0 10px 0;">💳 Payment Summary</h3>
                 <p style="margin: 5px 0; color: #6b7280;">
-                    <?= count($booking['selected_seats']) ?> seat(s) × ₦<?= number_format($booking['trip']['price'], 0) ?> each
+                    1 seat × ₦<?= number_format($booking['total_amount'], 0) ?>
                 </p>
                 <div class="amount-paid">₦<?= number_format($booking['total_amount'], 0) ?></div>
                 <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">

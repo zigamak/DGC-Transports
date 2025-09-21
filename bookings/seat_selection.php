@@ -5,34 +5,55 @@ require_once '../includes/db.php';
 require_once '../includes/config.php';
 require_once '../templates/header.php'; 
 
-if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_num_seats'])) {
+if (!isset($_SESSION['selected_trip'])) {
     header("Location: search_trips.php");
     exit();
 }
 
 $trip = $_SESSION['selected_trip'];
-$num_seats = $_SESSION['selected_num_seats'];
+$num_seats = $trip['num_seats'];
 
-// Debug: Check what's in the trip data
-// Uncomment the line below to see the trip structure
-// echo "<pre>" . print_r($trip, true) . "</pre>";
+// Get trip details for display
+$stmt = $conn->prepare("
+    SELECT 
+        tt.id,
+        tt.pickup_city_id,
+        tt.dropoff_city_id,
+        pc.name as pickup_city,
+        dc.name as dropoff_city,
+        vt.capacity,
+        vt.type as vehicle_type
+    FROM trip_templates tt
+    JOIN cities pc ON tt.pickup_city_id = pc.id
+    JOIN cities dc ON tt.dropoff_city_id = dc.id
+    JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+    WHERE tt.id = ?
+");
+$stmt->bind_param("i", $trip['template_id']);
+$stmt->execute();
+$trip_details = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-// Fetch booked seats - Fix the field name here
-$trip_id = isset($trip['trip_id']) ? $trip['trip_id'] : $trip['id'];
+if (!$trip_details) {
+    header("Location: search_trips.php");
+    exit();
+}
+
+// Fetch booked seats using correct schema
 $stmt = $conn->prepare("
     SELECT seat_number 
-    FROM seat_bookings sb
-    JOIN bookings b ON sb.booking_id = b.id
-    WHERE b.trip_id = ? AND b.payment_status = 'paid'
+    FROM bookings
+    WHERE template_id = ? 
+        AND trip_date = ? 
+        AND payment_status = 'paid'
+        AND status != 'cancelled'
 ");
-$stmt->bind_param("i", $trip_id);
+$stmt->bind_param("is", $trip['template_id'], $trip['trip_date']);
 $stmt->execute();
 $booked_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $booked_seat_numbers = array_column($booked_seats, 'seat_number');
+$stmt->close();
 
-// Debug: Check what seats are being fetched as booked
-// Uncomment the line below to see booked seats
-// echo "<pre>Booked seats: " . print_r($booked_seat_numbers, true) . "</pre>";
 ?>
 
 <!DOCTYPE html>
@@ -113,7 +134,8 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
                     </a>
                 </div>
                 <div class="text-sm text-gray-600">
-                    Select <?= $num_seats ?> seat(s) for your trip from <?= htmlspecialchars($trip['pickup_city']) ?> to <?= htmlspecialchars($trip['dropoff_city']) ?>
+                    Select <?= $num_seats ?> seat(s) for your trip from <?= htmlspecialchars($trip_details['pickup_city']) ?> to <?= htmlspecialchars($trip_details['dropoff_city']) ?>
+                    on <?= date('D, M j, Y', strtotime($trip['trip_date'])) ?>
                 </div>
             </div>
 
@@ -140,9 +162,10 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
             <?php if (isset($_GET['debug'])): ?>
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                     <h4 class="font-bold mb-2">Debug Information:</h4>
-                    <p><strong>Trip ID:</strong> <?= $trip_id ?></p>
+                    <p><strong>Template ID:</strong> <?= $trip['template_id'] ?></p>
+                    <p><strong>Trip Date:</strong> <?= $trip['trip_date'] ?></p>
                     <p><strong>Booked Seats:</strong> <?= implode(', ', $booked_seat_numbers) ?></p>
-                    <p><strong>Total Capacity:</strong> <?= $trip['capacity'] ?></p>
+                    <p><strong>Total Capacity:</strong> <?= $trip_details['capacity'] ?></p>
                 </div>
             <?php endif; ?>
 
@@ -154,9 +177,11 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
                     </div>
                 </div>
                 
-                <form id="seatForm" action="passenger_details.php" method="POST">
+                <form id="seatForm" action="process_seat_selection.php" method="POST">
+                    <input type="hidden" name="selected_seats" id="selectedSeatsInput" value="">
+                    
                     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                        <?php for ($i = 1; $i <= $trip['capacity']; $i++): ?>
+                        <?php for ($i = 1; $i <= $trip_details['capacity']; $i++): ?>
                             <?php $is_booked = in_array($i, $booked_seat_numbers); ?>
                             <div class="seat-container">
                                 <input type="checkbox" 
@@ -206,7 +231,8 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
         let selectedSeats = [];
         const bookedSeats = <?= json_encode($booked_seat_numbers) ?>;
         
-        console.log('Booked seats:', bookedSeats); // Debug line
+        console.log('Required seats:', requiredSeats);
+        console.log('Booked seats:', bookedSeats);
 
         function updateSeatSelection(seatNumber) {
             // Check if seat is booked
@@ -243,8 +269,10 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
             const selectedCount = document.getElementById('selectedCount');
             const selectedSeatsDisplay = document.getElementById('selectedSeatsDisplay');
             const selectedSeatsList = document.getElementById('selectedSeatsList');
+            const selectedSeatsInput = document.getElementById('selectedSeatsInput');
             
             selectedCount.textContent = selectedSeats.length;
+            selectedSeatsInput.value = JSON.stringify(selectedSeats);
             
             if (selectedSeats.length > 0) {
                 selectedSeatsDisplay.classList.remove('hidden');
@@ -282,27 +310,6 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
             submitBtn.disabled = true;
-            
-            // Store selected seats in session via AJAX
-            fetch('store_seats.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'seats=' + JSON.stringify(selectedSeats)
-            }).then(response => {
-                if (!response.ok) {
-                    e.preventDefault();
-                    alert('Failed to save seat selection. Please try again.');
-                    submitBtn.innerHTML = '<i class="fas fa-arrow-right mr-2"></i>Proceed to Passenger Details';
-                    submitBtn.disabled = false;
-                }
-            }).catch(error => {
-                e.preventDefault();
-                alert('Network error. Please try again.');
-                submitBtn.innerHTML = '<i class="fas fa-arrow-right mr-2"></i>Proceed to Passenger Details';
-                submitBtn.disabled = false;
-            });
         });
 
         // Initialize UI

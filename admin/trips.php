@@ -9,105 +9,37 @@ require_once '../includes/functions.php';
 // Enforce admin-only access
 requireRole('admin', '/login.php');
 
-// Handle inline edit submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit') {
-    $id = (int)$_POST['id'];
-    $price = (float)$_POST['price'];
-    $vehicle_id = (int)$_POST['vehicle_id'];
-    $time_slot_id = (int)$_POST['time_slot_id'];
-    $status = sanitizeInput($_POST['status']);
-
-    // Fetch vehicle details
-    $vehicle_stmt = $conn->prepare("SELECT vehicle_number, driver_name FROM vehicles WHERE id = ?");
-    $vehicle_stmt->bind_param("i", $vehicle_id);
-    $vehicle_stmt->execute();
-    $vehicle = $vehicle_stmt->get_result()->fetch_assoc();
-    $vehicle_stmt->close();
-
-    // Fetch time slot details
-    $time_stmt = $conn->prepare("SELECT departure_time, arrival_time FROM time_slots WHERE id = ?");
-    $time_stmt->bind_param("i", $time_slot_id);
-    $time_stmt->execute();
-    $time_slot = $time_stmt->get_result()->fetch_assoc();
-    $time_stmt->close();
-
-    if ($vehicle && $time_slot && in_array($status, ['active', 'inactive'])) {
-        $stmt = $conn->prepare("
-            UPDATE trips 
-            SET price = ?, vehicle_id = ?, time_slot_id = ?, departure_time = ?, arrival_time = ?, 
-                vehicle_number = ?, driver_name = ?, status = ?
-            WHERE id = ?
-        ");
-        $stmt->bind_param(
-            "dissssssi",
-            $price,
-            $vehicle_id,
-            $time_slot_id,
-            $time_slot['departure_time'],
-            $time_slot['arrival_time'],
-            $vehicle['vehicle_number'],
-            $vehicle['driver_name'],
-            $status,
-            $id
-        );
-        $stmt->execute();
-        $stmt->close();
-        header('Location: ' . SITE_URL . '/admin/trips.php?updated=1');
-        exit;
+// Handle delete request
+if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    $template_id = (int)$_GET['delete'];
+    $stmt = $conn->prepare("UPDATE trip_templates SET status = 'inactive' WHERE id = ?");
+    $stmt->bind_param("i", $template_id);
+    if ($stmt->execute()) {
+        $success = 'Trip template deleted successfully.';
     } else {
-        $error = 'Invalid input data.';
+        $error = 'Failed to delete trip template.';
     }
-}
-
-// Handle delete
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
-    $id = (int)$_GET['id'];
-    $stmt = $conn->prepare("DELETE FROM trips WHERE id = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
     $stmt->close();
-    header('Location: ' . SITE_URL . '/admin/trips.php?deleted=1');
-    exit;
 }
 
-// Fetch cities, vehicle types, vehicles, and time slots
-$cities_result = $conn->query("SELECT id, name FROM cities ORDER BY name");
-$cities = [];
-while ($row = $cities_result->fetch_assoc()) {
-    $cities[] = $row;
-}
-
-$vehicle_types_result = $conn->query("SELECT id, type FROM vehicle_types ORDER BY type");
-$vehicle_types = [];
-while ($row = $vehicle_types_result->fetch_assoc()) {
-    $vehicle_types[] = $row;
-}
-
-$vehicles_result = $conn->query("SELECT id, vehicle_number, driver_name FROM vehicles ORDER BY vehicle_number");
-$vehicles = [];
-while ($row = $vehicles_result->fetch_assoc()) {
-    $vehicles[] = $row;
-}
-
-$time_slots_result = $conn->query("SELECT id, departure_time, arrival_time FROM time_slots ORDER BY departure_time");
-$time_slots = [];
-while ($row = $time_slots_result->fetch_assoc()) {
-    $time_slots[] = $row;
-}
-
-// Fetch existing trips
-$trips_result = $conn->query("
-    SELECT t.id, t.trip_date, t.departure_time, t.arrival_time, t.vehicle_number, t.driver_name, t.price, t.status,
-           pc.name as pickup_city, dc.name as dropoff_city, vt.type as vehicle_type, t.vehicle_id, t.time_slot_id
-    FROM trips t
-    JOIN cities pc ON t.pickup_city_id = pc.id
-    JOIN cities dc ON t.dropoff_city_id = dc.id
-    JOIN vehicle_types vt ON t.vehicle_type_id = vt.id
-    ORDER BY t.trip_date DESC, t.departure_time DESC
-");
-$trips = [];
-while ($row = $trips_result->fetch_assoc()) {
-    $trips[] = $row;
+// Fetch all trip templates
+$query = "
+    SELECT tt.id, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type, 
+           v.vehicle_number, v.driver_name, ts.departure_time, ts.arrival_time, 
+           tt.price, tt.recurrence_type, tt.recurrence_days, tt.start_date, tt.end_date, tt.status
+    FROM trip_templates tt
+    JOIN cities c1 ON tt.pickup_city_id = c1.id
+    JOIN cities c2 ON tt.dropoff_city_id = c2.id
+    JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+    JOIN vehicles v ON tt.vehicle_id = v.id
+    JOIN time_slots ts ON tt.time_slot_id = ts.id
+    WHERE tt.status = 'active'
+    ORDER BY tt.start_date, ts.departure_time
+";
+$result = $conn->query($query);
+$trip_templates = [];
+while ($row = $result->fetch_assoc()) {
+    $trip_templates[] = $row;
 }
 
 require_once '../templates/sidebar.php';
@@ -118,223 +50,363 @@ require_once '../templates/sidebar.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Trips - DGC Transports</title>
+    <title>Trip Templates - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         :root {
             --primary-red: #e30613;
             --dark-red: #c70410;
             --black: #1a1a1a;
             --white: #ffffff;
             --gray: #f5f5f5;
+            --light-gray: #e5e7eb;
+            --accent-blue: #3b82f6;
         }
         body {
-            background: linear-gradient(to bottom right, var(--white), var(--gray));
+            background: linear-gradient(135deg, var(--white), var(--gray));
             font-family: 'Inter', sans-serif;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1280px;
         }
         .card {
             background: var(--white);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
         }
         .btn-primary {
-            background: var(--primary-red);
+            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
             color: var(--white);
             padding: 10px 20px;
             border-radius: 8px;
-            transition: background 0.3s ease;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.2s ease;
         }
         .btn-primary:hover {
-            background: var(--dark-red);
-        }
-        .btn-secondary {
-            background: var(--gray);
-            color: var(--black);
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: background 0.3s ease;
-        }
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-        .table th {
-            background: var(--gray);
-            color: var(--black);
-            font-weight: 600;
-            padding: 12px;
-            border-bottom: 2px solid var(--black);
-        }
-        .table td {
-            padding: 12px;
-            border-bottom: 1px solid #e0e0e0;
-            color: var(--black);
-        }
-        .table tr:hover {
-            background: #f9f9f9;
-        }
-        .inline-edit-form {
-            display: none;
-        }
-        .inline-edit-form.active {
-            display: table-row;
-        }
-        .input-field {
-            border: 1px solid var(--black);
-            border-radius: 6px;
-            padding: 8px;
-            width: 100%;
-            color: var(--black);
-        }
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary-red);
-            box-shadow: 0 0 5px rgba(227, 6, 19, 0.3);
+            background: linear-gradient(to right, var(--dark-red), var(--primary-red));
+            transform: translateY(-2px);
         }
         .error-message {
-            color: var(--primary-red);
+            color: #ef4444;
             font-size: 0.9rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
         }
         .success-message {
             color: #10b981;
             font-size: 0.9rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        /* Mobile-first card layout for table rows */
+        .mobile-card-row {
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 0.75rem;
+        }
+        .mobile-card-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .mobile-card-item:last-child {
+            margin-bottom: 0;
+        }
+        .mobile-card-label {
+            font-weight: 600;
+            color: #4b5563;
+            width: 80px;
+            min-width: 80px;
+        }
+        .mobile-card-content {
+            flex-grow: 1;
+        }
+        /* Desktop table layout */
+        @media (min-width: 768px) {
+            .mobile-card-row {
+                display: none;
+            }
+            .table-container {
+                display: block;
+            }
+            .table-header {
+                background: var(--gray);
+                color: var(--black);
+                font-weight: 600;
+            }
+            .table-row:hover {
+                background: #f9fafb;
+            }
+        }
+        @media (max-width: 767px) {
+            .table-container {
+                display: none;
+            }
         }
     </style>
-    <script>
-        function toggleEditForm(id) {
-            const viewRow = document.getElementById(`view-${id}`);
-            const editForm = document.getElementById(`edit-${id}`);
-            viewRow.classList.toggle('hidden');
-            editForm.classList.toggle('active');
-        }
-    </script>
 </head>
-<body>
-    <div class="container mx-auto mt-10 p-6">
-        <div class="card p-8 mb-8">
-            <h1 class="text-3xl font-bold mb-6">
-                <i class="fas fa-road text-red-600 mr-2"></i>Manage Trips
-            </h1>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-6 lg:p-10 flex flex-col items-center">
+    <div class="container mx-auto">
+        <div class="card p-6 sm:p-8 lg:p-10">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 sm:mb-0">
+                    <i class="fas fa-route text-primary-red mr-3"></i>Trip Templates
+                </h1>
+                <a href="add_trip.php" class="btn-primary inline-flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Add New Template
+                </a>
+            </div>
 
+            <?php if (isset($success)): ?>
+                <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= htmlspecialchars($success) ?></p>
+            <?php endif; ?>
             <?php if (isset($error)): ?>
-                <p class="error-message mb-4"><?= htmlspecialchars($error) ?></p>
-            <?php endif; ?>
-            <?php if (isset($_GET['updated'])): ?>
-                <p class="success-message mb-4">Trip updated successfully.</p>
-            <?php endif; ?>
-            <?php if (isset($_GET['deleted'])): ?>
-                <p class="success-message mb-4">Trip deleted successfully.</p>
+                <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
             <?php endif; ?>
 
-            <a href="<?= SITE_URL ?>/admin/add_trip.php" class="btn-primary inline-flex items-center mb-6">
-                <i class="fas fa-plus mr-2"></i>Add New Trip
-            </a>
+            <?php if (empty($trip_templates)): ?>
+                <div class="text-center py-12">
+                    <i class="fas fa-route text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-700 mb-2">No Trip Templates Found</h3>
+                    <p class="text-gray-500 mb-6">Create a new trip template to get started.</p>
+                    <a href="add_trip.php" class="btn-primary">
+                        <i class="fas fa-plus mr-2"></i>Create Trip Template
+                    </a>
+                </div>
+            <?php else: ?>
+                <!-- Mobile View - Card Layout -->
+                <div class="space-y-4 md:hidden">
+                    <?php foreach ($trip_templates as $template): ?>
+                        <div class="mobile-card-row bg-white shadow-md rounded-xl relative">
+                            <div class="absolute top-4 right-4">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $template['id'] ?>">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $template['id'] ?>">
+                                        <div class="py-1">
+                                            <a href="edit_trip.php?id=<?= $template['id'] ?>" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
+                                                <i class="fas fa-edit mr-2"></i>Edit
+                                            </a>
+                                            <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
+                                                <i class="fas fa-trash mr-2"></i>Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
+                                <span><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></span>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-bus text-primary-red mr-2"></i>
+                                <span><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></span>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-clock text-primary-red mr-2"></i>
+                                <span><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></span>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
+                                <span>₦<?= number_format($template['price'], 2) ?></span>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-redo text-primary-red mr-2"></i>
+                                <span>
+                                    <?php
+                                    if ($template['recurrence_type'] === 'day') {
+                                        echo 'One Day';
+                                    } elseif ($template['recurrence_type'] === 'week') {
+                                        echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
+                                    } elseif ($template['recurrence_type'] === 'month') {
+                                        echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
+                                    } else {
+                                        echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
+                                    }
+                                    ?>
+                                </span>
+                            </div>
+                            <div class="mobile-card-item">
+                                <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
+                                <span><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
 
-            <div class="overflow-x-auto">
-                <table class="table w-full">
-                    <thead>
-                        <tr>
-                            <th>Trip Date</th>
-                            <th>Departure</th>
-                            <th>Arrival</th>
-                            <th>Pickup</th>
-                            <th>Dropoff</th>
-                            <th>Vehicle Type</th>
-                            <th>Vehicle</th>
-                            <th>Driver</th>
-                            <th>Price</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($trips)): ?>
-                            <tr><td colspan="11" class="text-center">No trips found.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($trips as $trip): ?>
-                                <!-- View Row -->
-                                <tr id="view-<?= $trip['id'] ?>">
-                                    <td><?= htmlspecialchars(formatDate($trip['trip_date'], 'j, M, Y')) ?></td>
-                                    <td><?= htmlspecialchars(formatTime($trip['departure_time'], 'g:i A')) ?></td>
-                                    <td><?= htmlspecialchars($trip['arrival_time'] ? formatTime($trip['arrival_time'], 'g:i A') : '-') ?></td>
-                                    <td><?= htmlspecialchars($trip['pickup_city']) ?></td>
-                                    <td><?= htmlspecialchars($trip['dropoff_city']) ?></td>
-                                    <td><?= htmlspecialchars($trip['vehicle_type']) ?></td>
-                                    <td><?= htmlspecialchars($trip['vehicle_number']) ?></td>
-                                    <td><?= htmlspecialchars($trip['driver_name']) ?></td>
-                                    <td><?= formatCurrency($trip['price']) ?></td>
-                                    <td><?= htmlspecialchars($trip['status']) ?></td>
-                                    <td>
-                                        <button onclick="toggleEditForm(<?= $trip['id'] ?>)" class="btn-secondary mr-2">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <a href="<?= SITE_URL ?>/admin/trips.php?action=delete&id=<?= $trip['id'] ?>" class="text-red-600 hover:text-red-800" onclick="return confirm('Are you sure you want to delete this trip?');">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </a>
+                <!-- Desktop View - Table Layout -->
+                <div class="overflow-x-auto hidden md:block">
+                    <table class="w-full table-auto border-collapse">
+                        <thead>
+                            <tr class="table-header rounded-lg">
+                                <th class="px-4 py-3 text-left">Route</th>
+                                <th class="px-4 py-3 text-left">Vehicle</th>
+                                <th class="px-4 py-3 text-left">Time</th>
+                                <th class="px-4 py-3 text-left">Price</th>
+                                <th class="px-4 py-3 text-left">Schedule</th>
+                                <th class="px-4 py-3 text-left">Period</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($trip_templates as $template): ?>
+                                <tr class="table-row border-b border-gray-200">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
+                                            <span><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></span>
+                                        </div>
                                     </td>
-                                </tr>
-                                <!-- Edit Form Row -->
-                                <tr id="edit-<?= $trip['id'] ?>" class="inline-edit-form">
-                                    <td colspan="11">
-                                        <form method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-                                            <input type="hidden" name="action" value="edit">
-                                            <input type="hidden" name="id" value="<?= $trip['id'] ?>">
-                                            <div>
-                                                <label class="block font-semibold mb-1">Price (₦)</label>
-                                                <input type="number" name="price" value="<?= $trip['price'] ?>" step="0.01" class="input-field" required>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-bus text-primary-red mr-2"></i>
+                                            <span><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number'] . ' (' . $template['driver_name'] . ')') ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-clock text-primary-red mr-2"></i>
+                                            <span><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
+                                            <span>₦<?= number_format($template['price'], 2) ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-redo text-primary-red mr-2"></i>
+                                            <span>
+                                                <?php
+                                                if ($template['recurrence_type'] === 'day') {
+                                                    echo 'One Day';
+                                                } elseif ($template['recurrence_type'] === 'week') {
+                                                    echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
+                                                } elseif ($template['recurrence_type'] === 'month') {
+                                                    echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
+                                                } else {
+                                                    echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
+                                                }
+                                                ?>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
+                                            <span><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-right relative">
+                                        <div class="relative inline-block text-left">
+                                            <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $template['id'] ?>">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $template['id'] ?>">
+                                                <div class="py-1">
+                                                    <a href="edit_trip.php?id=<?= $template['id'] ?>" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
+                                                        <i class="fas fa-edit mr-2"></i>Edit
+                                                    </a>
+                                                    <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
+                                                        <i class="fas fa-trash mr-2"></i>Delete
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label class="block font-semibold mb-1">Vehicle</label>
-                                                <select name="vehicle_id" class="input-field" required>
-                                                    <?php foreach ($vehicles as $vehicle): ?>
-                                                        <option value="<?= $vehicle['id'] ?>" <?= $vehicle['id'] == $trip['vehicle_id'] ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($vehicle['vehicle_number'] . ' (' . $vehicle['driver_name'] . ')') ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="block font-semibold mb-1">Time Slot</label>
-                                                <select name="time_slot_id" class="input-field" required>
-                                                    <?php foreach ($time_slots as $slot): ?>
-                                                        <option value="<?= $slot['id'] ?>" <?= $slot['id'] == $trip['time_slot_id'] ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars(formatTime($slot['departure_time'], 'g:i A') . ' - ' . formatTime($slot['arrival_time'], 'g:i A')) ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label class="block font-semibold mb-1">Status</label>
-                                                <select name="status" class="input-field" required>
-                                                    <option value="active" <?= $trip['status'] == 'active' ? 'selected' : '' ?>>Active</option>
-                                                    <option value="inactive" <?= $trip['status'] == 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                                                </select>
-                                            </div>
-                                            <div class="md:col-span-3 flex space-x-2">
-                                                <button type="submit" class="btn-primary">
-                                                    <i class="fas fa-save mr-2"></i>Save
-                                                </button>
-                                                <button type="button" onclick="toggleEditForm(<?= $trip['id'] ?>)" class="btn-secondary">
-                                                    <i class="fas fa-times mr-2"></i>Cancel
-                                                </button>
-                                            </div>
-                                        </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Custom Delete Confirmation Modal -->
+    <div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center">
+        <div class="modal-content bg-white rounded-lg p-6 max-w-sm mx-auto shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-center">Confirm Deletion</h3>
+            <p id="deleteMessage" class="text-gray-700 mb-6 text-center"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancelButton" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">Cancel</button>
+                <a id="confirmDeleteLink" href="#" class="btn-primary bg-red-600 hover:bg-red-700">Delete</a>
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const deleteModal = document.getElementById('deleteModal');
+            const deleteMessage = document.getElementById('deleteMessage');
+            const confirmDeleteLink = document.getElementById('confirmDeleteLink');
+            const cancelButton = document.getElementById('cancelButton');
+
+            window.showDeleteModal = (id, name) => {
+                deleteMessage.textContent = `Are you sure you want to delete the trip template for ${name}?`;
+                confirmDeleteLink.href = `trip_templates.php?delete=${id}`;
+                deleteModal.classList.remove('hidden');
+            };
+
+            cancelButton.addEventListener('click', () => {
+                deleteModal.classList.add('hidden');
+            });
+
+            // Close modal when clicking outside of it
+            window.addEventListener('click', (event) => {
+                if (event.target === deleteModal) {
+                    deleteModal.classList.add('hidden');
+                }
+            });
+
+            // Handle dropdown menus
+            const menuToggles = document.querySelectorAll('.menu-toggle');
+            menuToggles.forEach(toggle => {
+                toggle.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const id = toggle.dataset.id;
+                    const menu = document.querySelector(`.menu-content[data-id="${id}"]`);
+                    // Close all other menus
+                    document.querySelectorAll('.menu-content').forEach(otherMenu => {
+                        if (otherMenu !== menu) {
+                            otherMenu.classList.add('hidden');
+                        }
+                    });
+                    // Toggle the clicked menu
+                    menu.classList.toggle('hidden');
+                });
+            });
+
+            // Close dropdowns when clicking anywhere else on the page
+            window.addEventListener('click', (event) => {
+                document.querySelectorAll('.menu-content').forEach(menu => {
+                    if (!menu.classList.contains('hidden')) {
+                        menu.classList.add('hidden');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

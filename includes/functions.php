@@ -1,30 +1,28 @@
 <?php
 // includes/functions.php - Updated for DGC Transport System
 
+
 /**
- * Generate a unique PNR (Passenger Name Record) for booking
- * @return string Unique PNR
+ * Generate unique PNR
+ * Format: D + 5 random digits + 1 random uppercase letter
+ * Example: D12345X
  */
 function generatePNR() {
-    // Define the prefix
     $prefix = 'D';
-    
-    // Generate 5 random digits
-    $numbers = '';
-    for ($i = 0; $i < 5; $i++) {
-        $numbers .= random_int(0, 9);
-    }
-    
-    // Return the PNR
-    return $prefix . $numbers;
-}
+    $numbers = str_pad(strval(random_int(0, 99999)), 5, '0', STR_PAD_LEFT); // Always 5 digits
+    $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $randomLetter = $letters[random_int(0, 25)];
 
+    return $prefix . $numbers . $randomLetter;
+}
 
 /**
  * Verify Paystack payment
  * @param string $reference Payment reference
  * @return array Payment verification result with status and data
  */
+
+
 function verifyPaystackPayment($reference) {
     // Check if Paystack secret key is defined
     if (!defined('PAYSTACK_SECRET_KEY') || empty(PAYSTACK_SECRET_KEY)) {

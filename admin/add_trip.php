@@ -18,62 +18,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $time_slot_id = (int)$_POST['time_slot_id'];
     $price = (float)$_POST['price'];
     $recurrence_type = sanitizeInput($_POST['recurrence_type']);
-    $start_date = new DateTime($_POST['start_date']);
-    $recurrence_days = isset($_POST['recurrence_days']) ? implode(',', $_POST['recurrence_days']) : NULL;
-
-    // Calculate end date based on recurrence type from the start date
-    $end_date = clone $start_date;
+    $start_date = $_POST['start_date'];
+    $recurrence_days = isset($_POST['recurrence_days']) ? implode(',', $_POST['recurrence_days']) : '';
+    
+    // Calculate end date based on recurrence type
+    $start_date_obj = new DateTime($start_date);
+    $end_date_obj = clone $start_date_obj;
     switch ($recurrence_type) {
         case 'day':
-            $end_date->modify('+1 day');
             break;
         case 'week':
-            $end_date->modify('+1 week');
+            $end_date_obj->modify('+6 days');
             break;
         case 'month':
-            $end_date->modify('+1 month');
+            $end_date_obj->modify('+1 month -1 day');
             break;
         case 'year':
-            $end_date->modify('+1 year');
+            $end_date_obj->modify('+1 year -1 day');
             break;
     }
-    // Correct the date to be inclusive, a day, week, month, or year from start_date
-    $end_date->modify('-1 day'); 
+    $end_date = $end_date_obj->format('Y-m-d');
 
     // Validate inputs
     if ($pickup_city_id && $dropoff_city_id && $vehicle_type_id && $vehicle_id && $time_slot_id && $price > 0 && $start_date) {
-        $stmt = $conn->prepare("
-            INSERT INTO trip_schedules (
-                pickup_city_id, 
-                dropoff_city_id, 
-                vehicle_type_id, 
-                vehicle_id, 
-                time_slot_id, 
-                price, 
-                start_date, 
-                end_date,
-                recurrence_type,
-                recurrence_days
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param(
-            "iiiidsdsss",
-            $pickup_city_id,
-            $dropoff_city_id,
-            $vehicle_type_id,
-            $vehicle_id,
-            $time_slot_id,
-            $price,
-            $start_date->format('Y-m-d'),
-            $end_date->format('Y-m-d'),
-            $recurrence_type,
-            $recurrence_days
-        );
-        $stmt->execute();
-        $stmt->close();
-        
-        header('Location: ' . SITE_URL . '/admin/trips.php?success=1');
-        exit;
+        if ($pickup_city_id === $dropoff_city_id) {
+            $error = 'Pickup and dropoff cities cannot be the same.';
+        } else {
+            // Insert into trip_templates
+            $stmt = $conn->prepare("
+                INSERT INTO trip_templates (
+                    pickup_city_id, dropoff_city_id, vehicle_type_id, vehicle_id, 
+                    time_slot_id, price, recurrence_type, recurrence_days, start_date, end_date, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+            ");
+            $stmt->bind_param(
+                "iiiisdssss",
+                $pickup_city_id,
+                $dropoff_city_id,
+                $vehicle_type_id,
+                $vehicle_id,
+                $time_slot_id,
+                $price,
+                $recurrence_type,
+                $recurrence_days,
+                $start_date,
+                $end_date
+            );
+            if ($stmt->execute()) {
+                $stmt->close();
+                header('Location: ' . SITE_URL . '/admin/trips.php?success=1');
+                exit;
+            } else {
+                $error = 'Failed to create trip template. Please try again.';
+                $stmt->close();
+            }
+        }
     } else {
         $error = 'Please fill all required fields correctly.';
     }
@@ -112,7 +111,7 @@ require_once '../templates/sidebar.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Trip - DGC Transports</title>
+    <title>Add Trip Template - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -174,11 +173,6 @@ require_once '../templates/sidebar.php';
             color: #10b981;
             font-size: 0.9rem;
         }
-        .checkbox-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.5rem;
-        }
     </style>
     <script>
         function toggleRecurrenceDays() {
@@ -186,27 +180,14 @@ require_once '../templates/sidebar.php';
             document.getElementById('recurrence_days_section').style.display = (type === 'week') ? 'block' : 'none';
         }
 
-        function filterDropoffCities() {
-            const pickupCityId = document.getElementById('pickup_city_id').value;
-            const dropoffCitySelect = document.getElementById('dropoff_city_id');
-            const dropoffOptions = dropoffCitySelect.options;
-
-            // Loop through all options in the dropoff city select
-            for (let i = 0; i < dropoffOptions.length; i++) {
-                const option = dropoffOptions[i];
-                // Show all options by default
-                option.style.display = 'block';
-
-                // Hide the option that matches the selected pickup city
-                if (option.value === pickupCityId && pickupCityId !== '') {
-                    option.style.display = 'none';
-                }
+        function validateForm() {
+            const pickupCity = document.getElementById('pickup_city_id').value;
+            const dropoffCity = document.getElementById('dropoff_city_id').value;
+            if (pickupCity && dropoffCity && pickupCity === dropoffCity) {
+                alert('Pickup and dropoff cities cannot be the same.');
+                return false;
             }
-
-            // If the selected dropoff city is the same as the pickup city, reset it
-            if (dropoffCitySelect.value === pickupCityId) {
-                dropoffCitySelect.value = '';
-            }
+            return true;
         }
     </script>
 </head>
@@ -214,17 +195,17 @@ require_once '../templates/sidebar.php';
     <div class="container mx-auto mt-10 p-6">
         <div class="card p-8">
             <h1 class="text-3xl font-bold mb-6">
-                <i class="fas fa-plus text-red-600 mr-2"></i>Add New Trip
+                <i class="fas fa-plus text-red-600 mr-2"></i>Add New Trip Template
             </h1>
 
             <?php if (isset($error)): ?>
                 <p class="error-message mb-4"><?= htmlspecialchars($error) ?></p>
             <?php endif; ?>
 
-            <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6" onsubmit="return validateForm()">
                 <div>
                     <label for="pickup_city_id" class="label block mb-2">Pickup City</label>
-                    <select id="pickup_city_id" name="pickup_city_id" class="input-field" onchange="filterDropoffCities()" required>
+                    <select id="pickup_city_id" name="pickup_city_id" class="input-field" required>
                         <option value="">Select Pickup City</option>
                         <?php foreach ($cities as $city): ?>
                             <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
@@ -273,37 +254,36 @@ require_once '../templates/sidebar.php';
                 </div>
                 <div>
                     <label for="price" class="label block mb-2">Price (₦)</label>
-                    <input type="number" id="price" name="price" step="0.01" class="input-field" required>
+                    <input type="number" id="price" name="price" step="0.01" min="0" class="input-field" required>
                 </div>
                 <div>
                     <label for="start_date" class="label block mb-2">Start Date</label>
-                    <input type="date" id="start_date" name="start_date" class="input-field" required>
+                    <input type="date" id="start_date" name="start_date" class="input-field" min="<?= date('Y-m-d') ?>" required>
                 </div>
                 <div>
-                    <label for="recurrence_type" class="label block mb-2">Schedule For</label>
+                    <label for="recurrence_type" class="label block mb-2">Recurrence Type</label>
                     <select id="recurrence_type" name="recurrence_type" class="input-field" onchange="toggleRecurrenceDays()" required>
                         <option value="day">One Day</option>
-                        <option value="week">One Week</option>
-                        <option value="month">One Month</option>
-                        <option value="year">One Year</option>
+                        <option value="week">Weekly</option>
+                        <option value="month">Monthly</option>
+                        <option value="year">Yearly</option>
                     </select>
                 </div>
                 <div id="recurrence_days_section" style="display: none;">
                     <label class="label block mb-2">Days (for Weekly Schedule)</label>
-                    <div class="checkbox-grid">
-                        <?php 
-                        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                        foreach ($days as $day): ?>
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" name="recurrence_days[]" value="<?= $day ?>" class="text-red-600 focus:ring-red-600">
-                                <span><?= $day ?></span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
+                    <select multiple name="recurrence_days[]" class="input-field">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
                 </div>
                 <div class="md:col-span-2">
                     <button type="submit" class="btn-primary">
-                        <i class="fas fa-plus mr-2"></i>Create Trip Schedule
+                        <i class="fas fa-plus mr-2"></i>Create Trip Template
                     </button>
                 </div>
             </form>
