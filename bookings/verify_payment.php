@@ -1,250 +1,288 @@
 <?php
-// bookings/verify_payment.php
+// bookings/verify_payment.php - DGC Transport System Payment Verification
+
+// Start output buffering to prevent JSON corruption
+ob_start();
+
+// Configure error handling
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/error.log');
+
+// Start session and include dependencies
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
+require_once '../includes/functions.php';
 
+// Set timezone from config
+date_default_timezone_set(DEFAULT_TIMEZONE);
+
+// Set JSON headers
 header('Content-Type: application/json');
+header('Cache-Control: no-cache, must-revalidate');
+
+// Helper function to send JSON response
+function jsonResponse($data) {
+    ob_end_clean(); // Clear output buffer
+    if (!is_array($data) || json_encode($data) === false) {
+        error_log("Invalid JSON data: " . print_r($data, true));
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Internal server error: Invalid response data']);
+    } else {
+        echo json_encode($data);
+    }
+    exit();
+}
+
+// Validate request method
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jsonResponse(['success' => false, 'message' => 'Method not allowed']);
+}
+
+// Validate payment reference
+if (!isset($_POST['reference']) || empty($_POST['reference'])) {
+    jsonResponse(['success' => false, 'message' => 'Payment reference is required']);
+}
+
+$reference = trim($_POST['reference']);
+error_log("Starting payment verification for reference: $reference");
+
+// Verify session reference
+if (!isset($_SESSION['payment_reference']) || $_SESSION['payment_reference'] !== $reference) {
+    error_log("Payment reference mismatch or session expired: $reference");
+    jsonResponse(['success' => false, 'message' => 'Payment reference mismatch or session expired']);
+}
+
+// Check required session data
+if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_seats']) || !isset($_SESSION['passenger_details'])) {
+    error_log("Missing session data: " . json_encode([
+        'selected_trip' => $_SESSION['selected_trip'] ?? 'not set',
+        'selected_seats' => $_SESSION['selected_seats'] ?? 'not set',
+        'passenger_details' => $_SESSION['passenger_details'] ?? 'not set'
+    ]));
+    jsonResponse(['success' => false, 'message' => 'Booking details not found in session']);
+}
+
+$trip = $_SESSION['selected_trip'];
+$selected_seats = $_SESSION['selected_seats'];
+$passenger_details = $_SESSION['passenger_details'];
+
+// Validate trip ID
+$trip_id = isset($trip['trip_id']) ? (int)$trip['trip_id'] : 0;
+if ($trip_id <= 0) {
+    error_log("Invalid trip ID: $trip_id");
+    jsonResponse(['success' => false, 'message' => 'Invalid trip ID']);
+}
+
+// Validate trip existence and status
+$trip_data = getTripById($conn, $trip_id);
+if (!$trip_data) {
+    error_log("Trip not found or inactive: $trip_id");
+    jsonResponse(['success' => false, 'message' => 'Invalid or inactive trip']);
+}
+
+// Validate seat availability
+$conflicting_seats = checkSeatAvailabilityForTrip($conn, $selected_seats, $trip_id);
+if (!empty($conflicting_seats)) {
+    error_log("Conflicting seats for trip $trip_id: " . implode(', ', $conflicting_seats));
+    jsonResponse(['success' => false, 'message' => 'Selected seats are no longer available: ' . implode(', ', $conflicting_seats)]);
+}
+
+// Validate passenger details
+if (!isValidEmail($passenger_details['email']) || !isValidPhone($passenger_details['phone']) || !isValidName($passenger_details['passenger_name'])) {
+    error_log("Invalid passenger details: " . json_encode($passenger_details));
+    jsonResponse(['success' => false, 'message' => 'Invalid passenger details']);
+}
+
+// Calculate total amount
+$total_amount = count($selected_seats) * $trip['price'];
+
+// Generate unique PNR
+$pnr = generatePNR();
+
+// Handle user_id (optional)
+$user_id = null;
+if (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+    $user_check = $conn->prepare("SELECT id FROM users WHERE id = ?");
+    if (!$user_check) {
+        error_log("Prepare user check failed: " . $conn->error);
+        jsonResponse(['success' => false, 'message' => 'Database error']);
+    }
+    $user_check->bind_param("i", $_SESSION['user_id']);
+    $user_check->execute();
+    $user_result = $user_check->get_result();
+    if ($user_result->num_rows > 0) {
+        $user_id = $_SESSION['user_id'];
+    }
+    $user_check->close();
+}
+
+// Begin database transaction
+$conn->begin_transaction();
 
 try {
-    if (!isset($_POST['reference']) || !isset($_SESSION['payment_reference'])) {
-        throw new Exception('Invalid payment reference');
-    }
-
-    $reference = $_POST['reference'];
-    $session_reference = $_SESSION['payment_reference'];
-
-    // Verify the reference matches what we stored
-    if ($reference !== $session_reference) {
-        throw new Exception('Payment reference mismatch');
-    }
-
     // Verify payment with Paystack
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-        CURLOPT_URL => "https://api.paystack.co/transaction/verify/" . $reference,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => "",
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => "GET",
-        CURLOPT_HTTPHEADER => array(
-            "Authorization: Bearer " . PAYSTACK_SECRET_KEY,
-            "Cache-Control: no-cache",
-        ),
-    ));
+    error_log("Calling verifyPaystackPayment for reference: $reference");
+    $verification_result = verifyPaystackPayment($reference);
+    error_log("Paystack verification result: " . json_encode($verification_result));
 
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    if ($err) {
-        throw new Exception('Payment verification failed: ' . $err);
+    if (!$verification_result['status']) {
+        throw new Exception($verification_result['message']);
     }
 
-    $paystack_response = json_decode($response, true);
+    $payment_data = $verification_result['data'];
+    $paid_amount_in_kobo = $payment_data['amount'];
+    $paid_amount = $paid_amount_in_kobo / 100;
+    $gateway_reference = $payment_data['reference'];
+    $payment_method = isset($payment_data['channel']) ? $payment_data['channel'] : 'Unknown';
 
-    if (!$paystack_response['status'] || $paystack_response['data']['status'] !== 'success') {
-        throw new Exception('Payment was not successful');
+    // Verify payment amount
+    if ($paid_amount < $total_amount) {
+        throw new Exception("Amount mismatch: paid ₦{$paid_amount}, expected ₦{$total_amount}");
     }
 
-    // Get session data
-    if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_seats']) || !isset($_SESSION['passenger_details'])) {
-        throw new Exception('Session data missing');
+    // Extract trip data with defaults
+    $pickup_city_id = isset($trip['pickup_city_id']) ? (int)$trip['pickup_city_id'] : 1;
+    $dropoff_city_id = isset($trip['dropoff_city_id']) ? (int)$trip['dropoff_city_id'] : 2;
+    $vehicle_type_id = isset($trip['vehicle_type_id']) ? (int)$trip['vehicle_type_id'] : 1;
+    $trip_date = isset($trip['trip_date']) ? $trip['trip_date'] : date('Y-m-d');
+
+    // Insert booking
+    error_log("Inserting booking with PNR: $pnr");
+    $stmt = $conn->prepare("
+        INSERT INTO `bookings` 
+        (pnr, user_id, passenger_name, email, phone, pickup_city_id, dropoff_city_id, vehicle_type_id, trip_id, total_amount, payment_status, departure_date, status, created_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, 'confirmed', NOW())
+    ");
+    if (!$stmt) {
+        throw new Exception('Prepare booking statement failed: ' . $conn->error);
     }
 
-    $trip = $_SESSION['selected_trip'];
-    $selected_seats = $_SESSION['selected_seats'];
-    $passenger_details = $_SESSION['passenger_details'];
-    $total_amount = count($selected_seats) * $trip['price'];
+    $stmt->bind_param("sisssiiiids", 
+        $pnr,
+        $user_id,
+        $passenger_details['passenger_name'],
+        $passenger_details['email'],
+        $passenger_details['phone'],
+        $pickup_city_id,
+        $dropoff_city_id,
+        $vehicle_type_id,
+        $trip_id,
+        $total_amount,
+        $trip_date
+    );
 
-    // FIXED: Better amount verification
-    // Convert both amounts to integers (kobo) for exact comparison
-    $paid_amount_kobo = (int) $paystack_response['data']['amount'];
-    $expected_amount_kobo = (int) ($total_amount * 100);
+    if (!$stmt->execute()) {
+        throw new Exception('Execute booking insert failed: ' . $stmt->error);
+    }
     
-    // Log for debugging
-    error_log("Payment verification - Expected: ₦$total_amount ($expected_amount_kobo kobo), Paid: " . ($paid_amount_kobo/100) . " (₦$paid_amount_kobo kobo)");
-    
-    if ($paid_amount_kobo !== $expected_amount_kobo) {
-        throw new Exception("Payment amount mismatch. Expected: ₦$total_amount, Received: ₦" . ($paid_amount_kobo/100));
+    $booking_id = $conn->insert_id;
+    if (!$booking_id) {
+        throw new Exception('Failed to get booking ID');
     }
 
-    // Additional security checks
-    if ($paystack_response['data']['currency'] !== 'NGN') {
-        throw new Exception('Invalid currency');
+    // Insert seat bookings
+    error_log("Inserting seats for booking ID: $booking_id");
+    $stmt_seats = $conn->prepare("INSERT INTO `seat_bookings` (booking_id, seat_number) VALUES (?, ?)");
+    if (!$stmt_seats) {
+        throw new Exception('Prepare seats statement failed: ' . $conn->error);
     }
 
-    // Check if this payment has already been processed
-    $stmt = $conn->prepare("SELECT id FROM payments WHERE transaction_reference = ?");
-    $stmt->bind_param("s", $reference);
-    $stmt->execute();
-    $existing_payment = $stmt->get_result()->fetch_assoc();
-    
-    if ($existing_payment) {
-        throw new Exception('This payment has already been processed');
+    foreach ($selected_seats as $seat) {
+        $stmt_seats->bind_param("ii", $booking_id, $seat);
+        if (!$stmt_seats->execute()) {
+            throw new Exception('Insert seat failed for seat ' . $seat . ': ' . $stmt_seats->error);
+        }
     }
 
-    // Start database transaction
-    $conn->begin_transaction();
-
-    try {
-        // Double-check if seats are still available
-        $seat_placeholders = str_repeat('?,', count($selected_seats) - 1) . '?';
-        $stmt = $conn->prepare("
-            SELECT sb.seat_number 
-            FROM seat_bookings sb
-            JOIN bookings b ON sb.booking_id = b.id
-            WHERE b.trip_id = ? AND b.payment_status = 'paid' AND sb.seat_number IN ($seat_placeholders)
-        ");
-        
-        $params = array_merge([$trip['id']], $selected_seats);
-        $types = str_repeat('i', count($params));
-        $stmt->bind_param($types, ...$params);
-        $stmt->execute();
-        $conflicting_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-        if (!empty($conflicting_seats)) {
-            $conflicting_numbers = array_column($conflicting_seats, 'seat_number');
-            throw new Exception('Seats ' . implode(', ', $conflicting_numbers) . ' are no longer available');
-        }
-
-        // Generate unique booking ID and PNR
-        $booking_id = 'BOOK_' . uniqid() . '_' . time();
-        $pnr = 'DGC' . strtoupper(substr(uniqid(), -6));
-
-        // Create booking record
-        $stmt = $conn->prepare("
-            INSERT INTO bookings (
-                id, pnr, passenger_name, email, phone, emergency_contact, 
-                special_requests, pickup_city_id, dropoff_city_id, 
-                vehicle_type_id, trip_id, total_amount, payment_status, 
-                departure_date, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, 'confirmed', NOW())
-        ");
-        
-        $stmt->bind_param(
-            "ssssssiiiidds",
-            $booking_id,
-            $pnr,
-            $passenger_details['passenger_name'],
-            $passenger_details['email'],
-            $passenger_details['phone'],
-            $passenger_details['emergency_contact'] ?? '',
-            $passenger_details['special_requests'] ?? '',
-            $trip['pickup_city_id'],
-            $trip['dropoff_city_id'],
-            $trip['vehicle_type_id'],
-            $trip['id'],
-            $total_amount,
-            $trip['trip_date']
-        );
-        
-        if (!$stmt->execute()) {
-            throw new Exception('Failed to create booking: ' . $stmt->error);
-        }
-
-        // Get the actual database booking ID
-        $db_booking_id = $conn->insert_id;
-
-        // Create seat booking records
-        $stmt = $conn->prepare("INSERT INTO seat_bookings (booking_id, seat_number) VALUES (?, ?)");
-        foreach ($selected_seats as $seat_number) {
-            $stmt->bind_param("si", $booking_id, $seat_number);
-            if (!$stmt->execute()) {
-                throw new Exception('Failed to book seat ' . $seat_number);
-            }
-        }
-
-        // Create payment record with additional Paystack data
-        $stmt = $conn->prepare("
-            INSERT INTO payments (
-                booking_id, amount, transaction_reference, gateway_reference, 
-                payment_method, status, gateway_response, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'completed', ?, NOW())
-        ");
-        
-        $gateway_reference = $paystack_response['data']['gateway_response'] ?? '';
-        $payment_method = $paystack_response['data']['authorization']['channel'] ?? 'card';
-        $gateway_response = json_encode($paystack_response['data']);
-        
-        $stmt->bind_param(
-            "sdssss", 
-            $booking_id, 
-            $total_amount, 
-            $reference, 
-            $gateway_reference,
-            $payment_method,
-            $gateway_response
-        );
-        
-        if (!$stmt->execute()) {
-            throw new Exception('Failed to record payment');
-        }
-
-        // Update trip booked seats count
-        $stmt = $conn->prepare("
-            UPDATE trips 
-            SET booked_seats = (
-                SELECT COUNT(*) 
-                FROM seat_bookings sb 
-                JOIN bookings b ON sb.booking_id = b.id 
-                WHERE b.trip_id = ? AND b.payment_status = 'paid'
-            )
-            WHERE id = ?
-        ");
-        $stmt->bind_param("ii", $trip['id'], $trip['id']);
-        $stmt->execute();
-
-        // Commit transaction
-        $conn->commit();
-
-        // Store booking info in session for confirmation page
-        $_SESSION['booking_confirmation'] = [
-            'booking_id' => $booking_id,
-            'pnr' => $pnr,
-            'passenger_name' => $passenger_details['passenger_name'],
-            'email' => $passenger_details['email'],
-            'phone' => $passenger_details['phone'],
-            'trip' => $trip,
-            'selected_seats' => $selected_seats,
-            'total_amount' => $total_amount,
-            'payment_reference' => $reference,
-            'payment_method' => $payment_method
-        ];
-
-        // Clear booking-related session data
-        unset($_SESSION['selected_trip']);
-        unset($_SESSION['selected_seats']);
-        unset($_SESSION['selected_num_seats']);
-        unset($_SESSION['passenger_details']);
-        unset($_SESSION['payment_reference']);
-
-        // Log successful booking
-        error_log("Booking successful: ID = $booking_id, PNR = $pnr, Amount = ₦$total_amount, Reference = $reference");
-
-        // Send confirmation email (implement this function if needed)
-        // sendBookingConfirmationEmail($booking_id, $passenger_details['email']);
-
-        echo json_encode([
-            'success' => true,
-            'booking_id' => $booking_id,
-            'pnr' => $pnr,
-            'message' => 'Payment successful and booking confirmed'
-        ]);
-
-    } catch (Exception $e) {
-        $conn->rollback();
-        error_log("Booking transaction failed: " . $e->getMessage());
-        throw $e;
+    // Update trip booked seats
+    error_log("Updating trip ID: $trip_id with booked seats: " . count($selected_seats));
+    $stmt_trip = $conn->prepare("UPDATE `trips` SET booked_seats = booked_seats + ? WHERE id = ?");
+    if (!$stmt_trip) {
+        throw new Exception('Prepare trip update failed: ' . $conn->error);
     }
+
+    $num_seats = count($selected_seats);
+    $stmt_trip->bind_param("ii", $num_seats, $trip_id);
+    if (!$stmt_trip->execute()) {
+        throw new Exception('Update trip failed: ' . $stmt_trip->error);
+    }
+
+    // Insert payment record
+    error_log("Inserting payment for booking ID: $booking_id");
+    $stmt_payment = $conn->prepare("
+        INSERT INTO `payments` 
+        (booking_id, amount, transaction_reference, gateway_reference, payment_method, status, gateway_response, created_at) 
+        VALUES (?, ?, ?, ?, ?, 'completed', ?, NOW())
+    ");
+    if (!$stmt_payment) {
+        throw new Exception('Prepare payment failed: ' . $conn->error);
+    }
+
+    $json_response = json_encode($payment_data);
+    $stmt_payment->bind_param("idssss", 
+        $booking_id,          // i - integer
+        $paid_amount,         // d - decimal
+        $reference,           // s - string
+        $gateway_reference,   // s - string
+        $payment_method,      // s - string
+        $json_response        // s - string
+    );
+
+    if (!$stmt_payment->execute()) {
+        throw new Exception('Insert payment failed: ' . $stmt_payment->error);
+    }
+
+    // Commit transaction
+    $conn->commit();
+
+    // Store booking confirmation data
+    $_SESSION['booking_confirmation'] = [
+        'pnr' => $pnr,
+        'booking_id' => $booking_id,
+        'passenger_name' => $passenger_details['passenger_name'],
+        'email' => $passenger_details['email'],
+        'phone' => $passenger_details['phone'],
+        'selected_seats' => $selected_seats,
+        'total_amount' => $total_amount,
+        'payment_method' => $payment_method,
+        'payment_reference' => $reference,
+        'trip' => $trip
+    ];
+
+    // Clear booking session data
+    unset($_SESSION['selected_trip']);
+    unset($_SESSION['selected_seats']);
+    unset($_SESSION['passenger_details']);
+    unset($_SESSION['payment_reference']);
+
+    // Return success response with redirect URL
+    jsonResponse([
+        'success' => true,
+        'message' => 'Payment verified and booking confirmed successfully',
+        'pnr' => $pnr,
+        'booking_id' => $booking_id,
+        'redirect_url' => "booking_confirmation.php?pnr=" . urlencode($pnr)
+    ]);
 
 } catch (Exception $e) {
-    error_log("Payment verification error: " . $e->getMessage());
-    echo json_encode([
+    $conn->rollback();
+    error_log("Payment verification error for reference $reference: " . $e->getMessage());
+    http_response_code(500);
+    jsonResponse([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => 'Payment verification failed: ' . $e->getMessage(),
+        'reference' => $reference
     ]);
+} finally {
+    // Close statements and connection
+    if (isset($stmt)) $stmt->close();
+    if (isset($stmt_seats)) $stmt_seats->close();
+    if (isset($stmt_trip)) $stmt_trip->close();
+    if (isset($stmt_payment)) $stmt_payment->close();
+    $conn->close();
 }
 ?>

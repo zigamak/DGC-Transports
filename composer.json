@@ -1,0 +1,14 @@
+{
+    "require": {
+        "tecnickcom/tcpdf": "^6.6",
+        "endroid/qrcode": "^4.8",
+        "phpmailer/phpmailer": "^6.10",
+        "phpoffice/phpspreadsheet": "^2.1",
+        "endroid/qr-code": "^5.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    }
+}

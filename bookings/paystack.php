@@ -33,6 +33,7 @@ $email = $passenger_details['email'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment - <?= SITE_NAME ?></title>
+    <!-- Note: Replace Tailwind CDN with local build for production (see https://tailwindcss.com/docs/installation) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -263,32 +264,32 @@ $email = $passenger_details['email'];
             countdown.textContent = 'Initiating payment...';
 
             const handler = PaystackPop.setup({
-                key: '<?= PAYSTACK_PUBLIC_KEY ?>',
-                email: '<?= htmlspecialchars($email) ?>',
-                amount: <?= $amount_in_kobo ?>,
+                key: <?php echo json_encode(PAYSTACK_PUBLIC_KEY); ?>,
+                email: <?php echo json_encode($email); ?>,
+                amount: <?php echo json_encode($amount_in_kobo); ?>,
                 currency: 'NGN',
-                ref: '<?= $reference ?>',
+                ref: <?php echo json_encode($reference); ?>,
                 metadata: {
                     custom_fields: [
                         {
                             display_name: "Passenger Name",
                             variable_name: "passenger_name",
-                            value: "<?= htmlspecialchars($passenger_details['passenger_name']) ?>"
+                            value: <?php echo json_encode($passenger_details['passenger_name']); ?>
                         },
                         {
                             display_name: "Trip Route",
                             variable_name: "trip_route",
-                            value: "<?= htmlspecialchars($trip['pickup_city']) ?> to <?= htmlspecialchars($trip['dropoff_city']) ?>"
+                            value: <?php echo json_encode($trip['pickup_city'] . ' to ' . $trip['dropoff_city']); ?>
                         },
                         {
                             display_name: "Seats",
                             variable_name: "seats",
-                            value: "<?= implode(', ', $selected_seats) ?>"
+                            value: <?php echo json_encode(implode(', ', $selected_seats)); ?>
                         },
                         {
                             display_name: "Trip ID",
                             variable_name: "trip_id",
-                            value: "<?= $trip['id'] ?>"
+                            value: <?php echo json_encode($trip['trip_id']); ?>
                         }
                     ]
                 },
@@ -300,7 +301,7 @@ $email = $passenger_details['email'];
                 onClose: function() {
                     // Reset button if user closes payment modal
                     payButton.disabled = false;
-                    payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?= number_format($total_amount, 0) ?> Now';
+                    payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?php echo number_format($total_amount, 0); ?> Now';
                     spinner.classList.add('hidden');
                     countdown.textContent = 'Payment cancelled. Click "Pay Now" to try again.';
                 }
@@ -322,13 +323,13 @@ $email = $passenger_details['email'];
                 hideLoading();
                 if (data.success) {
                     // Redirect to confirmation page
-                    window.location.href = 'booking_confirmation.php?booking_id=' + data.booking_id;
+window.location.href = data.redirect_url;
                 } else {
                     alert('Payment verification failed: ' + (data.message || 'Unknown error'));
                     // Reset payment button
                     const payButton = document.getElementById('payButton');
                     payButton.disabled = false;
-                    payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?= number_format($total_amount, 0) ?> Now';
+                    payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?php echo number_format($total_amount, 0); ?> Now';
                     document.getElementById('spinner').classList.add('hidden');
                     document.getElementById('countdown').textContent = 'Payment failed. Click "Pay Now" to try again.';
                 }
@@ -340,7 +341,7 @@ $email = $passenger_details['email'];
                 // Reset payment button
                 const payButton = document.getElementById('payButton');
                 payButton.disabled = false;
-                payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?= number_format($total_amount, 0) ?> Now';
+                payButton.innerHTML = '<i class="fas fa-lock mr-2"></i>Pay ₦<?php echo number_format($total_amount, 0); ?> Now';
                 document.getElementById('spinner').classList.add('hidden');
                 document.getElementById('countdown').textContent = 'Error occurred. Click "Pay Now" to try again.';
             });

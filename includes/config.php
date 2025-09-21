@@ -16,8 +16,8 @@ define('FROM_NAME', 'Smart Invites');
 define('SMTP_SECURE', 'tls');
 
 // Payment gateway settings
-define('PAYSTACK_SECRET_KEY', 'sk_test_be01403681f196171d7700d04e98bbffbb067125');
-define('PAYSTACK_PUBLIC_KEY', 'pk_test_3f71f73029c6f1b2e9564341cbfe57c9edde49f9');
+define('PAYSTACK_SECRET_KEY', 'sk_test_6ceb75d8532032bc4bdb45113b71d0e95c9b7afc');
+define('PAYSTACK_PUBLIC_KEY', 'pk_test_3446d9fc9c4e3851058d1ba46b326e762ec72319');
 
 // Application settings
 define('DEFAULT_TIMEZONE', 'Africa/Lagos');

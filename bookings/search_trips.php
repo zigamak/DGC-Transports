@@ -40,11 +40,11 @@ $dropoff_city_query->bind_param("i", $search['dropoff_city_id']);
 $dropoff_city_query->execute();
 $dropoff_city = $dropoff_city_query->get_result()->fetch_assoc()['name'];
 
-// Generate available trips dynamically based on vehicle-time slot combinations
-// This query creates virtual trips for any date by combining vehicles and time slots
+// Query to fetch available trips
 $trips_query = "
     SELECT 
-        CONCAT(v.id, '-', ts.id, '-', ?) as virtual_trip_id,
+        CONCAT(t.id, '-', ?) as virtual_trip_id,
+        t.id as trip_id,
         v.id as vehicle_id,
         v.vehicle_number,
         v.driver_name,
@@ -55,34 +55,25 @@ $trips_query = "
         ts.id as time_slot_id,
         ts.departure_time,
         ts.arrival_time,
-        ? as trip_date,
-        (vt.capacity - COALESCE(booked_seats.seats_booked, 0)) as available_seats
-    FROM vehicles v
+        t.trip_date,
+        (vt.capacity - COALESCE(t.booked_seats, 0)) as available_seats,
+        COALESCE(t.booked_seats, 0) as booked_seats_count
+    FROM trips t
+    JOIN vehicles v ON t.vehicle_id = v.id
     JOIN vehicle_types vt ON v.vehicle_type_id = vt.id
-    CROSS JOIN time_slots ts
-    LEFT JOIN (
-        SELECT 
-            t.vehicle_id,
-            t.time_slot_id,
-            COUNT(sb.seat_number) as seats_booked
-        FROM trips t
-        JOIN bookings b ON t.id = b.trip_id
-        JOIN seat_bookings sb ON b.id = sb.booking_id
-        WHERE b.payment_status = 'paid'
-        AND t.pickup_city_id = ?
-        AND t.dropoff_city_id = ?
-        AND t.trip_date = ?
-        GROUP BY t.vehicle_id, t.time_slot_id
-    ) booked_seats ON v.id = booked_seats.vehicle_id AND ts.id = booked_seats.time_slot_id
-    WHERE v.vehicle_type_id = ?
-    AND (vt.capacity - COALESCE(booked_seats.seats_booked, 0)) >= ?
+    JOIN time_slots ts ON t.time_slot_id = ts.id
+    WHERE t.pickup_city_id = ?
+    AND t.dropoff_city_id = ?
+    AND t.trip_date = ?
+    AND v.vehicle_type_id = ?
+    AND t.status = 'active'
+    AND (vt.capacity - COALESCE(t.booked_seats, 0)) >= ?
     ORDER BY ts.departure_time
 ";
 
 $stmt = $conn->prepare($trips_query);
-$stmt->bind_param("ssiiisi", 
+$stmt->bind_param("siisii", 
     $search['departure_date'],
-    $search['departure_date'], 
     $search['pickup_city_id'], 
     $search['dropoff_city_id'], 
     $search['departure_date'],
@@ -143,6 +134,14 @@ $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 </div>
             </div>
 
+            <!-- Debug Information (remove in production) -->
+            <?php if (isset($_GET['debug'])): ?>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <h4 class="font-bold mb-2">Debug Information:</h4>
+                    <pre class="text-xs"><?= print_r($trips, true) ?></pre>
+                </div>
+            <?php endif; ?>
+
             <!-- Trips List -->
             <?php if (empty($trips)): ?>
                 <div class="bg-white rounded-xl shadow-lg p-8 text-center">
@@ -188,18 +187,26 @@ $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
                                     <!-- Seats and Price -->
                                     <div class="text-center">
-                                        <div class="text-lg font-bold text-green-600 mb-1">
+                                        <div class="text-lg font-bold <?= $trip['available_seats'] > 3 ? 'text-green-600' : ($trip['available_seats'] > 1 ? 'text-yellow-600' : 'text-red-600') ?> mb-1">
                                             <?= $trip['available_seats'] ?> seats left
                                         </div>
                                         <div class="text-sm text-gray-500">
                                             of <?= $trip['capacity'] ?> total
                                         </div>
+                                        <?php if ($trip['booked_seats_count'] > 0): ?>
+                                            <div class="text-xs text-gray-400 mt-1">
+                                                (<?= $trip['booked_seats_count'] ?> booked)
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
 
                                     <!-- Price and Book Button -->
                                     <div class="text-center">
                                         <div class="text-3xl font-bold text-primary mb-2">
                                             ₦<?= number_format($trip['price'] * $search['num_seats'], 0) ?>
+                                        </div>
+                                        <div class="text-sm text-gray-500 mb-3">
+                                            ₦<?= number_format($trip['price'], 0) ?> per seat
                                         </div>
                                         <button onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>)" 
                                                 class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-3 px-6 rounded-lg hover:from-secondary hover:to-primary transition-all duration-200">
