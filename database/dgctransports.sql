@@ -123,6 +123,16 @@ CREATE TABLE `payments` (
   FOREIGN KEY (`booking_id`) REFERENCES `bookings`(`id`) ON DELETE CASCADE
 );
 
+
+CREATE TABLE password_resets (
+    email VARCHAR(255) NOT NULL,
+    token VARCHAR(100) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    PRIMARY KEY (email),
+    INDEX idx_token (token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 -- Insert sample data
 INSERT INTO `cities` (`name`) VALUES
 ('Abuja'),

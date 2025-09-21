@@ -1,5 +1,5 @@
 <?php
-// bookings/search_trips.php
+//bookings/search_trips.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -110,6 +110,56 @@ $stmt->execute();
 $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+// Query for similar trips (same route, different date or vehicle type)
+$similar_trips = [];
+if (empty($trips)) {
+    $date_range_start = date('Y-m-d', strtotime($search['departure_date'] . ' -7 days'));
+    $date_range_end = date('Y-m-d', strtotime($search['departure_date'] . ' +7 days'));
+    $similar_trips_query = "
+        SELECT 
+            CONCAT(tt.id, '-', ti.trip_date) AS virtual_trip_id,
+            tt.id AS template_id,
+            v.id AS vehicle_id,
+            v.vehicle_number,
+            v.driver_name,
+            tt.vehicle_type_id,
+            vt.type AS vehicle_type,
+            vt.capacity,
+            tt.price,
+            ts.departure_time,
+            ts.arrival_time,
+            ti.trip_date,
+            COALESCE(ti.booked_seats, 0) AS booked_seats_count,
+            (vt.capacity - COALESCE(ti.booked_seats, 0)) AS available_seats
+        FROM trip_templates tt
+        JOIN vehicles v ON tt.vehicle_id = v.id
+        JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+        JOIN time_slots ts ON tt.time_slot_id = ts.id
+        LEFT JOIN trip_instances ti ON tt.id = ti.template_id AND ti.trip_date BETWEEN ? AND ? AND ti.status = 'active'
+        WHERE tt.pickup_city_id = ?
+            AND tt.dropoff_city_id = ?
+            AND tt.status = 'active'
+            AND ti.trip_date BETWEEN ? AND ?
+            AND (vt.capacity - COALESCE(ti.booked_seats, 0)) >= ?
+        ORDER BY ti.trip_date, ts.departure_time
+        LIMIT 5
+    ";
+    $stmt = $conn->prepare($similar_trips_query);
+    $stmt->bind_param(
+        "ssiissi",
+        $date_range_start,
+        $date_range_end,
+        $search['pickup_city_id'],
+        $search['dropoff_city_id'],
+        $date_range_start,
+        $date_range_end,
+        $search['num_seats']
+    );
+    $stmt->execute();
+    $similar_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -120,6 +170,9 @@ $stmt->close();
     <title>Available Trips - <?= SITE_NAME ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-red: #e30613;
@@ -128,35 +181,52 @@ $stmt->close();
             --white: #ffffff;
             --gray: #f5f5f5;
             --accent-blue: #3b82f6;
+            --slate-800: #1e293b;
         }
         body {
-            background: linear-gradient(135deg, var(--white), var(--gray));
-            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f4f8, #e2e8f0);
+            font-family: 'Poppins', sans-serif;
         }
         .container {
             max-width: 1280px;
         }
         .card {
             background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
         }
         .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            transform: translateY(-6px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1);
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
         }
         .btn-primary {
             background: linear-gradient(to right, var(--primary-red), var(--dark-red));
             color: var(--white);
             padding: 12px 24px;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
             transition: background 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 15px rgba(227, 6, 19, 0.4);
         }
         .btn-primary:hover {
             background: linear-gradient(to right, var(--dark-red), var(--primary-red));
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.5);
         }
         .error-message {
             color: var(--primary-red);
@@ -164,57 +234,51 @@ $stmt->close();
             margin-bottom: 16px;
             display: flex;
             align-items: center;
+            background: #ffe6e6;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--primary-red);
         }
         .error-message i {
-            margin-right: 6px;
+            margin-right: 8px;
         }
-        
-        /* Mobile-specific styles */
-        @media (max-width: 767px) {
-            .trip-details-grid {
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
-            }
-            .trip-details-grid > div:not(:last-child) {
-                border-bottom: 1px solid #e5e7eb;
-                padding-bottom: 1.5rem;
-            }
-            .time-route-section {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .time-route-section > div {
-                text-align: left;
-            }
-            .time-route-section .flex-1 {
-                display: none; /* Hide horizontal line on mobile */
-            }
-            .time-route-section .w-3 {
-                margin-right: 0.5rem;
-            }
-            .time-route-section .text-2xl {
-                font-size: 1.5rem;
-            }
-            .trip-card-price, .trip-card-seats {
-                text-align: center;
-            }
-            .trip-card-price .text-3xl {
-                font-size: 2rem;
-            }
-            .trip-card-price .btn-primary {
-                width: 100%;
-            }
+        .seat-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .seat-badge.high {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .seat-badge.medium {
+            background-color: #fef3c7;
+            color: #b45309;
+        }
+        .seat-badge.low {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .info-panel {
+            background-color: var(--white);
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
     </style>
 </head>
 <body>
     <div class="container mx-auto mt-6 p-4 md:mt-12 md:p-6">
-        <div class="card p-6 md:p-10">
+        <div class="card p-6 md:p-10 mb-8">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-8">
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4 md:mb-0">
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-4 md:mb-0">
                     <i class="fas fa-bus text-primary-red mr-3"></i>Available Trips
                 </h1>
-                <a href="../index.php" class="text-primary-red hover:text-dark-red font-semibold flex items-center justify-center md:justify-start">
+                <a href="../index.php" class="text-primary-red hover:text-dark-red font-semibold flex items-center transition-colors duration-200">
                     <i class="fas fa-arrow-left mr-2"></i>New Search
                 </a>
             </div>
@@ -223,15 +287,15 @@ $stmt->close();
                 <p class="error-message"><i class="fas fa-exclamation-circle"></i><?= htmlspecialchars($error) ?></p>
             <?php endif; ?>
 
-            <div class="flex flex-wrap items-center space-y-4 md:space-y-0 md:space-x-6 text-gray-600 mb-6 md:mb-8">
+            <div class="info-panel flex flex-wrap items-center justify-between space-y-4 md:space-y-0 md:space-x-6 text-gray-600 mb-6 md:mb-8">
                 <div class="flex items-center w-full md:w-auto">
                     <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
-                    <span class="font-semibold"><?= htmlspecialchars($pickup_city) ?></span>
-                    <i class="fas fa-arrow-right mx-3 text-gray-400"></i>
-                    <span class="font-semibold"><?= htmlspecialchars($dropoff_city) ?></span>
+                    <span class="font-semibold text-slate-800"><?= htmlspecialchars($pickup_city) ?></span>
+                    <i class="fas fa-long-arrow-alt-right mx-3 text-gray-400"></i>
+                    <span class="font-semibold text-slate-800"><?= htmlspecialchars($dropoff_city) ?></span>
                 </div>
                 <div class="flex items-center w-full md:w-auto">
-                    <i class="fas fa-calendar text-primary-red mr-2"></i>
+                    <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
                     <span><?= date('D, M j, Y', strtotime($search['departure_date'])) ?></span>
                 </div>
                 <div class="flex items-center w-full md:w-auto">
@@ -242,71 +306,119 @@ $stmt->close();
 
             <?php if (empty($trips)): ?>
                 <div class="text-center py-8 md:py-12">
-                    <i class="fas fa-bus text-5xl md:text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-xl md:text-2xl font-bold text-gray-700 mb-2">No Trips Available</h3>
-                    <p class="text-gray-500 mb-4 md:mb-6">Sorry, no trips found for your selected route, date, and vehicle type.</p>
+                    <i class="fas fa-bus text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-700 mb-2">No Trips Available</h3>
+                    <p class="text-gray-500 mb-6">Sorry, no trips found for your selected route, date, and vehicle type.</p>
                     <a href="../index.php" class="btn-primary">
                         <i class="fas fa-search mr-2"></i>Try Different Search
                     </a>
                 </div>
-            <?php else: ?>
-                <div class="space-y-4 md:space-y-6">
-                    <?php foreach ($trips as $trip): ?>
-                        <div class="card p-4 md:p-6">
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 items-center trip-details-grid">
-                                <div class="md:col-span-2 time-route-section">
-                                    <div class="flex items-center space-x-4 mb-2">
+                <?php if (!empty($similar_trips)): ?>
+                    <div class="mt-8">
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4 border-l-4 border-primary-red pl-4">Similar Trips Available</h3>
+                        <div class="space-y-6">
+                            <?php foreach ($similar_trips as $trip): ?>
+                                <div class="card p-4 md:p-6" onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                        <div class="md:col-span-2">
+                                            <div class="flex items-center space-x-4 mb-2">
+                                                <div>
+                                                    <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['departure_time'])) ?></div>
+                                                    <div class="text-sm text-gray-500">Departure</div>
+                                                </div>
+                                                <div class="flex-1 flex items-center relative">
+                                                    <div class="w-3 h-3 bg-primary-red rounded-full"></div>
+                                                    <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
+                                                    <div class="w-3 h-3 bg-primary-red rounded-full"></div>
+                                                </div>
+                                                <div>
+                                                    <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['arrival_time'])) ?></div>
+                                                    <div class="text-sm text-gray-500">Arrival</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-sm text-gray-600 mt-2">
+                                                <i class="fas fa-bus mr-2 text-primary-red"></i>
+                                                <span><?= htmlspecialchars($trip['vehicle_type']) ?> - <?= htmlspecialchars($trip['vehicle_number']) ?> (Driver: <?= htmlspecialchars($trip['driver_name']) ?>)</span>
+                                            </div>
+                                            <div class="text-sm text-gray-600 mt-1">
+                                                <i class="fas fa-calendar-alt mr-2 text-primary-red"></i>
+                                                <span>Date: <?= date('D, M j, Y', strtotime($trip['trip_date'])) ?></span>
+                                            </div>
+                                        </div>
                                         <div class="text-center">
-                                            <div class="text-xl md:text-2xl font-bold text-black">
-                                                <?= date('H:i', strtotime($trip['departure_time'])) ?>
+                                            <?php
+                                                $seats_class = 'low';
+                                                if ($trip['available_seats'] > 5) {
+                                                    $seats_class = 'high';
+                                                } elseif ($trip['available_seats'] > 2) {
+                                                    $seats_class = 'medium';
+                                                }
+                                            ?>
+                                            <span class="seat-badge <?= $seats_class ?>"><i class="fas fa-chair mr-2"></i><?= $trip['available_seats'] ?> seats left</span>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-3xl font-bold text-primary-red mb-1">
+                                                ₦<?= number_format($trip['price'] * $search['num_seats'], 0) ?>
                                             </div>
                                             <div class="text-sm text-gray-500">
-                                                <?= date('h:i A', strtotime($trip['departure_time'])) ?>
+                                                ₦<?= number_format($trip['price'], 0) ?> per seat
                                             </div>
-                                            <div class="text-sm text-gray-500">Departure</div>
-                                        </div>
-                                        <div class="flex-1 flex items-center">
-                                            <div class="w-3 h-3 bg-primary-red rounded-full"></div>
-                                            <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
-                                            <div class="text-center">
-                                                <div class="text-xl md:text-2xl font-bold text-black">
-                                                    <?= date('H:i', strtotime($trip['arrival_time'])) ?>
-                                                </div>
-                                                <div class="text-sm text-gray-500">
-                                                    <?= date('h:i A', strtotime($trip['arrival_time'])) ?>
-                                                </div>
-                                                <div class="text-sm text-gray-500">Arrival</div>
-                                            </div>
+                                            <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
+                                                <i class="fas fa-ticket-alt mr-2"></i>Book Now
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="flex items-center text-sm text-gray-600 mt-2 md:mt-0">
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <div class="space-y-6">
+                    <?php foreach ($trips as $trip): ?>
+                        <div class="card p-4 md:p-6" onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')">
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                                <div class="md:col-span-2">
+                                    <div class="flex items-center space-x-4 mb-2">
+                                        <div>
+                                            <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['departure_time'])) ?></div>
+                                            <div class="text-sm text-gray-500">Departure</div>
+                                        </div>
+                                        <div class="flex-1 flex items-center relative">
+                                            <div class="w-3 h-3 bg-primary-red rounded-full"></div>
+                                            <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
+                                            <div class="w-3 h-3 bg-primary-red rounded-full"></div>
+                                        </div>
+                                        <div>
+                                            <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['arrival_time'])) ?></div>
+                                            <div class="text-sm text-gray-500">Arrival</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-2">
                                         <i class="fas fa-bus mr-2 text-primary-red"></i>
                                         <span><?= htmlspecialchars($trip['vehicle_type']) ?> - <?= htmlspecialchars($trip['vehicle_number']) ?> (Driver: <?= htmlspecialchars($trip['driver_name']) ?>)</span>
                                     </div>
                                 </div>
-                                <div class="text-center trip-card-seats">
-                                    <div class="text-lg font-bold <?= $trip['available_seats'] > 3 ? 'text-green-600' : ($trip['available_seats'] > 1 ? 'text-yellow-600' : 'text-red-600') ?> mb-1">
-                                        <?= $trip['available_seats'] ?> seats left
-                                    </div>
-                                    <div class="text-sm text-gray-500">
-                                        of <?= $trip['capacity'] ?> total
-                                    </div>
-                                    <?php if ($trip['booked_seats_count'] > 0): ?>
-                                        <div class="text-xs text-gray-400 mt-1">
-                                            (<?= $trip['booked_seats_count'] ?> booked)
-                                        </div>
-                                    <?php endif; ?>
+                                <div class="text-center">
+                                    <?php
+                                        $seats_class = 'low';
+                                        if ($trip['available_seats'] > 5) {
+                                            $seats_class = 'high';
+                                        } elseif ($trip['available_seats'] > 2) {
+                                            $seats_class = 'medium';
+                                        }
+                                    ?>
+                                    <span class="seat-badge <?= $seats_class ?>"><i class="fas fa-chair mr-2"></i><?= $trip['available_seats'] ?> seats left</span>
                                 </div>
-                                <div class="text-center trip-card-price">
-                                    <div class="text-2xl md:text-3xl font-bold text-primary-red mb-2">
+                                <div class="text-center">
+                                    <div class="text-3xl font-bold text-primary-red mb-1">
                                         ₦<?= number_format($trip['price'] * $search['num_seats'], 0) ?>
                                     </div>
-                                    <div class="text-sm text-gray-500 mb-3">
+                                    <div class="text-sm text-gray-500">
                                         ₦<?= number_format($trip['price'], 0) ?> per seat
                                     </div>
-                                    <button onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" 
-                                        class="btn-primary w-full">
-                                        <i class="fas fa-ticket-alt mr-2"></i>Select Trip
+                                    <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
+                                        <i class="fas fa-ticket-alt mr-2"></i>Book Now
                                     </button>
                                 </div>
                             </div>
@@ -319,14 +431,12 @@ $stmt->close();
 
     <script>
         function selectTrip(virtualTripId, numSeats, price, templateId, tripDate) {
-            // Disable all buttons to prevent multiple clicks
             const buttons = document.querySelectorAll('.btn-primary');
             buttons.forEach(btn => {
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
             });
 
-            // Prepare data for the POST request
             const data = new URLSearchParams({
                 virtual_trip_id: virtualTripId,
                 num_seats: numSeats,
@@ -354,21 +464,17 @@ $stmt->close();
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                // Redirect to seat selection page
                 window.location.href = 'seat_selection.php';
             })
             .catch(error => {
-                // Re-enable buttons and restore text
                 buttons.forEach(btn => {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Select Trip';
+                    btn.innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Book Now';
                 });
-                // Display error message
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'error-message mt-4';
                 errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i>${error.message}`;
-                document.querySelector('.card').insertBefore(errorDiv, document.querySelector('.flex.items-center.space-x-6'));
-                // Scroll to top to show error
+                document.querySelector('.container .card').insertBefore(errorDiv, document.querySelector('.info-panel'));
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         }

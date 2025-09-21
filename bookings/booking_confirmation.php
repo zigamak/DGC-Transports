@@ -1,8 +1,8 @@
 <?php
-// bookings/booking_confirmation.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
+require_once '../libs/phpqrcode/qrlib.php'; // Include phpqrcode library
 
 // Get PNR from URL (supporting both 'pnr' and 'booking_id' for compatibility)
 $pnr = $_GET['pnr'] ?? $_GET['booking_id'] ?? '';
@@ -61,6 +61,14 @@ foreach ($db_bookings as $db_booking) {
     $db_bookings_by_pnr[$db_booking['pnr']] = $db_booking;
 }
 
+// Generate QR code for the first PNR
+$qr_code_dir = '../qrcodes/';
+if (!is_dir($qr_code_dir)) {
+    mkdir($qr_code_dir, 0755, true);
+}
+$qr_code_path = $qr_code_dir . 'pnr_' . $pnr . '.png';
+QRcode::png($pnr, $qr_code_path, QR_ECLEVEL_L, 4);
+
 require_once '../templates/header.php';
 ?>
 
@@ -97,221 +105,233 @@ require_once '../templates/header.php';
         .gradient-bg {
             background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
         }
+        .qr-code-img {
+            max-width: 120px;
+            border: 2px solid #1a1a1a;
+            border-radius: 8px;
+        }
+        @media (max-width: 640px) {
+            .text-4xl { font-size: 1.5rem; }
+            .text-2xl { font-size: 1.25rem; }
+            .text-xl { font-size: 1.125rem; }
+            .p-6 { padding: 1rem; }
+            .max-w-4xl { max-width: 100%; }
+            .px-4 { padding-left: 1rem; padding-right: 1rem; }
+            .gap-8 { gap: 1.5rem; }
+            .py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .px-6 { padding-left: 1rem; padding-right: 1rem; }
+        }
         @media print {
-            .no-print { display: none; }
             body { background: white; }
+            .no-print { display: none !important; }
+            .ticket-card { display: block; }
             .gradient-bg { background: #dc2626; }
+            .min-h-screen, .py-8, .max-w-4xl, .px-4 { padding: 0; margin: 0; }
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="min-h-screen py-8">
-        <div class="max-w-4xl mx-auto px-4">
-            <!-- Success Header -->
-            <div class="text-center mb-8">
-                <div class="checkmark-animation inline-block">
-                    <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
-                </div>
-                <h1 class="text-4xl font-bold text-gray-800 mb-2">Booking Confirmed!</h1>
-                <p class="text-lg text-gray-600">Your trip has been successfully booked</p>
+<body class="bg-gray-50 min-h-screen py-8">
+    <div class="max-w-4xl mx-auto px-4">
+        <!-- Success Header -->
+        <div class="text-center mb-8 no-print">
+            <div class="checkmark-animation inline-block">
+                <i class="fas fa-check-circle text-4xl sm:text-6xl text-green-500 mb-4"></i>
             </div>
+            <h1 class="text-2xl sm:text-4xl font-bold text-gray-800 mb-2">Booking Confirmed!</h1>
+            <p class="text-base sm:text-lg text-gray-600">Your trip has been successfully booked</p>
+        </div>
 
-            <!-- Booking Details Card -->
-            <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
-                <!-- Header -->
-                <div class="gradient-bg text-white p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold"><?= SITE_NAME ?></h2>
-                            <p class="text-red-100">Electronic Ticket</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm text-red-100">PNR(s)</div>
-                            <div class="text-2xl font-bold"><?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?></div>
-                        </div>
+        <!-- Booking Details Card -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-8 ticket-card">
+            <!-- Header -->
+            <div class="gradient-bg text-white p-4 sm:p-6">
+                <div class="flex flex-col sm:flex-row items-center justify-between">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-bold"><?= SITE_NAME ?></h2>
+                        <p class="text-red-100 text-sm sm:text-base">Electronic Ticket</p>
+                    </div>
+                    <div class="text-center sm:text-right mt-2 sm:mt-0">
+                        <div class="text-xs sm:text-sm text-red-100">PNR(s)</div>
+                        <div class="text-lg sm:text-2xl font-bold"><?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Main Content -->
-                <div class="p-6">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <!-- Trip Details -->
-                        <div>
-                            <h3 class="text-xl font-bold mb-4 flex items-center">
-                                <i class="fas fa-route text-primary mr-3"></i>
-                                Trip Details
-                            </h3>
-                            
-                            <div class="space-y-3">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Route:</span>
-                                    <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['pickup_city']) ?> → <?= htmlspecialchars($booking_confirmation['trip']['dropoff_city']) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Date:</span>
-                                    <span class="font-semibold"><?= date('M j, Y', strtotime($booking_confirmation['trip']['trip_date'])) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Departure Time:</span>
-                                    <span class="font-semibold"><?= date('H:i', strtotime($booking_confirmation['trip']['departure_time'])) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Vehicle:</span>
-                                    <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['vehicle_type']) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Vehicle Number:</span>
-                                    <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['vehicle_number']) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Driver:</span>
-                                    <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['driver_name']) ?></span>
-                                </div>
+            <!-- Main Content -->
+            <div class="p-4 sm:p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                    <!-- Trip Details -->
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <i class="fas fa-route text-primary mr-2 sm:mr-3"></i>
+                            Trip Details
+                        </h3>
+                        <div class="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Route:</span>
+                                <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['pickup_city']) ?> → <?= htmlspecialchars($booking_confirmation['trip']['dropoff_city']) ?></span>
                             </div>
-
-                            <!-- Seats -->
-                            <div class="mt-6">
-                                <h4 class="font-semibold mb-2">Your Seats:</h4>
-                                <div class="flex flex-wrap gap-2">
-                                    <?php foreach ($booking_confirmation['selected_seats'] as $seat): ?>
-                                        <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                            Seat <?= $seat ?>
-                                        </span>
-                                    <?php endforeach; ?>
-                                </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Date:</span>
+                                <span class="font-semibold"><?= date('M j, Y', strtotime($booking_confirmation['trip']['trip_date'])) ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Departure Time:</span>
+                                <span class="font-semibold"><?= date('H:i', strtotime($booking_confirmation['trip']['departure_time'])) ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Vehicle:</span>
+                                <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['vehicle_type']) ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Vehicle Number:</span>
+                                <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['vehicle_number']) ?></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Driver:</span>
+                                <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['trip']['driver_name']) ?></span>
                             </div>
                         </div>
-
-                        <!-- Passenger Details -->
-                        <div>
-                            <h3 class="text-xl font-bold mb-4 flex items-center">
-                                <i class="fas fa-user text-primary mr-3"></i>
-                                Passenger Information
-                            </h3>
-                            
-                            <div class="space-y-4">
-                                <?php foreach ($booking_confirmation['passenger_details'] as $index => $passenger): ?>
-                                    <div class="border-t pt-2">
-                                        <h4 class="font-semibold mb-2">Passenger <?= $index + 1 ?> - Seat <?= $passenger['seat_number'] ?></h4>
-                                        <div class="space-y-2">
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">PNR:</span>
-                                                <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['pnrs'][$index]) ?></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">Name:</span>
-                                                <span class="font-semibold"><?= htmlspecialchars($passenger['name']) ?></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">Email:</span>
-                                                <span class="font-semibold"><?= htmlspecialchars($passenger['email']) ?></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">Phone:</span>
-                                                <span class="font-semibold"><?= htmlspecialchars($passenger['phone']) ?></span>
-                                            </div>
-                                            <?php if (!empty($passenger['emergency_contact'])): ?>
-                                                <div class="flex justify-between">
-                                                    <span class="text-gray-600">Emergency Contact:</span>
-                                                    <span class="font-semibold"><?= htmlspecialchars($passenger['emergency_contact']) ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if ($index === 0 && !empty($passenger['special_requests'])): ?>
-                                                <div class="flex justify-between">
-                                                    <span class="text-gray-600">Special Requests:</span>
-                                                    <span class="font-semibold"><?= htmlspecialchars($passenger['special_requests']) ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
+                        <div class="mt-4 sm:mt-6">
+                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Your Seats:</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <?php foreach ($booking_confirmation['selected_seats'] as $seat): ?>
+                                    <span class="bg-primary text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
+                                        Seat <?= $seat ?>
+                                    </span>
                                 <?php endforeach; ?>
                             </div>
-
-                            <!-- Payment Details -->
-                            <div class="mt-6">
-                                <h4 class="font-semibold mb-2">Payment Details:</h4>
-                                <div class="space-y-2 text-sm">
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Amount Paid:</span>
-                                        <span class="font-semibold text-green-600">₦<?= number_format($booking_confirmation['total_amount'], 0) ?></span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Payment Method:</span>
-                                        <span class="font-semibold"><?= ucfirst($booking_confirmation['payment_method']) ?></span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Reference:</span>
-                                        <span class="font-semibold text-xs"><?= htmlspecialchars($booking_confirmation['payment_reference']) ?></span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
-                    <!-- Booking Summary -->
-                    <div class="border-t pt-6 mt-6">
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <span class="text-lg font-semibold">Total Seats: <?= count($booking_confirmation['selected_seats']) ?></span>
-                                    <span class="text-gray-600 ml-4">× ₦<?= number_format($booking_confirmation['trip']['price'], 0) ?> each</span>
+                    <!-- Passenger Details -->
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                            <i class="fas fa-user text-primary mr-2 sm:mr-3"></i>
+                            Passenger Information
+                        </h3>
+                        <div class="space-y-3 sm:space-y-4 text-sm sm:text-base">
+                            <?php foreach ($booking_confirmation['passenger_details'] as $index => $passenger): ?>
+                                <div class="border-t pt-2">
+                                    <h4 class="font-semibold mb-2 text-sm sm:text-base">Passenger <?= $index + 1 ?> - Seat <?= $passenger['seat_number'] ?></h4>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">PNR:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($booking_confirmation['pnrs'][$index]) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Name:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($passenger['name']) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Email:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($passenger['email']) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Phone:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($passenger['phone']) ?></span>
+                                        </div>
+                                        <?php if (!empty($passenger['emergency_contact'])): ?>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Emergency Contact:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($passenger['emergency_contact']) ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($index === 0 && !empty($passenger['special_requests'])): ?>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Special Requests:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($passenger['special_requests']) ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
-                                <div class="text-2xl font-bold text-primary">
-                                    ₦<?= number_format($booking_confirmation['total_amount'], 0) ?>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="mt-4 sm:mt-6">
+                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Payment Details:</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Amount Paid:</span>
+                                    <span class="font-semibold text-green-600">₦<?= number_format($booking_confirmation['total_amount'], 0) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Payment Method:</span>
+                                    <span class="font-semibold"><?= ucfirst($booking_confirmation['payment_method']) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Reference:</span>
+                                    <span class="font-semibold text-xs"><?= htmlspecialchars($booking_confirmation['payment_reference']) ?></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Important Information -->
-            <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
-                <h3 class="text-lg font-bold text-yellow-800 mb-3 flex items-center">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-3"></i>
-                    Important Information
-                </h3>
-                <ul class="space-y-2 text-yellow-800">
-                    <li class="flex items-start">
-                        <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                        Please arrive at the terminal at least 30 minutes before departure
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                        Bring a valid ID for verification
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                        Keep your PNR(s) (<?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?>) for reference
-                    </li>
-                    <li class="flex items-start">
-                        <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                        Contact support if you need to make changes to your booking
-                    </li>
-                </ul>
+                <!-- Booking Summary -->
+                <div class="border-t pt-4 sm:pt-6 mt-4 sm:mt-6">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-center">
+                            <div>
+                                <span class="text-base sm:text-lg font-semibold">Total Seats: <?= count($booking_confirmation['selected_seats']) ?></span>
+                                <span class="text-gray-600 ml-0 sm:ml-4 text-sm">× ₦<?= number_format($booking_confirmation['trip']['price'], 0) ?> each</span>
+                            </div>
+                            <div class="text-lg sm:text-2xl font-bold text-primary mt-2 sm:mt-0">
+                                ₦<?= number_format($booking_confirmation['total_amount'], 0) ?>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-center">
+                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Booking QR Code</h4>
+                            <img src="<?= SITE_URL . '/qrcodes/pnr_' . htmlspecialchars($pnr) . '.png' ?>" alt="PNR QR Code" class="qr-code-img mx-auto">
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
 
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-4 justify-center no-print">
-                <button onclick="window.print()" class="bg-primary text-white font-bold py-3 px-6 rounded-xl hover:bg-secondary transition-colors duration-200 flex items-center justify-center">
-                    <i class="fas fa-print mr-2"></i>Print Ticket
-                </button>
-                
-                <button onclick="downloadPDF()" class="bg-gray-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center">
-                    <i class="fas fa-download mr-2"></i>Download PDF
-                </button>
-                
-                <a href="search_trips.php" class="bg-green-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center justify-center">
-                    <i class="fas fa-plus mr-2"></i>Book Another Trip
-                </a>
-            </div>
+        <!-- Important Information -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6 mb-8 no-print">
+            <h3 class="text-base sm:text-lg font-bold text-yellow-800 mb-3 flex items-center">
+                <i class="fas fa-exclamation-triangle text-yellow-600 mr-2 sm:mr-3"></i>
+                Important Information
+            </h3>
+            <ul class="space-y-2 text-yellow-800 text-sm sm:text-base">
+                <li class="flex items-start">
+                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
+                    Please arrive at the terminal at least 30 minutes before departure
+                </li>
+                <li class="flex items-start">
+                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
+                    Bring a valid ID for verification
+                </li>
+                <li class="flex items-start">
+                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
+                    Keep your PNR(s) (<?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?>) for reference
+                </li>
+                <li class="flex items-start">
+                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
+                    Contact support if you need to make changes to your booking
+                </li>
+            </ul>
+        </div>
 
-            <!-- Contact Information -->
-            <div class="text-center mt-8 text-gray-600">
-                <p class="mb-2">Need help? Contact us:</p>
-                <p class="font-semibold">Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
-                <p class="text-sm mt-2">Your PNR(s): <span class="font-bold text-primary"><?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?></span></p>
-            </div>
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center no-print">
+            <button onclick="window.print()" class="bg-primary text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-secondary transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
+                <i class="fas fa-print mr-2"></i>Print Ticket
+            </button>
+            <button onclick="downloadPDF()" class="bg-gray-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
+                <i class="fas fa-download mr-2"></i>Download PDF
+            </button>
+            <a href="search_trips.php" class="bg-green-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
+                <i class="fas fa-plus mr-2"></i>Book Another Trip
+            </a>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="text-center mt-8 text-gray-600 no-print">
+            <p class="mb-2 text-sm sm:text-base">Need help? Contact us:</p>
+            <p class="font-semibold text-sm sm:text-base">Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
+            <p class="text-xs sm:text-sm mt-2">Your PNR(s): <span class="font-bold text-primary"><?= htmlspecialchars(implode(', ', $booking_confirmation['pnrs'])) ?></span></p>
         </div>
     </div>
 <?php require_once '../templates/footer.php'; ?>
@@ -325,7 +345,7 @@ require_once '../templates/header.php';
 
             // Add logo or title
             doc.setFontSize(20);
-            doc.setTextColor(220, 38, 38); // Primary color
+            doc.setTextColor(220, 38, 38);
             doc.text('<?= SITE_NAME ?> - Booking Confirmation', margin, y);
             y += 10;
 
@@ -406,12 +426,11 @@ require_once '../templates/header.php';
         // Clear the booking confirmation from session after 5 minutes
         setTimeout(function() {
             fetch('clear_session.php', {method: 'POST'});
-        }, 300000); // 5 minutes
+        }, 300000);
     </script>
 </body>
 </html>
 
 <?php
-// Clear the booking confirmation after displaying
 unset($_SESSION['booking_confirmation']);
 ?>
