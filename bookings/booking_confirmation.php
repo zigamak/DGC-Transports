@@ -31,6 +31,8 @@ if (!$db_booking) {
     header("Location: search_trips.php");
     exit();
 }
+require_once '../templates/header.php';
+
 ?>
 
 <!DOCTYPE html>
@@ -259,7 +261,7 @@ if (!$db_booking) {
             </div>
         </div>
     </div>
-
+<?php require_once '../templates/footer.php'; ?>
     <script>
         function downloadPDF() {
             // Simple PDF download using browser print functionality

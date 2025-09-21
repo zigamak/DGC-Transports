@@ -39,6 +39,9 @@ function sendBookingConfirmationEmail($booking_data) {
         
         // Load the email template
         $mail->Body = renderBookingConfirmationTemplate($booking_data);
+        if (empty($mail->Body)) {
+            throw new Exception('Email body is empty - template rendering failed');
+        }
         
         // Alternative plain text version
         $mail->AltBody = createPlainTextVersion($booking_data);
@@ -92,8 +95,12 @@ function sendBookingCancellationEmail($booking_data) {
         $mail->isHTML(true);
         $mail->Subject = 'Booking Cancelled - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME;
         
-        // Simple cancellation template (you can create a separate template file)
+        // Simple cancellation template
         $mail->Body = renderCancellationTemplate($booking_data);
+        if (empty($mail->Body)) {
+            throw new Exception('Cancellation email body is empty - template rendering failed');
+        }
+        
         $mail->AltBody = 'Your booking with PNR ' . $booking_data['pnr'] . ' has been cancelled.';
 
         $result = $mail->send();
@@ -117,9 +124,25 @@ function sendBookingCancellationEmail($booking_data) {
  * Render booking confirmation email template
  */
 function renderBookingConfirmationTemplate($booking) {
+    $template_path = __DIR__ . '/templates/email_booking_confirmation.php';
+    if (!file_exists($template_path)) {
+        error_log("Email template not found: $template_path");
+        return '';
+    }
+    
     ob_start();
-    include __DIR__ . '/../templates/email_booking_confirmation.php';
-    return ob_get_clean();
+    try {
+        include $template_path;
+        $content = ob_get_clean();
+        if (empty($content)) {
+            error_log("Email template rendered empty content: $template_path");
+        }
+        return $content;
+    } catch (Exception $e) {
+        error_log("Error rendering email template ($template_path): " . $e->getMessage());
+        ob_end_clean();
+        return '';
+    }
 }
 
 /**
@@ -179,6 +202,7 @@ function logEmail($to_email, $email_type, $status, $message = '') {
         ");
         $stmt->bind_param("ssss", $to_email, $email_type, $status, $message);
         $stmt->execute();
+        $stmt->close();
     } catch (Exception $e) {
         error_log("Failed to log email: " . $e->getMessage());
     }

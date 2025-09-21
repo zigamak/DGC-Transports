@@ -5,6 +5,9 @@ define('SITE_URL', 'http://localhost/dgctransports');
 
 // The name of the transport platform.
 define('SITE_NAME', 'DGC TRANSPORTS');
+define('SITE_EMAIL', 'admin@dgctransports.com');
+define('SITE_PHONE', '+234373783838');
+
 
 // SMTP Email settings
 define('SMTP_HOST', 'smtp.hostinger.com');

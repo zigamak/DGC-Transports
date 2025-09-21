@@ -15,6 +15,7 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/send_email.php'; // Added to support email sending
 
 // Set timezone from config
 date_default_timezone_set(DEFAULT_TIMEZONE);
@@ -252,6 +253,15 @@ try {
         'payment_reference' => $reference,
         'trip' => $trip
     ];
+
+    // Send booking confirmation email
+    $email_sent = sendBookingConfirmationEmail($_SESSION['booking_confirmation']);
+    if ($email_sent) {
+        error_log("Booking confirmation email sent successfully to: " . $passenger_details['email']);
+    } else {
+        error_log("Failed to send booking confirmation email to: " . $passenger_details['email']);
+        // Note: We don't fail the transaction if email sending fails, as it's not critical to the booking process
+    }
 
     // Clear booking session data
     unset($_SESSION['selected_trip']);

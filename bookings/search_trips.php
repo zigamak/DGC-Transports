@@ -6,10 +6,10 @@ require_once '../includes/config.php';
 require_once '../templates/header.php'; 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $pickup_city_id = $_POST['pickup_city_id'];
-    $dropoff_city_id = $_POST['dropoff_city_id'];
+    $pickup_city_id = (int)$_POST['pickup_city_id'];
+    $dropoff_city_id = (int)$_POST['dropoff_city_id'];
     $departure_date = $_POST['departure_date'];
-    $vehicle_type_id = $_POST['vehicle_type_id'];
+    $vehicle_type_id = (int)$_POST['vehicle_type_id'];
     $num_seats = (int)$_POST['num_seats'];
     
     // Store search criteria in session
@@ -33,12 +33,14 @@ if (empty($search)) {
 $pickup_city_query = $conn->prepare("SELECT name FROM cities WHERE id = ?");
 $pickup_city_query->bind_param("i", $search['pickup_city_id']);
 $pickup_city_query->execute();
-$pickup_city = $pickup_city_query->get_result()->fetch_assoc()['name'];
+$pickup_city = $pickup_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
+$pickup_city_query->close();
 
 $dropoff_city_query = $conn->prepare("SELECT name FROM cities WHERE id = ?");
 $dropoff_city_query->bind_param("i", $search['dropoff_city_id']);
 $dropoff_city_query->execute();
-$dropoff_city = $dropoff_city_query->get_result()->fetch_assoc()['name'];
+$dropoff_city = $dropoff_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
+$dropoff_city_query->close();
 
 // Query to fetch available trips
 $trips_query = "
@@ -48,40 +50,41 @@ $trips_query = "
         v.id as vehicle_id,
         v.vehicle_number,
         v.driver_name,
-        vt.id as vehicle_type_id,
+        t.vehicle_type_id as vehicle_type_id,
         vt.type as vehicle_type,
         vt.capacity,
-        vt.price,
+        t.price,
         ts.id as time_slot_id,
         ts.departure_time,
-        ts.arrival_time,
         t.trip_date,
         (vt.capacity - COALESCE(t.booked_seats, 0)) as available_seats,
         COALESCE(t.booked_seats, 0) as booked_seats_count
     FROM trips t
     JOIN vehicles v ON t.vehicle_id = v.id
-    JOIN vehicle_types vt ON v.vehicle_type_id = vt.id
+    JOIN vehicle_types vt ON t.vehicle_type_id = vt.id
     JOIN time_slots ts ON t.time_slot_id = ts.id
     WHERE t.pickup_city_id = ?
     AND t.dropoff_city_id = ?
     AND t.trip_date = ?
-    AND v.vehicle_type_id = ?
+    AND t.vehicle_type_id = ?
     AND t.status = 'active'
     AND (vt.capacity - COALESCE(t.booked_seats, 0)) >= ?
     ORDER BY ts.departure_time
 ";
 
 $stmt = $conn->prepare($trips_query);
-$stmt->bind_param("siisii", 
+$stmt->bind_param(
+    "siisii",
     $search['departure_date'],
-    $search['pickup_city_id'], 
-    $search['dropoff_city_id'], 
+    $search['pickup_city_id'],
+    $search['dropoff_city_id'],
     $search['departure_date'],
-    $search['vehicle_type_id'], 
+    $search['vehicle_type_id'],
     $search['num_seats']
 );
 $stmt->execute();
 $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -134,13 +137,6 @@ $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 </div>
             </div>
 
-            <!-- Debug Information (remove in production) -->
-            <?php if (isset($_GET['debug'])): ?>
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                    <h4 class="font-bold mb-2">Debug Information:</h4>
-                    <pre class="text-xs"><?= print_r($trips, true) ?></pre>
-                </div>
-            <?php endif; ?>
 
             <!-- Trips List -->
             <?php if (empty($trips)): ?>
@@ -165,18 +161,15 @@ $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                                                 <div class="text-2xl font-bold text-black">
                                                     <?= date('H:i', strtotime($trip['departure_time'])) ?>
                                                 </div>
+                                                <div class="text-sm text-gray-500">
+                                                    <?= date('h:i A', strtotime($trip['departure_time'])) ?>
+                                                </div>
                                                 <div class="text-sm text-gray-500">Departure</div>
                                             </div>
                                             <div class="flex-1 flex items-center">
                                                 <div class="w-3 h-3 bg-primary rounded-full"></div>
                                                 <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
                                                 <div class="w-3 h-3 bg-secondary rounded-full"></div>
-                                            </div>
-                                            <div class="text-center">
-                                                <div class="text-2xl font-bold text-black">
-                                                    <?= date('H:i', strtotime($trip['arrival_time'])) ?>
-                                                </div>
-                                                <div class="text-sm text-gray-500">Arrival</div>
                                             </div>
                                         </div>
                                         <div class="flex items-center text-sm text-gray-600">
