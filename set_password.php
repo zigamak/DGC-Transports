@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $stmt->close();
-            $success = 'Password set successfully. You can now <a href="' . SITE_URL . '/login.php" class="text-primary-red hover:underline">log in</a>.';
+            $success = 'Password set successfully. You can now <a href="' . SITE_URL . '/login.php" class="text-red-600 hover:underline">log in</a>.';
         } else {
             $errors[] = 'Failed to set password. Please try again.';
             $stmt->close();
@@ -78,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             --white: #ffffff;
             --gray: #f5f5f5;
             --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
         }
         * {
             margin: 0;
@@ -88,99 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
         body {
             font-family: 'Poppins', sans-serif;
             display: flex;
+            justify-content: center;
+            align-items: center;
             min-height: 100vh;
             background: linear-gradient(135deg, var(--white), var(--gray));
-        }
-        header {
-            background: #000;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 40;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        }
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 60px;
-        }
-        .header-logo img {
-            height: 40px;
-        }
-        .header-nav {
-            display: flex;
-            gap: 20px;
-        }
-        .header-nav a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .header-nav a:hover {
-            color: #dc2626;
-        }
-        #mobile-menu {
-            display: none;
-            background: #000;
-            padding: 20px;
-        }
-        #mobile-menu.active {
-            display: block;
-        }
-        .mobile-nav a {
-            display: block;
-            color: white;
-            text-decoration: none;
-            padding: 10px;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .mobile-nav a:hover {
-            color: #dc2626;
-        }
-        .toggle-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            display: none;
-        }
-        .toggle-btn:hover {
-            color: #dc2626;
-        }
-        main {
-            flex: 1;
-            padding-top: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        @media (min-width: 768px) {
-            .header-nav {
-                display: flex;
-            }
-            .toggle-btn {
-                display: none;
-            }
-            header.md-hidden {
-                display: none;
-            }
-        }
-        @media (max-width: 767px) {
-            .toggle-btn {
-                display: block;
-            }
-            .header-nav {
-                display: none;
-            }
         }
         .card {
             background: var(--white);
@@ -188,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
         }
         .card:hover {
             transform: translateY(-8px);
@@ -197,10 +107,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
         .btn-primary {
             background: linear-gradient(to right, var(--primary-red), var(--dark-red));
             color: var(--white);
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 8px;
             font-weight: 600;
             transition: background 0.3s ease, transform 0.2s ease;
+            width: 100%;
         }
         .btn-primary:hover {
             background: linear-gradient(to right, var(--dark-red), var(--primary-red));
@@ -221,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             align-items: center;
         }
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
         .form-group label {
             display: block;
@@ -231,98 +142,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
         }
         .form-group input {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid var(--light-gray);
             border-radius: 8px;
             font-size: 1rem;
             font-family: 'Poppins', sans-serif;
+            background-color: var(--gray);
         }
-        .text-red-600 { color: #e30613; }
-        .bg-red-600 { background-color: #e30613; }
-        .hover\:bg-red-600:hover { background-color: #e30613; }
-        .hover\:text-red-600:hover { color: #e30613; }
-        .bg-red-700 { background-color: #c70410; }
-        .hover\:bg-red-700:hover { background-color: #c70410; }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.2);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <header class="fixed top-0 left-0 w-full bg-black text-white p-4 shadow-md flex items-center justify-between z-40 md-hidden">
-        <button id="sidebar-toggle-mobile" class="toggle-btn">
-            <i class="fas fa-bars text-xl"></i>
-        </button>
-        <div class="flex-1 text-center">
-            <a href="<?= SITE_URL ?>">
-                <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-8 mx-auto">
-            </a>
-        </div>
-        <div class="w-10"></div>
-    </header>
-    <div id="mobile-menu" class="mobile-menu">
-        <nav class="mobile-nav">
-            <a href="<?= SITE_URL ?>/index.php">Book a Trip</a>
-            <a href="<?= SITE_URL ?>/bookings/manage_booking.php">Manage Booking</a>
-            <a href="<?= SITE_URL ?>/contact.php">Contact Us</a>
-            <a href="<?= SITE_URL ?>/login.php">Login</a>
-        </nav>
-    </div>
-
-    <main class="p-4 sm:p-6 lg:p-10">
-        <div class="container mx-auto">
-            <div class="card p-6 sm:p-8">
-                <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">
-                    <i class="fas fa-lock text-primary-red mr-3"></i>Set Your Password
-                </h1>
-                <?php if (!empty($errors)): ?>
-                    <?php foreach ($errors as $error): ?>
-                        <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
-                    <?php endforeach; ?>
-                    <p class="text-center text-gray-600">Contact the administrator to request a new setup link.</p>
-                <?php elseif ($success): ?>
-                    <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= $success ?></p>
-                <?php else: ?>
-                    <form method="POST" class="space-y-6">
-                        <div class="form-group">
-                            <label for="new_password">New Password</label>
-                            <input type="password" id="new_password" name="new_password" placeholder="Enter new password" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="confirm_password">Confirm Password</label>
-                            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
-                        </div>
-                        <div class="flex justify-end">
-                            <button type="submit" class="btn-primary">
-                                <i class="fas fa-save mr-2"></i>Set Password
-                            </button>
-                        </div>
-                    </form>
-                <?php endif; ?>
-            </div>
+    <main class="p-4 sm:p-6 lg:p-10 flex flex-col items-center">
+        <a href="<?= SITE_URL ?>" class="mb-8">
+            <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="DGC Transports Logo" class="h-12 sm:h-16">
+        </a>
+        <div class="card p-6 sm:p-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">
+                <i class="fas fa-lock text-primary-red mr-3"></i>Set Your Password
+            </h1>
+            <?php if (!empty($errors)): ?>
+                <?php foreach ($errors as $error): ?>
+                    <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
+                <?php endforeach; ?>
+                <p class="text-center text-gray-600 mt-4">Contact the administrator to request a new setup link.</p>
+            <?php elseif ($success): ?>
+                <p class="success-message text-center"><i class="fas fa-check-circle mr-1"></i><?= $success ?></p>
+            <?php else: ?>
+                <form method="POST" class="space-y-6">
+                    <div class="form-group">
+                        <label for="new_password">New Password</label>
+                        <input type="password" id="new_password" name="new_password" placeholder="Enter new password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save mr-2"></i>Set Password
+                    </button>
+                </form>
+            <?php endif; ?>
         </div>
     </main>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-            const mobileMenuCancel = document.getElementById('mobile-menu-cancel');
-            const mobileMenu = document.getElementById('mobile-menu');
-            const mobileMenuIcon = document.getElementById('mobile-menu-icon');
-            if (mobileMenuToggle && mobileMenuCancel && mobileMenu && mobileMenuIcon) {
-                mobileMenuToggle.addEventListener('click', function() {
-                    mobileMenu.classList.toggle('active');
-                    mobileMenuToggle.style.display = mobileMenu.classList.contains('active') ? 'none' : 'block';
-                    mobileMenuCancel.style.display = mobileMenu.classList.contains('active') ? 'block' : 'none';
-                    mobileMenuIcon.classList.toggle('fa-bars');
-                    mobileMenuIcon.classList.toggle('fa-times');
-                });
-                mobileMenuCancel.addEventListener('click', function() {
-                    mobileMenu.classList.remove('active');
-                    mobileMenuToggle.style.display = 'block';
-                    mobileMenuCancel.style.display = 'none';
-                    mobileMenuIcon.classList.remove('fa-times');
-                    mobileMenuIcon.classList.add('fa-bars');
-                });
-            }
-        });
-    </script>
 </body>
 </html>

@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if ($booking) {
             if ($booking['status'] === 'confirmed' || $booking['status'] === 'pending') {
-                // Update status to 'has boarded'
-                $stmt = $conn->prepare("UPDATE bookings SET status = 'has boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
+                // Update status to 'boarded'
+                $stmt = $conn->prepare("UPDATE bookings SET status = 'boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
                 $stmt->bind_param("i", $booking['id']);
                 if ($stmt->execute() && $stmt->affected_rows > 0) {
                     $response = [
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     ];
                 }
                 $stmt->close();
-            } else if ($booking['status'] === 'has boarded') {
+            } else if ($booking['status'] === 'boarded') {
                 $response = [
                     'status' => 'warning',
                     'passenger_name' => $booking['passenger_name'],

@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             --dark-red: #c70410;
             --black: #1a1a1a;
             --white: #ffffff;
-            --gray: #ffffff; /* Updated to solid white */
+            --gray: #ffffff; /* Solid white background */
             --light-gray: #e5e7eb;
             --accent-blue: #3b82f6;
         }
@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         body {
             font-family: 'Poppins', sans-serif;
             background: var(--gray); /* Solid white background */
-            color: #1a1a1a; /* Adjusted text color for contrast on white background */
+            color: #1a1a1a; /* Adjusted text color for contrast */
             min-height: 100vh;
             overscroll-behavior: none;
         }
@@ -220,6 +220,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .btn-success:hover {
             background: linear-gradient(to right, #059669, #047857);
             transform: translateY(-2px);
+        }
+        
+        .btn-stop {
+            background: #f8b400;
+            color: #0f2027;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-top: 20px;
+            display: none; /* Initially hidden */
+        }
+        
+        .btn-stop:hover {
+            background: #e0a800;
         }
         
         .input-field {
@@ -467,7 +485,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             .modal-content .seat-number {
                 font-size: 18px;
             }
-            .modal-content button, #start-camera-button {
+            .modal-content button, #start-camera-button, .btn-stop {
                 padding: 10px 20px;
                 font-size: 16px;
             }
@@ -527,6 +545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="scanner-container">
                             <video id="video" autoplay playsinline></video>
                             <div id="scan-overlay"></div>
+                            <button id="stop-camera-button" class="btn-stop">Stop Scanning</button>
                         </div>
                         <canvas id="canvas" style="display:none;"></canvas>
                         <div id="output">Press 'Start Scanning' to begin...</div>
@@ -720,7 +739,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 modalSeatNumber: document.getElementById('modal-seat-number'),
                 modalClose: document.getElementById('modal-close'),
                 startCameraButton: document.getElementById('start-camera-button'),
-                scanOverlay: document.getElementById('scan-overlay')
+                stopCameraButton: document.getElementById('stop-camera-button'),
+                scanOverlay: document.getElementById('scan-overlay'),
+                startButtonContainer: document.getElementById('start-button-container')
             };
 
             let canScan = true;
@@ -731,6 +752,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             if (elements.startCameraButton) {
                 elements.startCameraButton.addEventListener('click', initCamera);
+            }
+            
+            if (elements.stopCameraButton) {
+                elements.stopCameraButton.addEventListener('click', stopCamera);
             }
             
             if (elements.modalClose) {
@@ -909,11 +934,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     elements.video.srcObject = stream;
                     await elements.video.play();
                     
-                    // Show video and overlay, hide button
+                    // Show video, overlay, and stop button; hide start button
                     elements.video.style.display = 'block';
                     elements.scanOverlay.style.display = 'block';
                     elements.startCameraButton.style.display = 'none';
-                    document.getElementById('start-button-container').style.display = 'none';
+                    elements.startButtonContainer.style.display = 'none';
+                    elements.stopCameraButton.style.display = 'block';
                     
                     elements.output.textContent = 'Camera initialized. Position QR code...';
                     requestAnimationFrame(processFrame);
@@ -933,6 +959,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
+            function stopCamera() {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                elements.video.srcObject = null;
+                elements.video.style.display = 'none';
+                elements.scanOverlay.style.display = 'none';
+                elements.stopCameraButton.style.display = 'none';
+                elements.startCameraButton.style.display = 'block';
+                elements.startButtonContainer.style.display = 'block';
+                elements.output.innerHTML = "Press 'Start Scanning' to begin...";
+                canScan = true;
+            }
+
             window.addEventListener('unload', () => {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
@@ -950,6 +991,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
                     e.preventDefault();
                     elements.startCameraButton.click();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    elements.stopCameraButton.click();
                 }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                     e.preventDefault();

@@ -1,7 +1,11 @@
 <?php
 // includes/config.php
 
-define('SITE_URL', 'http://localhost/dgctransports');
+define('SITE_URL', 'http://booking.dgctransports.com');
+//define('BASE_DIR', '/public_html/booking.dgctransports.com'); // e.g., /home/dgctrans/public_html/booking.dgctransports.com
+//define('LOGS_DIR', BASE_DIR . '/logs'); // e.g., /home/dgctrans/public_html/booking.dgctransports.com/logs
+
+
 
 // The name of the transport platform.
 define('SITE_NAME', 'DGC TRANSPORTS');
@@ -10,12 +14,12 @@ define('SITE_PHONE', '+234373783838');
 
 
 // SMTP Email settings
-define('SMTP_HOST', 'smtp.hostinger.com');
+define('SMTP_HOST', 'dgctransports.com');
 define('SMTP_PORT', 587);
-define('SMTP_USERNAME', 'noreply@smartinvite.net');
-define('SMTP_PASSWORD', 'fU[P=:V>0z');
-define('FROM_EMAIL', 'noreply@smartinvite.net');
-define('FROM_NAME', 'Smart Invites');
+define('SMTP_USERNAME', 'noreply@dgctransports.com');
+define('SMTP_PASSWORD', 'EI8WT6[Y{%q-AUFx');
+define('FROM_EMAIL', 'noreply@dgctransports.com');
+define('FROM_NAME', 'DGC Transports');
 define('SMTP_SECURE', 'tls');
 
 // Payment gateway settings
