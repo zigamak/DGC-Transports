@@ -13,17 +13,26 @@ if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_num_seats']
 $trip = $_SESSION['selected_trip'];
 $num_seats = $_SESSION['selected_num_seats'];
 
-// Fetch booked seats
+// Debug: Check what's in the trip data
+// Uncomment the line below to see the trip structure
+// echo "<pre>" . print_r($trip, true) . "</pre>";
+
+// Fetch booked seats - Fix the field name here
+$trip_id = isset($trip['trip_id']) ? $trip['trip_id'] : $trip['id'];
 $stmt = $conn->prepare("
     SELECT seat_number 
     FROM seat_bookings sb
     JOIN bookings b ON sb.booking_id = b.id
     WHERE b.trip_id = ? AND b.payment_status = 'paid'
 ");
-$stmt->bind_param("i", $trip['id']);
+$stmt->bind_param("i", $trip_id);
 $stmt->execute();
 $booked_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $booked_seat_numbers = array_column($booked_seats, 'seat_number');
+
+// Debug: Check what seats are being fetched as booked
+// Uncomment the line below to see booked seats
+// echo "<pre>Booked seats: " . print_r($booked_seat_numbers, true) . "</pre>";
 ?>
 
 <!DOCTYPE html>
@@ -127,6 +136,16 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
                 </div>
             </div>
 
+            <!-- Debug Information (remove in production) -->
+            <?php if (isset($_GET['debug'])): ?>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <h4 class="font-bold mb-2">Debug Information:</h4>
+                    <p><strong>Trip ID:</strong> <?= $trip_id ?></p>
+                    <p><strong>Booked Seats:</strong> <?= implode(', ', $booked_seat_numbers) ?></p>
+                    <p><strong>Total Capacity:</strong> <?= $trip['capacity'] ?></p>
+                </div>
+            <?php endif; ?>
+
             <div class="bg-white rounded-xl shadow-lg p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold">Available Seats</h3>
@@ -138,20 +157,24 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
                 <form id="seatForm" action="passenger_details.php" method="POST">
                     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
                         <?php for ($i = 1; $i <= $trip['capacity']; $i++): ?>
+                            <?php $is_booked = in_array($i, $booked_seat_numbers); ?>
                             <div class="seat-container">
                                 <input type="checkbox" 
                                        id="seat_<?= $i ?>" 
                                        name="seats[]" 
                                        value="<?= $i ?>" 
                                        class="hidden seat-checkbox"
-                                       <?= in_array($i, $booked_seat_numbers) ? 'disabled' : '' ?>
+                                       <?= $is_booked ? 'disabled' : '' ?>
                                        onchange="updateSeatSelection(<?= $i ?>)">
                                 <label for="seat_<?= $i ?>" 
-                                       class="seat-label block text-center p-4 rounded-lg cursor-pointer min-h-[80px] flex flex-col items-center justify-center
-                                              <?= in_array($i, $booked_seat_numbers) ? 'seat-booked' : 'seat-available' ?>"
+                                       class="seat-label block text-center p-4 rounded-lg min-h-[80px] flex flex-col items-center justify-center
+                                              <?= $is_booked ? 'seat-booked cursor-not-allowed' : 'seat-available cursor-pointer' ?>"
                                        id="label_<?= $i ?>">
                                     <i class="fas fa-chair seat-icon"></i>
-                                    <span class="text-sm font-medium">Seat <?= $i ?></span>
+                                    <span class="text-sm font-medium">
+                                        Seat <?= $i ?>
+                                        <?= $is_booked ? '<br><small>(Booked)</small>' : '' ?>
+                                    </span>
                                 </label>
                             </div>
                         <?php endfor; ?>
@@ -181,8 +204,17 @@ $booked_seat_numbers = array_column($booked_seats, 'seat_number');
     <script>
         const requiredSeats = <?= $num_seats ?>;
         let selectedSeats = [];
+        const bookedSeats = <?= json_encode($booked_seat_numbers) ?>;
+        
+        console.log('Booked seats:', bookedSeats); // Debug line
 
         function updateSeatSelection(seatNumber) {
+            // Check if seat is booked
+            if (bookedSeats.includes(seatNumber)) {
+                alert('This seat is already booked!');
+                return;
+            }
+            
             const checkbox = document.getElementById('seat_' + seatNumber);
             const label = document.getElementById('label_' + seatNumber);
             
