@@ -1,22 +1,67 @@
 <?php
 // index.php
-session_start();
-require_once 'includes/db.php';
-require_once 'includes/config.php';
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error_log.txt');
 
-// Fetch cities and vehicle types for the form
-$cities_result = $conn->query("SELECT id, name FROM cities ORDER BY name");
-$vehicle_types_result = $conn->query("SELECT id, type, capacity FROM vehicle_types ORDER BY type");
-$vehicle_types = [];
-while ($vehicle = $vehicle_types_result->fetch_assoc()) {
-    $vehicle_types[$vehicle['id']] = $vehicle;
+// Start session
+session_start();
+
+// Include required files with error handling
+try {
+    require_once __DIR__ . '/includes/db.php';
+} catch (Exception $e) {
+    error_log("Failed to include db.php: " . $e->getMessage());
+    die("Error: Database connection failed. Please check server logs.");
 }
 
-// Fetch the furthest end_date from trip_templates
-$max_date_result = $conn->query("SELECT MAX(end_date) AS max_date FROM trip_templates WHERE status = 'active'");
-$max_date = $max_date_result->fetch_assoc()['max_date'] ?? date('Y-m-d', strtotime('+1 year'));
+try {
+    require_once __DIR__ . '/includes/config.php';
+} catch (Exception $e) {
+    error_log("Failed to include config.php: " . $e->getMessage());
+    define('SITE_URL', 'https://booking.dgctransports.com');
+    define('SITE_NAME', 'DGC Transports'); // Fallback
+}
 
-require_once 'templates/header.php';
+// Fetch cities and vehicle types for the form
+$cities_result = null;
+$vehicle_types_result = null;
+$vehicle_types = [];
+$max_date = date('Y-m-d', strtotime('+1 year')); // Default fallback
+
+if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
+    // Check if tables exist
+    $table_check = $conn->query("SHOW TABLES LIKE 'cities'");
+    if ($table_check->num_rows > 0) {
+        $cities_result = $conn->query("SELECT id, name FROM cities ORDER BY name");
+    } else {
+        error_log("Table 'cities' does not exist in database.");
+    }
+
+    $table_check = $conn->query("SHOW TABLES LIKE 'vehicle_types'");
+    if ($table_check->num_rows > 0) {
+        $vehicle_types_result = $conn->query("SELECT id, type, capacity FROM vehicle_types ORDER BY type");
+        while ($vehicle = $vehicle_types_result->fetch_assoc()) {
+            $vehicle_types[$vehicle['id']] = $vehicle;
+        }
+    } else {
+        error_log("Table 'vehicle_types' does not exist in database.");
+    }
+
+    // Fetch the furthest end_date from trip_templates if table exists
+    $table_check = $conn->query("SHOW TABLES LIKE 'trip_templates'");
+    if ($table_check->num_rows > 0) {
+        $max_date_result = $conn->query("SELECT MAX(end_date) AS max_date FROM trip_templates WHERE status = 'active'");
+        $max_date = $max_date_result->fetch_assoc()['max_date'] ?? date('Y-m-d', strtotime('+1 year'));
+    } else {
+        error_log("Table 'trip_templates' does not exist in database.");
+    }
+} else {
+    error_log("Database connection not established.");
+}
 ?>
 
 <!DOCTYPE html>
@@ -24,7 +69,7 @@ require_once 'templates/header.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Your Journey - <?= SITE_NAME ?></title>
+    <title>Book Your Journey - <?= defined('SITE_NAME') ? SITE_NAME : 'DGC Transports' ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -101,7 +146,7 @@ require_once 'templates/header.php';
             margin-right: 6px;
         }
         .hero-image {
-            background-image: url('/assets/images/bus-hero.jpg'); /* Replace with local asset */
+            background-image: url("<?= defined('SITE_URL') ? SITE_URL : 'https://booking.dgctransports.com' ?>/assets/images/suv.jpg");
             background-size: cover;
             background-position: center;
         }
@@ -138,6 +183,14 @@ require_once 'templates/header.php';
     </style>
 </head>
 <body>
+    <?php
+    try {
+        require_once __DIR__ . '/templates/header.php';
+    } catch (Exception $e) {
+        error_log("Failed to include header.php: " . $e->getMessage());
+        echo '<div class="error-message"><i class="fas fa-exclamation-circle"></i>Failed to load header. Please contact support.</div>';
+    }
+    ?>
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="container w-full">
             <div class="card overflow-hidden fade-in">
@@ -155,6 +208,9 @@ require_once 'templates/header.php';
                                 <p class="error-message"><i class="fas fa-exclamation-circle"></i><?= htmlspecialchars($_SESSION['error']) ?></p>
                                 <?php unset($_SESSION['error']); ?>
                             <?php endif; ?>
+                            <?php if (!$cities_result || !$vehicle_types_result): ?>
+                                <p class="error-message"><i class="fas fa-exclamation-circle"></i>Unable to load booking options. Please try again later.</p>
+                            <?php endif; ?>
                             <form id="bookingForm" action="bookings/search_trips.php" method="POST" class="space-y-6">
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="form-group">
@@ -164,11 +220,14 @@ require_once 'templates/header.php';
                                         <i class="fas fa-map-marker-alt"></i>
                                         <select class="input-field input-field-with-icon" id="pickup_city_id" name="pickup_city_id" required aria-label="Pickup city" onchange="updateDropoffOptions()">
                                             <option value="">Select pickup city</option>
-                                            <?php 
-                                            $cities_result->data_seek(0);
-                                            while ($city = $cities_result->fetch_assoc()): ?>
-                                                <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
-                                            <?php endwhile; ?>
+                                            <?php
+                                            if ($cities_result) {
+                                                $cities_result->data_seek(0);
+                                                while ($city = $cities_result->fetch_assoc()): ?>
+                                                    <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
+                                                <?php endwhile;
+                                            }
+                                            ?>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -178,11 +237,14 @@ require_once 'templates/header.php';
                                         <i class="fas fa-map-marker-alt"></i>
                                         <select class="input-field input-field-with-icon" id="dropoff_city_id" name="dropoff_city_id" required aria-label="Destination city">
                                             <option value="">Select destination</option>
-                                            <?php 
-                                            $cities_result->data_seek(0);
-                                            while ($city = $cities_result->fetch_assoc()): ?>
-                                                <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
-                                            <?php endwhile; ?>
+                                            <?php
+                                            if ($cities_result) {
+                                                $cities_result->data_seek(0);
+                                                while ($city = $cities_result->fetch_assoc()): ?>
+                                                    <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
+                                                <?php endwhile;
+                                            }
+                                            ?>
                                         </select>
                                     </div>
                                 </div>
@@ -309,63 +371,67 @@ require_once 'templates/header.php';
         }
 
         // Form validation
-        document.getElementById('bookingForm').addEventListener('submit', function(e) {
-            const pickupCity = document.getElementById('pickup_city_id').value;
-            const dropoffCity = document.getElementById('dropoff_city_id').value;
-            const vehicleType = document.getElementById('vehicle_type_id').value;
-            const departureDate = document.getElementById('departure_date').value;
-            const numSeats = document.getElementById('num_seats').value;
-            const today = new Date().toISOString().split('T')[0];
-            const maxDate = '<?php echo $max_date; ?>';
-
-            if (!pickupCity || !dropoffCity || !vehicleType || !departureDate || !numSeats) {
-                e.preventDefault();
-                showError('Please fill in all required fields.');
-                return false;
-            }
-
-            if (pickupCity === dropoffCity) {
-                e.preventDefault();
-                showError('Pickup and dropoff cities cannot be the same.');
-                return false;
-            }
-
-            if (numSeats < 1) {
-                e.preventDefault();
-                showError('Please select at least one seat.');
-                return false;
-            }
-
-            if (vehicleType && vehicleTypes[vehicleType] && numSeats > vehicleTypes[vehicleType].capacity) {
-                e.preventDefault();
-                showError(`Number of seats cannot exceed vehicle capacity (${vehicleTypes[vehicleType].capacity}).`);
-                return false;
-            }
-
-            if (departureDate < today) {
-                e.preventDefault();
-                showError('Departure date cannot be in the past.');
-                return false;
-            }
-
-            if (departureDate > maxDate) {
-                e.preventDefault();
-                showError('Departure date cannot be after ' + maxDate);
-                return false;
-            }
-        });
-
-        function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i>${message}`;
+        document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('bookingForm');
-            form.prepend(errorDiv);
-            setTimeout(() => errorDiv.remove(), 5000);
-        }
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const pickupCity = document.getElementById('pickup_city_id').value;
+                    const dropoffCity = document.getElementById('dropoff_city_id').value;
+                    const vehicleType = document.getElementById('vehicle_type_id').value;
+                    const departureDate = document.getElementById('departure_date').value;
+                    const numSeats = document.getElementById('num_seats').value;
+                    const today = new Date().toISOString().split('T')[0];
+                    const maxDate = '<?php echo $max_date; ?>';
 
-        // Initialize max seats on page load
-        updateMaxSeats();
+                    if (!pickupCity || !dropoffCity || !vehicleType || !departureDate || !numSeats) {
+                        e.preventDefault();
+                        showError('Please fill in all required fields.');
+                        return false;
+                    }
+
+                    if (pickupCity === dropoffCity) {
+                        e.preventDefault();
+                        showError('Pickup and dropoff cities cannot be the same.');
+                        return false;
+                    }
+
+                    if (numSeats < 1) {
+                        e.preventDefault();
+                        showError('Please select at least one seat.');
+                        return false;
+                    }
+
+                    if (vehicleType && vehicleTypes[vehicleType] && numSeats > vehicleTypes[vehicleType].capacity) {
+                        e.preventDefault();
+                        showError(`Number of seats cannot exceed vehicle capacity (${vehicleTypes[vehicleType].capacity}).`);
+                        return false;
+                    }
+
+                    if (departureDate < today) {
+                        e.preventDefault();
+                        showError('Departure date cannot be in the past.');
+                        return false;
+                    }
+
+                    if (departureDate > maxDate) {
+                        e.preventDefault();
+                        showError('Departure date cannot be after ' + maxDate);
+                        return false;
+                    }
+                });
+            }
+
+            function showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i>${message}`;
+                form.prepend(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+
+            // Initialize max seats on page load
+            updateMaxSeats();
+        });
     </script>
 </body>
 </html>

@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
-require_once '../templates/header.php'; 
 
 if (!isset($_SESSION['selected_trip'])) {
     header("Location: search_trips.php");
@@ -52,6 +51,9 @@ $stmt->execute();
 $booked_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $booked_seat_numbers = array_column($booked_seats, 'seat_number');
 $stmt->close();
+
+
+require_once '../templates/header.php'; 
 
 ?>
 

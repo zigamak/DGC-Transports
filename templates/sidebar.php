@@ -1,22 +1,43 @@
 <?php
-// Use absolute paths based on document root
-require_once $_SERVER['DOCUMENT_ROOT'] . '/dgctransports/includes/db.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/dgctransports/includes/config.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/dgctransports/includes/auth.php';
-?>
+// templates/sidebar.php
+// Include required files with error handling
+try {
+    require_once __DIR__ . '/../includes/db.php';
+} catch (Exception $e) {
+    error_log("Failed to include db.php: " . $e->getMessage());
+}
 
-<?php if (isLoggedIn()): ?>
+try {
+    require_once __DIR__ . '/../includes/config.php';
+} catch (Exception $e) {
+    error_log("Failed to include config.php: " . $e->getMessage());
+    define('SITE_URL', 'https://booking.dgctransports.com'); // Fallback
+}
+
+try {
+    require_once __DIR__ . '/../includes/auth.php';
+} catch (Exception $e) {
+    error_log("Failed to include auth.php: " . $e->getMessage());
+    if (!function_exists('isLoggedIn')) {
+        function isLoggedIn() {
+            return false; // Default to not logged in
+        }
+    }
+}
+
+// Only show sidebar if user is logged in
+if (function_exists('isLoggedIn') && isLoggedIn()): ?>
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-black text-white p-6 shadow-xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
         <div class="flex items-center justify-between mb-8">
             <a href="<?= SITE_URL ?>/index.php" class="flex items-center">
-                <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-10">
+                <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="DGC Transports Logo" class="h-10" onerror="this.src='https://via.placeholder.com/150x40?text=Logo';">
             </a>
             <button id="sidebar-close" class="md:hidden text-white hover:text-red-600 focus:outline-none">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <nav class="space-y-4">
-            <?php if ($_SESSION['user']['role'] === 'admin'): ?>
+            <?php if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin'): ?>
                 <a href="<?= SITE_URL ?>/admin/dashboard.php" class="flex items-center p-3 rounded-lg hover:bg-red-600 transition-colors duration-200">
                     <i class="fas fa-tachometer-alt text-lg mr-4"></i>
                     <span>Dashboard</span>
@@ -37,7 +58,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/dgctransports/includes/auth.php';
                     <i class="fas fa-users-cog text-lg mr-4"></i>
                     <span>Manage Users</span>
                 </a>
-            <?php elseif ($_SESSION['user']['role'] === 'staff'): ?>
+            <?php elseif (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'staff'): ?>
                 <a href="<?= SITE_URL ?>/staff/dashboard.php" class="flex items-center p-3 rounded-lg hover:bg-red-600 transition-colors duration-200">
                     <i class="fas fa-tachometer-alt text-lg mr-4"></i>
                     <span>Dashboard</span>
@@ -58,21 +79,25 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/dgctransports/includes/auth.php';
         </nav>
     </aside>
     <div id="sidebar-overlay" class="fixed inset-0 bg-black opacity-50 z-40 hidden md:hidden"></div>
-<?php endif; ?>
 
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-    :root {
-        --primary-red: #e30613;
-        --dark-red: #c70410;
-    }
-    body {
-        font-family: 'Poppins', sans-serif;
-    }
-    .text-red-600 { color: #e30613; }
-    .bg-red-600 { background-color: #e30613; }
-    .hover\:bg-red-600:hover { background-color: #e30613; }
-    .hover\:text-red-600:hover { color: #e30613; }
-    .bg-red-700 { background-color: #c70410; }
-    .hover\:bg-red-700:hover { background-color: #c70410; }
-</style>
+    <script>
+        // Sidebar toggle for mobile
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarClose = document.getElementById('sidebar-close');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+            if (sidebarClose && sidebar && sidebarOverlay) {
+                sidebarClose.addEventListener('click', function() {
+                    sidebar.classList.add('-translate-x-full');
+                    sidebarOverlay.classList.add('hidden');
+                });
+
+                sidebarOverlay.addEventListener('click', function() {
+                    sidebar.classList.add('-translate-x-full');
+                    sidebarOverlay.classList.add('hidden');
+                });
+            }
+        });
+    </script>
+<?php endif; ?>
