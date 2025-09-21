@@ -9,16 +9,16 @@ function generatePNR() {
     // Define the prefix
     $prefix = 'D';
     
-    // Generate 5 random uppercase letters
-    $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $random = '';
+    // Generate 5 random digits
+    $numbers = '';
     for ($i = 0; $i < 5; $i++) {
-        $random .= $characters[random_int(0, 25)];
+        $numbers .= random_int(0, 9);
     }
     
     // Return the PNR
-    return $prefix . $random;
+    return $prefix . $numbers;
 }
+
 
 /**
  * Verify Paystack payment
@@ -407,17 +407,6 @@ function getTripById($conn, $trip_id) {
     }
 }
 
-/**
- * Send booking confirmation email (placeholder function)
- * @param array $booking_data Booking data
- * @return bool True if email sent successfully
- */
-function sendBookingConfirmationEmail($booking_data) {
-    // TODO: Implement email sending functionality
-    // This could use PHPMailer or a service like SendGrid
-    logActivity("Booking confirmation email would be sent", ['pnr' => $booking_data['pnr']]);
-    return true;
-}
 
 /**
  * Format date for display
@@ -425,7 +414,7 @@ function sendBookingConfirmationEmail($booking_data) {
  * @param string $format Output format
  * @return string Formatted date
  */
-function formatDate($date, $format = 'M j, Y') {
+function formatDate($date, $format = 'j, M, Y') {
     try {
         return date($format, strtotime($date));
     } catch (Exception $e) {
@@ -439,11 +428,10 @@ function formatDate($date, $format = 'M j, Y') {
  * @param string $format Output format
  * @return string Formatted time
  */
-function formatTime($time, $format = 'H:i') {
+function formatTime($time, $format = 'g:i A') {
     try {
         return date($format, strtotime($time));
     } catch (Exception $e) {
         return $time;
     }
 }
-?>
