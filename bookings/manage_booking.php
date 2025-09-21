@@ -1,10 +1,9 @@
 <?php
-// bookings/manage_booking.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
-require_once '../libs/phpqrcode/qrlib.php'; // Include phpqrcode library
+require_once '../libs/phpqrcode/qrlib.php';
 
 // Initialize variables
 $pnr = '';
@@ -17,15 +16,25 @@ $qr_code_path = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'search') {
     $pnr = sanitizeInput($_POST['pnr']);
     if (!empty($pnr)) {
+        // Updated query to join the new tables
         $stmt = $conn->prepare("
-            SELECT b.*, 
-                   t.trip_date, t.departure_time, t.arrival_time, t.vehicle_number, t.driver_name, t.price, t.vehicle_type_id,
-                   pc.name as pickup_city, dc.name as dropoff_city, vt.type as vehicle_type
+            SELECT
+                b.*,
+                vt.type as vehicle_type,
+                v.vehicle_number,
+                v.driver_name,
+                ts.departure_time,
+                ts.arrival_time,
+                pc.name as pickup_city,
+                dc.name as dropoff_city,
+                tt.price
             FROM bookings b
-            JOIN trips t ON b.trip_id = t.id
-            JOIN cities pc ON t.pickup_city_id = pc.id
-            JOIN cities dc ON t.dropoff_city_id = dc.id
-            JOIN vehicle_types vt ON t.vehicle_type_id = vt.id
+            JOIN trip_templates tt ON b.template_id = tt.id
+            JOIN cities pc ON tt.pickup_city_id = pc.id
+            JOIN cities dc ON tt.dropoff_city_id = dc.id
+            JOIN time_slots ts ON tt.time_slot_id = ts.id
+            JOIN vehicles v ON tt.vehicle_id = v.id
+            JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
             WHERE b.pnr = ?
         ");
         $stmt->bind_param("s", $pnr);
@@ -36,17 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if (!$booking) {
             $error = 'No booking found with the provided PNR.';
         } else {
-            // Fetch selected seats
-            $stmt = $conn->prepare("SELECT seat_number FROM seat_bookings WHERE booking_id = ?");
-            $stmt->bind_param("i", $booking['id']);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $booking['selected_seats'] = [];
-            while ($row = $result->fetch_assoc()) {
-                $booking['selected_seats'][] = $row['seat_number'];
-            }
-            $stmt->close();
-
             // Generate QR code for PNR
             $qr_code_dir = '../qrcodes/';
             if (!is_dir($qr_code_dir)) {
@@ -63,15 +61,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Handle booking cancellation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'cancel' && isset($_POST['booking_id'])) {
     $booking_id = (int)$_POST['booking_id'];
-    $stmt = $conn->prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ? AND status != 'cancelled'");
+    $pnr_to_cancel = '';
+
+    // First, get the PNR and template ID for the booking
+    $stmt = $conn->prepare("SELECT pnr, template_id, trip_date FROM bookings WHERE id = ?");
     $stmt->bind_param("i", $booking_id);
-    if ($stmt->execute() && $stmt->affected_rows > 0) {
-        $success = 'Booking cancelled successfully.';
-        $booking['status'] = 'cancelled';
-    } else {
-        $error = 'Unable to cancel booking. It may already be cancelled or invalid.';
-    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $booking_to_cancel = $result->fetch_assoc();
     $stmt->close();
+
+    if ($booking_to_cancel) {
+        $pnr_to_cancel = $booking_to_cancel['pnr'];
+        $template_id = $booking_to_cancel['template_id'];
+        $trip_date = $booking_to_cancel['trip_date'];
+
+        // Start a transaction for atomicity
+        $conn->begin_transaction();
+        $success_flag = false;
+
+        try {
+            // Update booking status
+            $stmt = $conn->prepare("UPDATE bookings SET status = 'cancelled', payment_status = 'cancelled' WHERE id = ? AND status != 'cancelled'");
+            $stmt->bind_param("i", $booking_id);
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                // Update booked_seats in trip_instances
+                $stmt2 = $conn->prepare("UPDATE trip_instances SET booked_seats = booked_seats - 1 WHERE template_id = ? AND trip_date = ?");
+                $stmt2->bind_param("is", $template_id, $trip_date);
+                $stmt2->execute();
+                $stmt2->close();
+                
+                $success = 'Booking cancelled successfully. A refund will be processed to your original payment method.';
+                $success_flag = true;
+            } else {
+                $error = 'Unable to cancel booking. It may already be cancelled or invalid.';
+                $conn->rollback();
+            }
+            $stmt->close();
+
+            if ($success_flag) {
+                $conn->commit();
+                // Re-fetch booking details to display the updated status
+                $stmt = $conn->prepare("
+                    SELECT
+                        b.*,
+                        vt.type as vehicle_type,
+                        v.vehicle_number,
+                        v.driver_name,
+                        ts.departure_time,
+                        ts.arrival_time,
+                        pc.name as pickup_city,
+                        dc.name as dropoff_city,
+                        tt.price
+                    FROM bookings b
+                    JOIN trip_templates tt ON b.template_id = tt.id
+                    JOIN cities pc ON tt.pickup_city_id = pc.id
+                    JOIN cities dc ON tt.dropoff_city_id = dc.id
+                    JOIN time_slots ts ON tt.time_slot_id = ts.id
+                    JOIN vehicles v ON tt.vehicle_id = v.id
+                    JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+                    WHERE b.pnr = ?
+                ");
+                $stmt->bind_param("s", $pnr_to_cancel);
+                $stmt->execute();
+                $booking = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+            }
+        } catch (mysqli_sql_exception $e) {
+            $conn->rollback();
+            $error = "An error occurred during cancellation: " . $e->getMessage();
+        }
+    } else {
+        $error = 'Invalid booking ID.';
+    }
 }
 
 require_once '../templates/header.php';
@@ -97,6 +159,7 @@ require_once '../templates/header.php';
         }
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --primary-red: #dc2626;
@@ -125,7 +188,7 @@ require_once '../templates/header.php';
         .btn-primary {
             background: var(--primary-red);
             color: var(--white);
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 8px;
             transition: background 0.3s ease;
         }
@@ -163,25 +226,38 @@ require_once '../templates/header.php';
             font-size: 0.9rem;
         }
         .qr-code-img {
-            max-width: 150px;
+            max-width: 120px;
             border: 2px solid var(--black);
             border-radius: 8px;
         }
+        @media (max-width: 640px) {
+            .text-3xl { font-size: 1.5rem; }
+            .text-2xl { font-size: 1.25rem; }
+            .text-xl { font-size: 1.125rem; }
+            .p-8 { padding: 1rem; }
+            .p-6 { padding: 1rem; }
+            .max-w-4xl { max-width: 100%; }
+            .px-4 { padding-left: 1rem; padding-right: 1rem; }
+            .gap-8 { gap: 1.5rem; }
+            .py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+            .px-6 { padding-left: 1rem; padding-right: 1rem; }
+        }
         @media print {
-            .no-print { display: none; }
             body { background: white; }
+            .no-print { display: none !important; }
+            .ticket-card { display: block; }
             .gradient-bg { background: var(--primary-red); }
+            .min-h-screen, .py-8, .max-w-4xl, .px-4 { padding: 0; margin: 0; }
         }
     </style>
 </head>
 <body class="min-h-screen py-8">
     <div class="max-w-4xl mx-auto px-4">
-        <!-- PNR Search Form -->
-        <div class="card p-8 mb-8">
-            <h1 class="text-3xl font-bold mb-6">
+        <div class="card p-4 sm:p-8 mb-8 no-print">
+            <h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
                 <i class="fas fa-ticket-alt text-primary mr-2"></i>Manage Your Booking
             </h1>
-            <p class="text-gray-600 mb-6">Enter your PNR to view and manage your booking details.</p>
+            <p class="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base">Enter your PNR to view and manage your booking details.</p>
 
             <?php if ($error): ?>
                 <p class="error-message mb-4"><?= htmlspecialchars($error) ?></p>
@@ -190,44 +266,40 @@ require_once '../templates/header.php';
                 <p class="success-message mb-4"><?= htmlspecialchars($success) ?></p>
             <?php endif; ?>
 
-            <form method="POST" class="mb-6">
+            <form method="POST" class="mb-4 sm:mb-6">
                 <input type="hidden" name="action" value="search">
                 <div class="flex flex-col sm:flex-row gap-4">
-                    <input type="text" name="pnr" value="<?= htmlspecialchars($pnr) ?>" class="input-field" placeholder="Enter your PNR" required>
-                    <button type="submit" class="btn-primary">
+                    <input type="text" name="pnr" value="<?= htmlspecialchars($pnr) ?>" class="input-field text-sm sm:text-base" placeholder="Enter your PNR" required>
+                    <button type="submit" class="btn-primary flex items-center justify-center text-sm sm:text-base">
                         <i class="fas fa-search mr-2"></i>Find Booking
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Booking Details (if found) -->
         <?php if ($booking): ?>
-            <div class="card mb-8">
-                <!-- Header -->
-                <div class="gradient-bg text-white p-6">
-                    <div class="flex items-center justify-between">
+            <div class="card mb-8 ticket-card">
+                <div class="gradient-bg text-white p-4 sm:p-6">
+                    <div class="flex flex-col sm:flex-row items-center justify-between">
                         <div>
-                            <h2 class="text-2xl font-bold"><?= SITE_NAME ?></h2>
-                            <p class="text-red-100">Electronic Ticket</p>
+                            <h2 class="text-xl sm:text-2xl font-bold"><?= SITE_NAME ?></h2>
+                            <p class="text-red-100 text-sm sm:text-base">Electronic Ticket</p>
                         </div>
-                        <div class="text-right">
-                            <div class="text-sm text-red-100">PNR</div>
-                            <div class="text-2xl font-bold"><?= htmlspecialchars($booking['pnr']) ?></div>
+                        <div class="text-center sm:text-right mt-2 sm:mt-0">
+                            <div class="text-xs sm:text-sm text-red-100">PNR</div>
+                            <div class="text-lg sm:text-2xl font-bold"><?= htmlspecialchars($booking['pnr']) ?></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Main Content -->
-                <div class="p-6">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <!-- Trip Details -->
+                <div class="p-4 sm:p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
                         <div>
-                            <h3 class="text-xl font-bold mb-4 flex items-center">
-                                <i class="fas fa-route text-primary mr-3"></i>
+                            <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                                <i class="fas fa-route text-primary mr-2 sm:mr-3"></i>
                                 Trip Details
                             </h3>
-                            <div class="space-y-3">
+                            <div class="space-y-2 sm:space-y-3 text-sm sm:text-base">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Route:</span>
                                     <span class="font-semibold"><?= htmlspecialchars($booking['pickup_city']) ?> → <?= htmlspecialchars($booking['dropoff_city']) ?></span>
@@ -257,25 +329,22 @@ require_once '../templates/header.php';
                                     <span class="font-semibold"><?= htmlspecialchars($booking['driver_name']) ?></span>
                                 </div>
                             </div>
-                            <div class="mt-6">
-                                <h4 class="font-semibold mb-2">Your Seats:</h4>
+                            <div class="mt-4 sm:mt-6">
+                                <h4 class="font-semibold mb-2 text-sm sm:text-base">Your Seat:</h4>
                                 <div class="flex flex-wrap gap-2">
-                                    <?php foreach ($booking['selected_seats'] as $seat): ?>
-                                        <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                            Seat <?= htmlspecialchars($seat) ?>
-                                        </span>
-                                    <?php endforeach; ?>
+                                    <span class="bg-primary text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
+                                        Seat <?= htmlspecialchars($booking['seat_number']) ?>
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Passenger Details -->
                         <div>
-                            <h3 class="text-xl font-bold mb-4 flex items-center">
-                                <i class="fas fa-user text-primary mr-3"></i>
+                            <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
+                                <i class="fas fa-user text-primary mr-2 sm:mr-3"></i>
                                 Passenger Information
                             </h3>
-                            <div class="space-y-3">
+                            <div class="space-y-2 sm:space-y-3 text-sm sm:text-base">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Name:</span>
                                     <span class="font-semibold"><?= htmlspecialchars($booking['passenger_name']) ?></span>
@@ -295,8 +364,8 @@ require_once '../templates/header.php';
                                     </span>
                                 </div>
                             </div>
-                            <div class="mt-6">
-                                <h4 class="font-semibold mb-2">Payment Details:</h4>
+                            <div class="mt-4 sm:mt-6">
+                                <h4 class="font-semibold mb-2 text-sm sm:text-base">Payment Details:</h4>
                                 <div class="space-y-2 text-sm">
                                     <div class="flex justify-between">
                                         <span class="text-gray-600">Amount Paid:</span>
@@ -311,21 +380,20 @@ require_once '../templates/header.php';
                         </div>
                     </div>
 
-                    <!-- Booking Summary -->
-                    <div class="border-t pt-6 mt-6">
+                    <div class="border-t pt-4 sm:pt-6 mt-4 sm:mt-6">
                         <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="flex justify-between items-center">
+                            <div class="flex flex-col sm:flex-row justify-between items-center">
                                 <div>
-                                    <span class="text-lg font-semibold">Total Seats: <?= count($booking['selected_seats']) ?></span>
-                                    <span class="text-gray-600 ml-4">× ₦<?= number_format($booking['price'], 0) ?> each</span>
+                                    <span class="text-base sm:text-lg font-semibold">Total Seats: 1</span>
+                                    <span class="text-gray-600 ml-0 sm:ml-4 text-sm">× ₦<?= number_format($booking['price'], 0) ?> each</span>
                                 </div>
-                                <div class="text-2xl font-bold text-primary">
+                                <div class="text-lg sm:text-2xl font-bold text-primary mt-2 sm:mt-0">
                                     ₦<?= number_format($booking['total_amount'], 0) ?>
                                 </div>
                             </div>
                             <?php if ($qr_code_path): ?>
                                 <div class="mt-4 text-center">
-                                    <h4 class="font-semibold mb-2">Booking QR Code</h4>
+                                    <h4 class="font-semibold mb-2 text-sm sm:text-base">Booking QR Code</h4>
                                     <img src="<?= SITE_URL . '/qrcodes/pnr_' . htmlspecialchars($pnr) . '.png' ?>" alt="PNR QR Code" class="qr-code-img mx-auto">
                                 </div>
                             <?php endif; ?>
@@ -334,13 +402,12 @@ require_once '../templates/header.php';
                 </div>
             </div>
 
-            <!-- Important Information -->
-            <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
-                <h3 class="text-lg font-bold text-yellow-800 mb-3 flex items-center">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-3"></i>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6 mb-8 no-print">
+                <h3 class="text-base sm:text-lg font-bold text-yellow-800 mb-3 flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-2 sm:mr-3"></i>
                     Important Information
                 </h3>
-                <ul class="space-y-2 text-yellow-800">
+                <ul class="space-y-2 text-yellow-800 text-sm sm:text-base">
                     <li class="flex items-start">
                         <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
                         Please arrive at the terminal at least 30 minutes before departure.
@@ -360,40 +427,108 @@ require_once '../templates/header.php';
                 </ul>
             </div>
 
-            <!-- Action Buttons -->
             <div class="flex flex-col sm:flex-row gap-4 justify-center no-print">
-                <button onclick="window.print()" class="btn-primary flex items-center justify-center">
+                <button onclick="window.print()" class="btn-primary flex items-center justify-center text-sm sm:text-base">
                     <i class="fas fa-print mr-2"></i>Print Ticket
                 </button>
-                <button onclick="downloadPDF()" class="btn-secondary flex items-center justify-center">
-                    <i class="fas fa-download mr-2"></i>Download PDF
+               <button onclick="window.print()" class="btn-primary flex items-center justify-center text-sm sm:text-base">
+                    <i class="fas fa-print mr-2"></i>Download PDF
                 </button>
                 <?php if ($booking['status'] !== 'cancelled' && strtotime($booking['trip_date']) > time()): ?>
                     <form method="POST" class="inline">
                         <input type="hidden" name="action" value="cancel">
                         <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                        <button type="submit" class="bg-red-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-red-700 transition-colors duration-200 flex items-center justify-center" onclick="return confirm('Are you sure you want to cancel this booking?');">
+                        <button type="submit" class="bg-red-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-red-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base" onclick="return confirm('Are you sure you want to cancel this booking?');">
                             <i class="fas fa-times mr-2"></i>Cancel Booking
                         </button>
                     </form>
                 <?php endif; ?>
-                <a href="search_trips.php" class="bg-green-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center justify-center">
+                <a href="search_trips.php" class="bg-green-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
                     <i class="fas fa-plus mr-2"></i>Book Another Trip
                 </a>
             </div>
 
-            <!-- Contact Information -->
-            <div class="text-center mt-8 text-gray-600">
-                <p class="mb-2">Need help? Contact us:</p>
-                <p class="font-semibold">Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
-                <p class="text-sm mt-2">Your PNR: <span class="font-bold text-primary"><?= htmlspecialchars($booking['pnr']) ?></span></p>
+            <div class="text-center mt-8 text-gray-600 no-print">
+                <p class="mb-2 text-sm sm:text-base">Need help? Contact us:</p>
+                <p class="font-semibold text-sm sm:text-base">Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
+                <p class="text-xs sm:text-sm mt-2">Your PNR: <span class="font-bold text-primary"><?= htmlspecialchars($booking['pnr']) ?></span></p>
             </div>
         <?php endif; ?>
     </div>
 
     <script>
         function downloadPDF() {
-            window.print(); // Placeholder for PDF generation
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 10;
+            let y = 10;
+
+            // Add logo or title
+            doc.setFontSize(20);
+            doc.setTextColor(220, 38, 38);
+            doc.text('<?= SITE_NAME ?> - Booking Confirmation', margin, y);
+            y += 10;
+
+            // PNR
+            doc.setFontSize(12);
+            doc.setTextColor(0);
+            doc.text('PNR: <?= htmlspecialchars($booking['pnr'] ?? '') ?>', margin, y);
+            y += 10;
+
+            // Trip Details
+            doc.setFontSize(16);
+            doc.text('Trip Details', margin, y);
+            y += 10;
+            doc.setFontSize(12);
+            doc.text('Route: <?= htmlspecialchars($booking['pickup_city'] ?? '') ?> → <?= htmlspecialchars($booking['dropoff_city'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Date: <?= formatDate($booking['trip_date'] ?? '', 'j, M, Y') ?>', margin, y);
+            y += 7;
+            doc.text('Departure Time: <?= formatTime($booking['departure_time'] ?? '', 'g:i A') ?>', margin, y);
+            y += 7;
+            doc.text('Arrival Time: <?= $booking['arrival_time'] ? formatTime($booking['arrival_time'], 'g:i A') : '-' ?>', margin, y);
+            y += 7;
+            doc.text('Vehicle: <?= htmlspecialchars($booking['vehicle_type'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Vehicle Number: <?= htmlspecialchars($booking['vehicle_number'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Driver: <?= htmlspecialchars($booking['driver_name'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Seat: <?= htmlspecialchars($booking['seat_number'] ?? '') ?>', margin, y);
+            y += 10;
+
+            // Passenger Details
+            doc.setFontSize(16);
+            doc.text('Passenger Details', margin, y);
+            y += 10;
+            doc.setFontSize(12);
+            doc.text('Name: <?= htmlspecialchars($booking['passenger_name'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Email: <?= htmlspecialchars($booking['email'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Phone: <?= htmlspecialchars($booking['phone'] ?? '') ?>', margin, y);
+            y += 7;
+            doc.text('Status: <?= ucfirst(htmlspecialchars($booking['status'] ?? '')) ?>', margin, y);
+            y += 10;
+
+            // Payment Details
+            doc.setFontSize(16);
+            doc.text('Payment Details', margin, y);
+            y += 10;
+            doc.setFontSize(12);
+            doc.text('Amount Paid: ₦<?= number_format($booking['total_amount'] ?? 0, 0) ?>', margin, y);
+            y += 7;
+            doc.text('Payment Status: <?= ucfirst(htmlspecialchars($booking['payment_status'] ?? '')) ?>', margin, y);
+            y += 10;
+
+            // Footer
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text('Contact: Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?>', margin, doc.internal.pageSize.getHeight() - 10);
+
+            // Save PDF
+            doc.save('DGC_Transport_Booking_<?= htmlspecialchars($booking['pnr'] ?? 'ticket') ?>.pdf');
         }
     </script>
 <?php require_once '../templates/footer.php'; ?>

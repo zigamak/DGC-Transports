@@ -1,7 +1,4 @@
 <?php
-// includes/send_email.php
-// Function to send booking confirmation emails using PHPMailer
-
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
@@ -15,11 +12,9 @@ use PHPMailer\PHPMailer\Exception;
 function sendBookingConfirmationEmail($booking_data) {
     global $conn;
     
-    // Initialize PHPMailer
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings
         $mail->isSMTP();
         $mail->Host = SMTP_HOST;
         $mail->SMTPAuth = true;
@@ -28,41 +23,33 @@ function sendBookingConfirmationEmail($booking_data) {
         $mail->SMTPSecure = SMTP_SECURE;
         $mail->Port = SMTP_PORT;
 
-        // Recipients
         $mail->setFrom(FROM_EMAIL, FROM_NAME);
         $mail->addAddress($booking_data['email'], $booking_data['passenger_name']);
         $mail->addReplyTo(FROM_EMAIL, FROM_NAME);
 
-        // Content
         $mail->isHTML(true);
         $mail->Subject = 'Booking Confirmation - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME;
         
-        // Load the email template
         $mail->Body = renderBookingConfirmationTemplate($booking_data);
         if (empty($mail->Body)) {
             throw new Exception('Email body is empty - template rendering failed');
         }
         
-        // Alternative plain text version
         $mail->AltBody = createPlainTextVersion($booking_data);
 
-        // Send email
         $result = $mail->send();
         
         if ($result) {
-            // Log successful email
             logEmail($booking_data['email'], 'booking_confirmation', 'sent', 'Booking confirmation sent for PNR: ' . $booking_data['pnr']);
             error_log("Booking confirmation email sent successfully to: " . $booking_data['email']);
             return true;
         } else {
-            // Log failed email
             logEmail($booking_data['email'], 'booking_confirmation', 'failed', 'Failed to send booking confirmation');
             error_log("Failed to send booking confirmation email to: " . $booking_data['email']);
             return false;
         }
         
     } catch (Exception $e) {
-        // Log error
         logEmail($booking_data['email'], 'booking_confirmation', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
         error_log("PHPMailer Error: " . $mail->ErrorInfo);
         return false;
@@ -78,7 +65,6 @@ function sendBookingCancellationEmail($booking_data) {
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings
         $mail->isSMTP();
         $mail->Host = SMTP_HOST;
         $mail->SMTPAuth = true;
@@ -87,15 +73,12 @@ function sendBookingCancellationEmail($booking_data) {
         $mail->SMTPSecure = SMTP_SECURE;
         $mail->Port = SMTP_PORT;
 
-        // Recipients
         $mail->setFrom(FROM_EMAIL, FROM_NAME);
         $mail->addAddress($booking_data['email'], $booking_data['passenger_name']);
 
-        // Content
         $mail->isHTML(true);
         $mail->Subject = 'Booking Cancelled - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME;
         
-        // Simple cancellation template
         $mail->Body = renderCancellationTemplate($booking_data);
         if (empty($mail->Body)) {
             throw new Exception('Cancellation email body is empty - template rendering failed');
@@ -115,6 +98,55 @@ function sendBookingCancellationEmail($booking_data) {
         
     } catch (Exception $e) {
         logEmail($booking_data['email'], 'booking_cancellation', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
+        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+        return false;
+    }
+}
+
+/**
+ * Send set password email
+ */
+function sendPasswordResetEmail($reset_data) {
+    global $conn;
+    
+    $mail = new PHPMailer(true);
+    
+    try {
+        $mail->isSMTP();
+        $mail->Host = SMTP_HOST;
+        $mail->SMTPAuth = true;
+        $mail->Username = SMTP_USERNAME;
+        $mail->Password = SMTP_PASSWORD;
+        $mail->SMTPSecure = SMTP_SECURE;
+        $mail->Port = SMTP_PORT;
+
+        $mail->setFrom(FROM_EMAIL, FROM_NAME);
+        $mail->addAddress($reset_data['email']);
+
+        $mail->isHTML(true);
+        $mail->Subject = 'Set Up Your Password - ' . SITE_NAME;
+        
+        $mail->Body = renderPasswordResetTemplate($reset_data);
+        if (empty($mail->Body)) {
+            throw new Exception('Set password email body is empty - template rendering failed');
+        }
+        
+        $mail->AltBody = "Your account has been created.\n\nClick the following link to set up your password: " . SITE_URL . "/set_password.php?token={$reset_data['token']}\n\nThis link expires at {$reset_data['expires_at']}.";
+
+        $result = $mail->send();
+        
+        if ($result) {
+            logEmail($reset_data['email'], 'set_password', 'sent', 'Set password link sent to: ' . $reset_data['email']);
+            error_log("Set password email sent successfully to: " . $reset_data['email']);
+            return true;
+        } else {
+            logEmail($reset_data['email'], 'set_password', 'failed', 'Failed to send set password link');
+            error_log("Failed to send set password email to: " . $reset_data['email']);
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        logEmail($reset_data['email'], 'set_password', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
         error_log("PHPMailer Error: " . $mail->ErrorInfo);
         return false;
     }
@@ -168,7 +200,32 @@ function renderCancellationTemplate($booking) {
 }
 
 /**
- * Create plain text version of booking confirmation - Fixed version
+ * Render set password email template
+ */
+function renderPasswordResetTemplate($reset_data) {
+    $template_path = __DIR__ . '/templates/email_set_password.php';
+    if (!file_exists($template_path)) {
+        error_log("Email template not found: $template_path");
+        return '';
+    }
+    
+    ob_start();
+    try {
+        include $template_path;
+        $content = ob_get_clean();
+        if (empty($content)) {
+            error_log("Email template rendered empty content: $template_path");
+        }
+        return $content;
+    } catch (Exception $e) {
+        error_log("Error rendering email template ($template_path): " . $e->getMessage());
+        ob_end_clean();
+        return '';
+    }
+}
+
+/**
+ * Create plain text version of booking confirmation
  */
 function createPlainTextVersion($booking) {
     $text = SITE_NAME . " - Booking Confirmation\n\n";
@@ -180,12 +237,10 @@ function createPlainTextVersion($booking) {
     $text .= "Departure: " . date('H:i', strtotime($booking['trip']['departure_time'])) . "\n";
     $text .= "Vehicle: " . $booking['trip']['vehicle_type'] . " - " . $booking['trip']['vehicle_number'] . "\n";
     
-    // Handle optional driver name
     if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
         $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
     }
     
-    // Fixed: Use seat_number from booking data instead of selected_seats array
     $text .= "Seat: " . $booking['seat_number'] . "\n";
     $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n\n";
     $text .= "Please arrive at the terminal 30 minutes before departure.\n";
@@ -202,10 +257,8 @@ function logEmail($to_email, $email_type, $status, $message = '') {
     global $conn;
     
     try {
-        // Check if email_logs table exists first
         $result = $conn->query("SHOW TABLES LIKE 'email_logs'");
         if ($result->num_rows === 0) {
-            // Create email_logs table if it doesn't exist
             $create_table = "
                 CREATE TABLE email_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -236,8 +289,6 @@ function logEmail($to_email, $email_type, $status, $message = '') {
  * Send reminder email (for future use)
  */
 function sendTripReminderEmail($booking_data) {
-    // Implementation for trip reminder emails
-    // Can be used to send reminders 24 hours before trip
     return true;
 }
 
@@ -256,7 +307,6 @@ function testEmailConfiguration() {
         $mail->SMTPSecure = SMTP_SECURE;
         $mail->Port = SMTP_PORT;
         
-        // Test connection
         $mail->smtpConnect();
         $mail->smtpClose();
         

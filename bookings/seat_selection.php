@@ -18,7 +18,6 @@ $stmt = $conn->prepare("
     SELECT 
         tt.id,
         tt.pickup_city_id,
-        tt.dropoff_city_id,
         pc.name as pickup_city,
         dc.name as dropoff_city,
         vt.capacity,
@@ -68,8 +67,11 @@ $stmt->close();
             theme: {
                 extend: {
                     colors: {
-                        primary: '#dc2626',
-                        secondary: '#991b1b',
+                        primary: '#1f2937', // Dark Gray
+                        accent: '#ef4444', // Red
+                        'accent-hover': '#dc2626',
+                        'accent-selected': '#b91c1c',
+                        'accent-booked': '#9ca3af', // Gray for booked seats
                     }
                 }
             }
@@ -78,109 +80,94 @@ $stmt->close();
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .seat-available {
-            background: linear-gradient(135deg, #e5e7eb, #f3f4f6);
-            border: 2px solid #d1d5db;
-            color: #374151;
-            transition: all 0.3s ease;
+            background-color: #f9fafb;
+            border: 2px solid #e5e7eb;
+            color: #4b5563;
+            transition: all 0.2s ease-in-out;
         }
-        
         .seat-available:hover {
-            background: linear-gradient(135deg, #dbeafe, #eff6ff);
-            border-color: #3b82f6;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+            transform: scale(1.03);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
         }
-        
         .seat-selected {
-            background: linear-gradient(135deg, #dc2626, #b91c1c);
-            border: 2px solid #991b1b;
+            background-color: #ef4444;
+            border: 2px solid #dc2626;
             color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-            animation: pulse 2s infinite;
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(239, 68, 68, 0.4);
+            animation: pop-in 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
         }
-        
+        @keyframes pop-in {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1.05); opacity: 1; }
+        }
         .seat-booked {
-            background: linear-gradient(135deg, #6b7280, #9ca3af);
-            border: 2px solid #4b5563;
-            color: #f3f4f6;
+            background-color: #e5e7eb;
+            border: 2px solid #d1d5db;
+            color: #9ca3af;
             cursor: not-allowed;
-            opacity: 0.6;
+            opacity: 0.8;
         }
-        
-        @keyframes pulse {
-            0%, 100% {
-                box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-            }
-            50% {
-                box-shadow: 0 6px 16px rgba(220, 38, 38, 0.5);
-            }
-        }
-        
         .seat-icon {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             margin-bottom: 0.5rem;
+        }
+        .submit-button-active {
+            background: #ef4444;
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        .submit-button-active:hover {
+            background: #dc2626;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="min-h-screen py-8">
-        <div class="max-w-4xl mx-auto px-4">
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-                <div class="flex items-center justify-between mb-4">
-                    <h1 class="text-3xl font-bold text-black">Select Your Seats</h1>
-                    <a href="search_trips.php" class="text-primary hover:text-secondary font-semibold">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Trips
+<body class="bg-gray-100 font-sans">
+    <div class="min-h-screen py-10">
+        <div class="max-w-5xl mx-auto px-4">
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h1 class="text-4xl font-extrabold text-primary">Choose Your Seats</h1>
+                    <a href="search_trips.php" class="text-primary hover:text-accent font-semibold flex items-center gap-2">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back to Trips</span>
                     </a>
                 </div>
-                <div class="text-sm text-gray-600">
-                    Select <?= $num_seats ?> seat(s) for your trip from <?= htmlspecialchars($trip_details['pickup_city']) ?> to <?= htmlspecialchars($trip_details['dropoff_city']) ?>
-                    on <?= date('D, M j, Y', strtotime($trip['trip_date'])) ?>
+                <p class="text-lg text-gray-600 mb-6">
+                    Selecting <span class="font-bold text-accent"><?= $num_seats ?></span> seat(s) for your trip from <span class="font-bold"><?= htmlspecialchars($trip_details['pickup_city']) ?></span> to <span class="font-bold"><?= htmlspecialchars($trip_details['dropoff_city']) ?></span>
+                    on <span class="font-bold"><?= date('D, M j, Y', strtotime($trip['trip_date'])) ?></span>.
+                </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-white rounded-2xl shadow-lg p-6 mb-8">
+                <div class="flex flex-wrap justify-center sm:justify-start gap-6 mb-4 sm:mb-0">
+                    <div class="flex items-center gap-2">
+                        <div class="w-5 h-5 rounded-md bg-gray-200 border-2 border-gray-300"></div>
+                        <span class="text-sm text-gray-700">Available</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-5 h-5 rounded-md bg-accent border-2 border-accent-hover"></div>
+                        <span class="text-sm text-gray-700">Selected</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-5 h-5 rounded-md bg-accent-booked border-2 border-gray-400"></div>
+                        <span class="text-sm text-gray-700">Booked</span>
+                    </div>
+                </div>
+                <div class="text-md font-semibold text-primary text-center sm:text-right">
+                    <span id="selectedCount" class="text-2xl font-bold text-accent-hover">0</span> / <?= $num_seats ?> seats selected
                 </div>
             </div>
 
-            <!-- Seat Legend -->
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                <h3 class="text-lg font-semibold mb-4">Seat Legend</h3>
-                <div class="flex flex-wrap gap-6">
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded seat-available"></div>
-                        <span class="text-sm text-gray-600">Available</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded seat-selected"></div>
-                        <span class="text-sm text-gray-600">Selected</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded seat-booked"></div>
-                        <span class="text-sm text-gray-600">Booked</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Debug Information (remove in production) -->
-            <?php if (isset($_GET['debug'])): ?>
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                    <h4 class="font-bold mb-2">Debug Information:</h4>
-                    <p><strong>Template ID:</strong> <?= $trip['template_id'] ?></p>
-                    <p><strong>Trip Date:</strong> <?= $trip['trip_date'] ?></p>
-                    <p><strong>Booked Seats:</strong> <?= implode(', ', $booked_seat_numbers) ?></p>
-                    <p><strong>Total Capacity:</strong> <?= $trip_details['capacity'] ?></p>
-                </div>
-            <?php endif; ?>
-
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold">Available Seats</h3>
-                    <div class="text-sm font-medium">
-                        <span id="selectedCount" class="text-primary">0</span> / <?= $num_seats ?> seats selected
-                    </div>
-                </div>
-                
+            <div class="bg-white rounded-2xl shadow-xl p-8">
                 <form id="seatForm" action="process_seat_selection.php" method="POST">
                     <input type="hidden" name="selected_seats" id="selectedSeatsInput" value="">
                     
-                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
                         <?php for ($i = 1; $i <= $trip_details['capacity']; $i++): ?>
                             <?php $is_booked = in_array($i, $booked_seat_numbers); ?>
                             <div class="seat-container">
@@ -192,31 +179,29 @@ $stmt->close();
                                        <?= $is_booked ? 'disabled' : '' ?>
                                        onchange="updateSeatSelection(<?= $i ?>)">
                                 <label for="seat_<?= $i ?>" 
-                                       class="seat-label block text-center p-4 rounded-lg min-h-[80px] flex flex-col items-center justify-center
-                                              <?= $is_booked ? 'seat-booked cursor-not-allowed' : 'seat-available cursor-pointer' ?>"
+                                       class="seat-label w-full h-full block text-center p-4 rounded-lg flex flex-col items-center justify-center
+                                               <?= $is_booked ? 'seat-booked' : 'seat-available cursor-pointer' ?>"
                                        id="label_<?= $i ?>">
                                     <i class="fas fa-chair seat-icon"></i>
-                                    <span class="text-sm font-medium">
-                                        Seat <?= $i ?>
-                                        <?= $is_booked ? '<br><small>(Booked)</small>' : '' ?>
-                                    </span>
+                                    <span class="text-sm font-semibold">Seat <?= $i ?></span>
+                                    <?= $is_booked ? '<small class="text-xs font-normal">(Booked)</small>' : '' ?>
                                 </label>
                             </div>
                         <?php endfor; ?>
                     </div>
                     
-                    <div class="mt-8">
-                        <div id="selectedSeatsDisplay" class="mb-4 p-4 bg-gray-50 rounded-lg hidden">
-                            <h4 class="font-semibold mb-2">Selected Seats:</h4>
-                            <div id="selectedSeatsList" class="flex flex-wrap gap-2"></div>
+                    <div class="mt-10">
+                        <div id="selectedSeatsDisplay" class="p-4 bg-gray-50 rounded-xl hidden transition-all duration-300">
+                            <h4 class="font-bold text-lg mb-3 text-primary">Your Selected Seats:</h4>
+                            <div id="selectedSeatsList" class="flex flex-wrap gap-3"></div>
                         </div>
                         
-                        <p id="seatError" class="text-red-600 mb-4 hidden">Please select exactly <?= $num_seats ?> seat(s).</p>
+                        <p id="seatError" class="text-red-600 font-medium mt-4 hidden">Please select exactly <?= $num_seats ?> seat(s).</p>
                         
                         <button type="submit" 
                                 id="submitBtn" 
                                 disabled
-                                class="w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg disabled:cursor-not-allowed">
+                                class="mt-8 w-full font-bold py-5 px-6 rounded-xl transition-all duration-300 text-lg disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed">
                             <i class="fas fa-arrow-right mr-2"></i>
                             Proceed to Passenger Details
                         </button>
@@ -235,9 +220,7 @@ $stmt->close();
         console.log('Booked seats:', bookedSeats);
 
         function updateSeatSelection(seatNumber) {
-            // Check if seat is booked
             if (bookedSeats.includes(seatNumber)) {
-                alert('This seat is already booked!');
                 return;
             }
             
@@ -252,7 +235,6 @@ $stmt->close();
                 } else {
                     checkbox.checked = false;
                     alert('You can only select ' + requiredSeats + ' seat(s).');
-                    return;
                 }
             } else {
                 selectedSeats = selectedSeats.filter(seat => seat != seatNumber);
@@ -278,19 +260,20 @@ $stmt->close();
                 selectedSeatsDisplay.classList.remove('hidden');
                 selectedSeatsList.innerHTML = selectedSeats
                     .sort((a, b) => a - b)
-                    .map(seat => `<span class="bg-primary text-white px-3 py-1 rounded-full text-sm">Seat ${seat}</span>`)
+                    .map(seat => `<span class="bg-accent-hover text-white px-3 py-1 rounded-full text-sm font-medium">Seat ${seat}</span>`)
                     .join('');
             } else {
                 selectedSeatsDisplay.classList.add('hidden');
+                selectedSeatsList.innerHTML = '';
             }
 
             if (selectedSeats.length === requiredSeats) {
                 submitBtn.disabled = false;
-                submitBtn.className = "w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 px-6 rounded-xl hover:from-secondary hover:to-primary transition-all duration-300 shadow-lg hover:shadow-xl";
+                submitBtn.classList.add('submit-button-active');
                 errorDiv.classList.add('hidden');
             } else {
                 submitBtn.disabled = true;
-                submitBtn.className = "w-full bg-gradient-to-r from-gray-400 to-gray-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg disabled:cursor-not-allowed";
+                submitBtn.classList.remove('submit-button-active');
                 if (selectedSeats.length > 0) {
                     errorDiv.classList.remove('hidden');
                 } else {
@@ -306,13 +289,11 @@ $stmt->close();
                 return;
             }
             
-            // Show loading state
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
             submitBtn.disabled = true;
         });
 
-        // Initialize UI
         updateUI();
     </script>
 </body>
