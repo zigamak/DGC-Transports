@@ -168,7 +168,7 @@ function renderCancellationTemplate($booking) {
 }
 
 /**
- * Create plain text version of booking confirmation
+ * Create plain text version of booking confirmation - Fixed version
  */
 function createPlainTextVersion($booking) {
     $text = SITE_NAME . " - Booking Confirmation\n\n";
@@ -179,8 +179,14 @@ function createPlainTextVersion($booking) {
     $text .= "Date: " . date('M j, Y', strtotime($booking['trip']['trip_date'])) . "\n";
     $text .= "Departure: " . date('H:i', strtotime($booking['trip']['departure_time'])) . "\n";
     $text .= "Vehicle: " . $booking['trip']['vehicle_type'] . " - " . $booking['trip']['vehicle_number'] . "\n";
-    $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
-    $text .= "Seats: " . implode(', ', array_map(function($seat) { return "Seat $seat"; }, $booking['selected_seats'])) . "\n";
+    
+    // Handle optional driver name
+    if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
+        $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
+    }
+    
+    // Fixed: Use seat_number from booking data instead of selected_seats array
+    $text .= "Seat: " . $booking['seat_number'] . "\n";
     $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n\n";
     $text .= "Please arrive at the terminal 30 minutes before departure.\n";
     $text .= "Bring a valid ID for verification.\n\n";
@@ -196,6 +202,24 @@ function logEmail($to_email, $email_type, $status, $message = '') {
     global $conn;
     
     try {
+        // Check if email_logs table exists first
+        $result = $conn->query("SHOW TABLES LIKE 'email_logs'");
+        if ($result->num_rows === 0) {
+            // Create email_logs table if it doesn't exist
+            $create_table = "
+                CREATE TABLE email_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    to_email VARCHAR(255) NOT NULL,
+                    email_type VARCHAR(50) NOT NULL,
+                    status VARCHAR(20) NOT NULL,
+                    message TEXT,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ";
+            $conn->query($create_table);
+            error_log("Created email_logs table");
+        }
+        
         $stmt = $conn->prepare("
             INSERT INTO email_logs (to_email, email_type, status, message, sent_at) 
             VALUES (?, ?, ?, ?, NOW())
