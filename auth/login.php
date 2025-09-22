@@ -1,18 +1,23 @@
 <?php
+// auth/login.php
 session_start();
-require_once 'includes/db.php';
-require_once 'includes/config.php';
-require_once 'includes/auth.php'; // Include the auth file
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
-// If user is already logged in, redirect them based on their role
 if (isLoggedIn()) {
-    redirectUser();
+    // If already logged in, redirect back to passenger_details.php or appropriate dashboard
+    if (isset($_SESSION['selected_trip']) && isset($_SESSION['selected_seats'])) {
+        header("Location: " . SITE_URL . "/bookings/passenger_details.php");
+    } else {
+        redirectUser();
+    }
+    exit();
 }
 
-// Handle form submission
 $error = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
+    $email = trim($_POST['email']);
     $password = $_POST['password'];
 
     $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
@@ -23,14 +28,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->close();
 
     if ($user && password_verify($password, $user['password'])) {
-        $_SESSION['user'] = $user;
-        redirectUser();
+        $_SESSION['user'] = [
+            'id' => $user['id'],
+            'first_name' => $user['first_name'],
+            'last_name' => $user['last_name'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+            'affiliate_id' => $user['affiliate_id'],
+            'credits' => $user['credits']
+        ];
+        // Redirect back to passenger_details.php if booking in progress, else to dashboard
+        if (isset($_SESSION['selected_trip']) && isset($_SESSION['selected_seats'])) {
+            header("Location: " . SITE_URL . "/bookings/passenger_details.php");
+        } else {
+            redirectUser();
+        }
+        exit();
     } else {
         $error = "Invalid email or password.";
     }
 }
-
-require_once 'templates/header.php';
 ?>
 
 <!DOCTYPE html>
@@ -64,7 +81,7 @@ require_once 'templates/header.php';
                     </div>
                 <?php endif; ?>
 
-                <form action="login.php" method="POST" class="space-y-6">
+                <form action="" method="POST" class="space-y-6">
                     <div>
                         <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">
                             <i class="fas fa-envelope text-primary mr-2"></i>Email Address
@@ -93,13 +110,8 @@ require_once 'templates/header.php';
 
                 <div class="mt-6 text-center">
                     <p class="text-gray-600">Don't have an account?
-                        <a href="signup.php" class="text-primary hover:underline font-semibold">Sign Up</a>
+                        <a href="<?= SITE_URL ?>/auth/signup.php" class="text-primary hover:underline font-semibold">Sign Up</a>
                     </p>
-                </div>
-
-                <div class="mt-4 text-center">
-                    <p class="text-gray-600">Join our affiliate program! Earn credits by referring others.</p>
-                    <p class="text-sm text-gray-500">Sign up to get your unique affiliate ID.</p>
                 </div>
             </div>
         </div>
@@ -118,4 +130,3 @@ require_once 'templates/header.php';
     </script>
 </body>
 </html>
-?>

@@ -1,5 +1,4 @@
 <?php
-// includes/auth.php
 require_once __DIR__ . '/config.php';
 
 /**
@@ -64,8 +63,50 @@ function requireRole($required_roles, $redirect_page = '/dashboard.php') {
     }
 
     $user_role = $_SESSION['user']['role'];
-    if (!in_array($user_role, (array)$required_roles)) {
+    if (!is_array($required_roles)) {
+        $required_roles = [$required_roles];
+    }
+    if (!in_array($user_role, $required_roles)) {
         header("Location: " . SITE_URL . $redirect_page);
         exit();
     }
 }
+
+/**
+ * Generates a unique affiliate ID for a user in the format FIRST_NAME+ID (all caps).
+ * @param mysqli $conn Database connection.
+ * @param string $first_name User's first name.
+ * @param int $user_id User's ID.
+ * @return string Unique affiliate ID.
+ */
+function generateAffiliateId($conn, $first_name, $user_id) {
+    // Create base affiliate ID: FIRST_NAME+ID (all caps)
+    $base_id = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $first_name)  . $user_id);
+    
+    // Check if the affiliate ID already exists
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE affiliate_id = ?");
+    $stmt->bind_param("s", $base_id);
+    $stmt->execute();
+    $stmt->bind_result($count);
+    $stmt->fetch();
+    $stmt->close();
+
+    // If ID exists, append a number until unique
+    if ($count > 0) {
+        $suffix = 1;
+        do {
+            $new_id = $base_id . $suffix;
+            $stmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE affiliate_id = ?");
+            $stmt->bind_param("s", $new_id);
+            $stmt->execute();
+            $stmt->bind_result($count);
+            $stmt->fetch();
+            $stmt->close();
+            $suffix++;
+        } while ($count > 0);
+        return $new_id;
+    }
+    
+    return $base_id;
+}
+?>

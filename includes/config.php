@@ -1,8 +1,8 @@
 <?php
 // includes/config.php
 
-define('SITE_URL', 'http://booking.dgctransports.com');
-//define('BASE_DIR', '/public_html/booking.dgctransports.com'); // e.g., /home/dgctrans/public_html/booking.dgctransports.com
+define('SITE_URL', 'http://localhost/dgctransports');
+//define('BASE_DIR', 'C:/xampp/htdocs/dgctransports'); // e.g., /home/dgctrans/public_html/booking.dgctransports.com
 //define('LOGS_DIR', BASE_DIR . '/logs'); // e.g., /home/dgctrans/public_html/booking.dgctransports.com/logs
 
 
