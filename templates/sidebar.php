@@ -100,4 +100,4 @@ if (function_exists('isLoggedIn') && isLoggedIn()): ?>
             }
         });
     </script>
-<?php endif; ?>
+<?php endif; ?>z

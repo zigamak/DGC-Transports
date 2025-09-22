@@ -126,14 +126,16 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
         .form-group {
             position: relative;
         }
-        .form-group i {
+        .form-group .field-icon {
             position: absolute;
             left: 12px;
-            top: 40px;
+            top: 50%;
+            transform: translateY(-50%);
             color: var(--primary-red);
+            pointer-events: none;
         }
         .input-field-with-icon {
-            padding-left: 36px;
+            padding-left: 40px;
         }
         .error-message {
             color: var(--primary-red);
@@ -180,6 +182,47 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
             visibility: visible;
             opacity: 1;
         }
+        /* Seat counter styles */
+        .seat-counter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0;
+            width: 100%;
+            overflow: hidden;
+        }
+        .seat-counter button {
+            background: #f5f5f5;
+            color: var(--black);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .seat-counter button:hover {
+            background: #e5e7eb;
+        }
+        .seat-counter input {
+            text-align: center;
+            border: none;
+            width: 100%;
+            background: transparent;
+            font-size: 1rem;
+            -moz-appearance: textfield; /* Firefox */
+            padding: 10px 0;
+        }
+        .seat-counter input::-webkit-outer-spin-button,
+        .seat-counter input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -195,7 +238,6 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
         <div class="container w-full">
             <div class="card overflow-hidden fade-in">
                 <div class="grid lg:grid-cols-2 gap-0">
-                    <!-- Left side - Booking Form -->
                     <div class="p-8 lg:p-12">
                         <div class="max-w-md mx-auto">
                             <div class="text-center mb-8">
@@ -212,12 +254,12 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                                 <p class="error-message"><i class="fas fa-exclamation-circle"></i>Unable to load booking options. Please try again later.</p>
                             <?php endif; ?>
                             <form id="bookingForm" action="bookings/search_trips.php" method="POST" class="space-y-6">
-                                <div class="grid grid-cols-2 gap-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div class="form-group">
                                         <label for="pickup_city_id" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-map-marker-alt mr-2"></i>From
+                                            From
                                         </label>
-                                        <i class="fas fa-map-marker-alt"></i>
+                                        <i class="fas fa-map-marker-alt field-icon"></i>
                                         <select class="input-field input-field-with-icon" id="pickup_city_id" name="pickup_city_id" required aria-label="Pickup city" onchange="updateDropoffOptions()">
                                             <option value="">Select pickup city</option>
                                             <?php
@@ -232,9 +274,9 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                                     </div>
                                     <div class="form-group">
                                         <label for="dropoff_city_id" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-map-marker-alt mr-2"></i>To
+                                            To
                                         </label>
-                                        <i class="fas fa-map-marker-alt"></i>
+                                        <i class="fas fa-map-marker-alt field-icon"></i>
                                         <select class="input-field input-field-with-icon" id="dropoff_city_id" name="dropoff_city_id" required aria-label="Destination city">
                                             <option value="">Select destination</option>
                                             <?php
@@ -248,12 +290,12 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                                         </select>
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-3 gap-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div class="form-group">
                                         <label for="vehicle_type_id" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-bus mr-2"></i>Vehicle
+                                            Vehicle
                                         </label>
-                                        <i class="fas fa-bus"></i>
+                                        <i class="fas fa-bus field-icon"></i>
                                         <select class="input-field input-field-with-icon" id="vehicle_type_id" name="vehicle_type_id" required aria-label="Vehicle type" onchange="updateMaxSeats()">
                                             <option value="">Choose vehicle</option>
                                             <?php foreach ($vehicle_types as $vehicle): ?>
@@ -263,20 +305,23 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    <div class="form-group tooltip">
-                                        <label for="departure_date" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-calendar mr-2"></i>Date
-                                        </label>
-                                        <i class="fas fa-calendar"></i>
-                                        <input type="date" class="input-field input-field-with-icon" id="departure_date" name="departure_date" required min="<?= date('Y-m-d') ?>" max="<?= $max_date ?>" aria-label="Departure date">
-                                        <span class="tooltip-text">Select a travel date up to <?= date('M j, Y', strtotime($max_date)) ?></span>
-                                    </div>
                                     <div class="form-group">
                                         <label for="num_seats" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-users mr-2"></i>Seats
+                                            Seats
                                         </label>
-                                        <i class="fas fa-users"></i>
-                                        <input type="number" class="input-field input-field-with-icon" id="num_seats" name="num_seats" required min="1" placeholder="No. of seats" aria-label="Number of seats">
+                                        <div class="seat-counter">
+                                            <button type="button" id="decrement-seats" class="btn-seat" aria-label="Decrement seats">-</button>
+                                            <input type="number" class="input-field" id="num_seats" name="num_seats" value="1" min="1" required aria-label="Number of seats">
+                                            <button type="button" id="increment-seats" class="btn-seat" aria-label="Increment seats">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group tooltip">
+                                        <label for="departure_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                                            Date
+                                        </label>
+                                        <i class="fas fa-calendar field-icon"></i>
+                                        <input type="date" class="input-field input-field-with-icon" id="departure_date" name="departure_date" required min="<?= date('Y-m-d') ?>" max="<?= $max_date ?>" aria-label="Departure date">
+                                        <span class="tooltip-text">Select a travel date up to <?= date('M j, Y', strtotime($max_date)) ?></span>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn-primary w-full">
@@ -285,8 +330,7 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                             </form>
                         </div>
                     </div>
-                    <!-- Right side - Hero Image -->
-                    <div class="hero-image relative lg:flex items-center justify-center">
+                    <div class="hero-image relative hidden lg:flex items-center justify-center">
                         <div class="absolute inset-0 bg-black opacity-50"></div>
                         <div class="relative z-10 p-8 text-center text-white">
                             <i class="fas fa-bus text-8xl text-primary-red mb-6"></i>
@@ -360,30 +404,61 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
             if (selectedVehicleId && vehicleTypes[selectedVehicleId]) {
                 const maxSeats = vehicleTypes[selectedVehicleId].capacity;
                 numSeatsInput.max = maxSeats;
-                numSeatsInput.placeholder = `1-${maxSeats} seats`;
-                if (numSeatsInput.value > maxSeats) {
+                // If current seats exceed new max, set to max
+                if (parseInt(numSeatsInput.value) > maxSeats) {
                     numSeatsInput.value = maxSeats;
                 }
             } else {
                 numSeatsInput.max = '';
-                numSeatsInput.placeholder = 'No. of seats';
             }
         }
 
-        // Form validation
+        // Form validation and seat counter logic
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('bookingForm');
+            const numSeatsInput = document.getElementById('num_seats');
+            const decrementBtn = document.getElementById('decrement-seats');
+            const incrementBtn = document.getElementById('increment-seats');
+            const today = new Date().toISOString().split('T')[0];
+            const maxDate = '<?php echo $max_date; ?>';
+
+            // Seat counter functionality
+            decrementBtn.addEventListener('click', function() {
+                let currentSeats = parseInt(numSeatsInput.value);
+                if (currentSeats > 1) {
+                    numSeatsInput.value = currentSeats - 1;
+                }
+            });
+
+            incrementBtn.addEventListener('click', function() {
+                let currentSeats = parseInt(numSeatsInput.value);
+                const maxSeats = parseInt(numSeatsInput.max);
+                if (isNaN(maxSeats) || currentSeats < maxSeats) {
+                    numSeatsInput.value = currentSeats + 1;
+                } else if (!isNaN(maxSeats) && currentSeats >= maxSeats) {
+                    showError(`Cannot exceed max seats for this vehicle (${maxSeats}).`);
+                }
+            });
+
+            // Ensure seat input is always at least 1
+            numSeatsInput.addEventListener('change', function() {
+                if (numSeatsInput.value < 1) {
+                    numSeatsInput.value = 1;
+                }
+            });
+
             if (form) {
                 form.addEventListener('submit', function(e) {
                     const pickupCity = document.getElementById('pickup_city_id').value;
                     const dropoffCity = document.getElementById('dropoff_city_id').value;
                     const vehicleType = document.getElementById('vehicle_type_id').value;
                     const departureDate = document.getElementById('departure_date').value;
-                    const numSeats = document.getElementById('num_seats').value;
-                    const today = new Date().toISOString().split('T')[0];
-                    const maxDate = '<?php echo $max_date; ?>';
+                    const numSeats = parseInt(numSeatsInput.value);
 
-                    if (!pickupCity || !dropoffCity || !vehicleType || !departureDate || !numSeats) {
+                    // Clear any previous error messages
+                    document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+                    if (!pickupCity || !dropoffCity || !vehicleType || !departureDate) {
                         e.preventDefault();
                         showError('Please fill in all required fields.');
                         return false;

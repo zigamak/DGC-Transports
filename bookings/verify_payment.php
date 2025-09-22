@@ -1,5 +1,5 @@
 <?php
-// bookings/verify_payment.php - Updated with correct column names
+// bookings/verify_payment.php
 ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -7,334 +7,229 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/error.log');
 
 session_start();
-require_once '../includes/db.php';
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-require_once '../includes/send_email.php';
-
-date_default_timezone_set(DEFAULT_TIMEZONE);
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/send_email.php';
 
 header('Content-Type: application/json');
-header('Cache-Control: no-cache, must-revalidate');
 
-function jsonResponse($data) {
-    ob_end_clean();
-    if (!is_array($data) || json_encode($data) === false) {
-        error_log("Invalid JSON data: " . print_r($data, true));
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Internal server error: Invalid response data']);
-    } else {
-        echo json_encode($data);
-    }
+error_log("verify_payment.php accessed - Method: " . $_SERVER['REQUEST_METHOD']);
+error_log("POST data: " . print_r($_POST, true));
+error_log("Session data: " . print_r($_SESSION, true));
+
+// Check if payment reference is provided
+if (!isset($_POST['reference']) || empty(trim($_POST['reference']))) {
+    error_log("Missing or empty payment reference");
+    echo json_encode(['success' => false, 'message' => 'Invalid payment reference']);
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    jsonResponse(['success' => false, 'message' => 'Method not allowed']);
-}
-
-if (!isset($_POST['reference']) || empty($_POST['reference'])) {
-    jsonResponse(['success' => false, 'message' => 'Payment reference is required']);
-}
-
 $reference = trim($_POST['reference']);
-error_log("Starting payment verification for reference: $reference");
 
-if (!isset($_SESSION['payment_reference']) || $_SESSION['payment_reference'] !== $reference) {
-    error_log("Payment reference mismatch or session expired: $reference");
-    jsonResponse(['success' => false, 'message' => 'Payment reference mismatch or session expired']);
-}
-
-if (
-    !isset($_SESSION['selected_trip']) ||
-    !isset($_SESSION['selected_seats']) ||
-    !isset($_SESSION['passenger_details']) ||
-    !isset($_SESSION['booking_ids'])
-) {
-    error_log("Missing session data: " . json_encode([
-        'selected_trip' => isset($_SESSION['selected_trip']) ? 'set' : 'not set',
-        'selected_seats' => isset($_SESSION['selected_seats']) ? 'set' : 'not set',
+// Verify session data
+if (!isset($_SESSION['booking_ids']) || !isset($_SESSION['passenger_details']) || !isset($_SESSION['total_amount'])) {
+    error_log("Missing required session data: " . json_encode([
+        'booking_ids' => isset($_SESSION['booking_ids']) ? 'set' : 'not set',
         'passenger_details' => isset($_SESSION['passenger_details']) ? 'set' : 'not set',
-        'booking_ids' => isset($_SESSION['booking_ids']) ? 'set' : 'not set'
+        'total_amount' => isset($_SESSION['total_amount']) ? 'set' : 'not set'
     ]));
-    jsonResponse(['success' => false, 'message' => 'Booking details not found in session']);
+    echo json_encode(['success' => false, 'message' => 'Booking session expired. Please start a new booking.']);
+    exit();
 }
 
-$trip = $_SESSION['selected_trip'];
-$selected_seats = $_SESSION['selected_seats'];
-$passenger_details = $_SESSION['passenger_details'];
 $booking_ids = $_SESSION['booking_ids'];
+$passenger_details = $_SESSION['passenger_details'];
+$total_amount = $_SESSION['total_amount'];
+$user_id = isLoggedIn() ? $_SESSION['user']['id'] : null;
 
-// Get trip instance ID - look for existing trip instance or create one
-$template_id = isset($trip['template_id']) ? (int)$trip['template_id'] : 0;
-$trip_date = isset($trip['trip_date']) ? $trip['trip_date'] : '';
+// Verify payment with Paystack
+$curl = curl_init();
+curl_setopt_array($curl, [
+    CURLOPT_URL => "https://api.paystack.co/transaction/verify/" . urlencode($reference),
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . PAYSTACK_SECRET_KEY,
+        "Content-Type: application/json",
+    ],
+]);
 
-if ($template_id <= 0 || empty($trip_date)) {
-    error_log("Invalid template ID or trip date: template_id=$template_id, trip_date=$trip_date");
-    jsonResponse(['success' => false, 'message' => 'Invalid trip data']);
+$response = curl_exec($curl);
+$err = curl_error($curl);
+curl_close($curl);
+
+if ($err) {
+    error_log("Paystack API error: $err");
+    echo json_encode(['success' => false, 'message' => 'Failed to verify payment. Please contact support.']);
+    exit();
 }
 
-// Find or create trip instance
-$stmt = $conn->prepare("
-    SELECT id FROM trip_instances 
-    WHERE template_id = ? AND trip_date = ? AND status = 'active'
-");
-if (!$stmt) {
-    error_log("Prepare trip instance check failed: " . $conn->error);
-    jsonResponse(['success' => false, 'message' => 'Database error']);
-}
-$stmt->bind_param("is", $template_id, $trip_date);
-$stmt->execute();
-$instance_result = $stmt->get_result();
-$trip_instance = $instance_result->fetch_assoc();
-$stmt->close();
+$tranx = json_decode($response, true);
 
-if (!$trip_instance) {
-    // Create new trip instance
-    $stmt = $conn->prepare("
-        INSERT INTO trip_instances (template_id, trip_date, booked_seats, status) 
-        VALUES (?, ?, 0, 'active')
-    ");
-    if (!$stmt) {
-        error_log("Prepare trip instance creation failed: " . $conn->error);
-        jsonResponse(['success' => false, 'message' => 'Database error']);
-    }
-    $stmt->bind_param("is", $template_id, $trip_date);
-    if (!$stmt->execute()) {
-        error_log("Create trip instance failed: " . $stmt->error);
-        jsonResponse(['success' => false, 'message' => 'Failed to create trip instance']);
-    }
-    $trip_id = $conn->insert_id;
-    $stmt->close();
-} else {
-    $trip_id = $trip_instance['id'];
+if (!$tranx['status'] || $tranx['data']['status'] !== 'success') {
+    error_log("Paystack verification failed: " . json_encode($tranx));
+    echo json_encode(['success' => false, 'message' => 'Payment verification failed.']);
+    exit();
 }
 
-// Validate trip template and get vehicle capacity
-$stmt = $conn->prepare("
-    SELECT tt.*, vt.capacity
-    FROM trip_templates tt
-    JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
-    WHERE tt.id = ? AND tt.status = 'active'
-");
-if (!$stmt) {
-    error_log("Prepare trip template check failed: " . $conn->error);
-    jsonResponse(['success' => false, 'message' => 'Database error']);
+// Verify the amount paid matches expected amount
+$amount_paid = $tranx['data']['amount'] / 100; // Convert from kobo to naira
+if (abs($amount_paid - $total_amount) > 0.01) {
+    error_log("Amount mismatch: Paid $amount_paid, Expected $total_amount");
+    echo json_encode(['success' => false, 'message' => 'Payment amount mismatch. Please contact support.']);
+    exit();
 }
-$stmt->bind_param("i", $template_id);
-$stmt->execute();
-$template_result = $stmt->get_result();
-$trip_template = $template_result->fetch_assoc();
-$stmt->close();
-
-if (!$trip_template) {
-    error_log("Trip template not found or inactive: $template_id");
-    jsonResponse(['success' => false, 'message' => 'Invalid or inactive trip template']);
-}
-
-// Check for conflicting paid bookings
-$stmt = $conn->prepare("
-    SELECT seat_number 
-    FROM bookings 
-    WHERE template_id = ? 
-        AND trip_date = ? 
-        AND payment_status = 'paid' 
-        AND status != 'cancelled'
-");
-if (!$stmt) {
-    error_log("Prepare seat check failed: " . $conn->error);
-    jsonResponse(['success' => false, 'message' => 'Database error']);
-}
-$stmt->bind_param("is", $template_id, $trip_date);
-$stmt->execute();
-$booked_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$booked_seat_numbers = array_column($booked_seats, 'seat_number');
-$stmt->close();
-
-$conflicting_seats = array_intersect($selected_seats, $booked_seat_numbers);
-if (!empty($conflicting_seats)) {
-    error_log("Conflicting seats for template $template_id on $trip_date: " . implode(', ', $conflicting_seats));
-    jsonResponse(['success' => false, 'message' => 'Selected seats are no longer available: ' . implode(', ', $conflicting_seats)]);
-}
-
-if (count($booking_ids) !== count($selected_seats) || count($booking_ids) !== count($passenger_details)) {
-    error_log("Mismatch in booking IDs, seats, or passenger details: " . json_encode([
-        'booking_ids_count' => count($booking_ids),
-        'selected_seats_count' => count($selected_seats),
-        'passenger_details_count' => count($passenger_details)
-    ]));
-    jsonResponse(['success' => false, 'message' => 'Invalid booking data']);
-}
-
-$conn->begin_transaction();
 
 try {
-    error_log("Calling verifyPaystackPayment for reference: $reference");
-    $verification_result = verifyPaystackPayment($reference);
-    error_log("Paystack verification result: " . json_encode($verification_result));
+    $conn->begin_transaction();
 
-    if (!$verification_result['status']) {
-        throw new Exception($verification_result['message']);
+    // Update booking records
+    $stmt = $conn->prepare("
+        UPDATE bookings 
+        SET payment_status = 'paid', 
+            status = 'confirmed', 
+            payment_reference = ?, 
+            updated_at = NOW()
+        WHERE id = ?
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to prepare booking update query: ' . $conn->error);
     }
 
-    $payment_data = $verification_result['data'];
-    $paid_amount_in_kobo = $payment_data['amount'];
-    $paid_amount = $paid_amount_in_kobo / 100;
-    $gateway_reference = $payment_data['reference'];
-    $payment_method = isset($payment_data['channel']) ? $payment_data['channel'] : 'Unknown';
-
-    // Verify payment amount
-    $total_amount = count($selected_seats) * $trip['price'];
-    if ($paid_amount < $total_amount) {
-        throw new Exception("Amount mismatch: paid ₦{$paid_amount}, expected ₦{$total_amount}");
-    }
-
-    // Update bookings (correct column names)
-    $pnrs = [];
     foreach ($booking_ids as $booking_id) {
-        $stmt = $conn->prepare("
-            UPDATE bookings 
-            SET payment_status = 'paid', status = 'confirmed', created_at = created_at
-            WHERE id = ? AND payment_status = 'pending' AND status = 'pending'
-        ");
-        if (!$stmt) {
-            throw new Exception('Prepare booking update failed: ' . $conn->error);
-        }
-        $stmt->bind_param("i", $booking_id);
+        $stmt->bind_param("si", $reference, $booking_id);
         if (!$stmt->execute()) {
-            throw new Exception('Update booking failed for ID ' . $booking_id . ': ' . $stmt->error);
+            throw new Exception('Failed to update booking ID ' . $booking_id . ': ' . $stmt->error);
         }
-        if ($stmt->affected_rows === 0) {
-            throw new Exception('Booking ID ' . $booking_id . ' not found or already processed');
+        error_log("Updated booking ID $booking_id to paid and confirmed");
+    }
+    $stmt->close();
+
+    // Handle referral credits if applicable
+    if (isset($_SESSION['referral_code']) && isset($_SESSION['referrer_id'])) {
+        $referral_code = $_SESSION['referral_code'];
+        $referrer_id = $_SESSION['referrer_id'];
+
+        error_log("Processing referral for code: $referral_code, referrer ID: $referrer_id");
+
+        // Get referral credit amount from settings
+        $stmt_settings = $conn->prepare("SELECT credits FROM referral_settings WHERE id = 1");
+        if (!$stmt_settings) {
+            throw new Exception('Failed to prepare referral settings query: ' . $conn->error);
         }
-        $stmt->close();
+        $stmt_settings->execute();
+        $result = $stmt_settings->get_result();
+        $referral_settings = $result->fetch_assoc();
+        $referral_credits = $referral_settings ? $referral_settings['credits'] : 2000.00;
+        $stmt_settings->close();
 
-        // Fetch PNR for the booking
-        $stmt = $conn->prepare("SELECT pnr FROM bookings WHERE id = ?");
-        $stmt->bind_param("i", $booking_id);
-        $stmt->execute();
-        $pnr_result = $stmt->get_result()->fetch_assoc();
-        $pnrs[] = $pnr_result['pnr'];
-        $stmt->close();
-    }
+        error_log("Referral credits to award: $referral_credits");
 
-    // Insert payment records
-    error_log("Inserting payment for booking IDs: " . implode(', ', $booking_ids));
-    $stmt_payment = $conn->prepare("
-        INSERT INTO payments 
-        (booking_id, amount, transaction_reference, gateway_reference, payment_method, status, gateway_response, created_at) 
-        VALUES (?, ?, ?, ?, ?, 'completed', ?, NOW())
-    ");
-    if (!$stmt_payment) {
-        throw new Exception('Prepare payment failed: ' . $conn->error);
-    }
-
-    $json_response = json_encode($payment_data);
-    foreach ($booking_ids as $index => $booking_id) {
-        $seat_amount = $trip['price']; // Amount per seat
-        $stmt_payment->bind_param(
-            "idssss",
-            $booking_id,
-            $seat_amount,
-            $reference,
-            $gateway_reference,
-            $payment_method,
-            $json_response
-        );
-        if (!$stmt_payment->execute()) {
-            throw new Exception('Insert payment failed for booking ID ' . $booking_id . ': ' . $stmt_payment->error);
+        // Credit the referrer
+        $stmt_credit = $conn->prepare("UPDATE users SET credits = credits + ? WHERE id = ?");
+        if (!$stmt_credit) {
+            throw new Exception('Failed to prepare referrer credit query: ' . $conn->error);
         }
-    }
-    $stmt_payment->close();
+        $stmt_credit->bind_param("di", $referral_credits, $referrer_id);
+        if (!$stmt_credit->execute()) {
+            throw new Exception('Failed to credit referrer: ' . $stmt_credit->error);
+        }
+        $affected_rows = $stmt_credit->affected_rows;
+        $stmt_credit->close();
 
-    // Update trip_instances booked seats
-    error_log("Updating trip_instances ID: $trip_id with booked seats: " . count($selected_seats));
-    $stmt_trip = $conn->prepare("
-        UPDATE trip_instances 
-        SET booked_seats = booked_seats + ? 
-        WHERE id = ? AND status = 'active'
-    ");
-    if (!$stmt_trip) {
-        throw new Exception('Prepare trip_instances update failed: ' . $conn->error);
-    }
-    $num_seats = count($selected_seats);
-    $stmt_trip->bind_param("ii", $num_seats, $trip_id);
-    if (!$stmt_trip->execute()) {
-        throw new Exception('Update trip_instances failed: ' . $stmt_trip->error);
-    }
-    if ($stmt_trip->affected_rows === 0) {
-        error_log("Warning: No rows affected when updating trip_instances ID: $trip_id");
-        // Don't throw error here, as the booking might still be valid
-    }
-    $stmt_trip->close();
+        if ($affected_rows > 0) {
+            error_log("Successfully credited referrer ID {$referrer_id} with {$referral_credits} credits");
 
+            // Log the referral in affiliates table
+            $stmt_affiliate = $conn->prepare("
+                INSERT INTO affiliates (referrer_id, referred_user_id, referral_code, status, created_at) 
+                VALUES (?, ?, ?, 'completed', NOW())
+            ");
+            if (!$stmt_affiliate) {
+                throw new Exception('Failed to prepare affiliate log query: ' . $conn->error);
+            }
+            $stmt_affiliate->bind_param("iis", $referrer_id, $user_id, $referral_code);
+            if (!$stmt_affiliate->execute()) {
+                throw new Exception('Failed to log affiliate referral: ' . $stmt_affiliate->error);
+            }
+            $stmt_affiliate->close();
+
+            error_log("Successfully logged referral in affiliates table - Referrer: $referrer_id, Referred: " . ($user_id ?? 'guest') . ", Code: $referral_code");
+
+            // Verify the credit was added
+            $stmt_verify = $conn->prepare("SELECT credits FROM users WHERE id = ?");
+            $stmt_verify->bind_param("i", $referrer_id);
+            $stmt_verify->execute();
+            $result = $stmt_verify->get_result();
+            $user_credits = $result->fetch_assoc();
+            $stmt_verify->close();
+
+            if ($user_credits) {
+                error_log("Referrer ID {$referrer_id} now has {$user_credits['credits']} total credits");
+            }
+        } else {
+            error_log("Warning: No user found with ID {$referrer_id} to credit");
+        }
+
+        // Clear referral session data
+        unset($_SESSION['referral_code']);
+        unset($_SESSION['referrer_id']);
+        unset($_SESSION['referral_message']);
+    }
+
+    // Commit the transaction
     $conn->commit();
 
-    // Store booking confirmation data
-    $_SESSION['booking_confirmation'] = [
-        'pnrs' => $pnrs,
-        'booking_ids' => $booking_ids,
-        'passenger_details' => $passenger_details,
-        'selected_seats' => $selected_seats,
-        'total_amount' => $total_amount,
-        'payment_method' => $payment_method,
-        'payment_reference' => $reference,
-        'trip' => $trip
-    ];
-
-    // Send booking confirmation emails
-    foreach ($passenger_details as $index => $passenger) {
-        $confirmation_data = [
-            'pnr' => $pnrs[$index],
-            'booking_id' => $booking_ids[$index],
-            'passenger_name' => $passenger['name'],
+    // Send confirmation email to all passengers
+    foreach ($passenger_details as $passenger) {
+        $booking_data = [
             'email' => $passenger['email'],
-            'phone' => $passenger['phone'],
-            'emergency_contact' => isset($passenger['emergency_contact']) ? $passenger['emergency_contact'] : '',
-            'special_requests' => isset($passenger['special_requests']) ? $passenger['special_requests'] : '',
+            'passenger_name' => $passenger['name'],
+            'pnr' => $passenger['pnr'],
             'seat_number' => $passenger['seat_number'],
-            'total_amount' => $trip['price'], // Amount per seat
-            'payment_method' => $payment_method,
-            'payment_reference' => $reference,
-            'trip' => $trip
+            'total_amount' => $total_amount,
+            'trip' => [
+                'pickup_city' => $_SESSION['selected_trip']['pickup_city'],
+                'dropoff_city' => $_SESSION['selected_trip']['dropoff_city'],
+                'trip_date' => $_SESSION['selected_trip']['trip_date'],
+                'departure_time' => $_SESSION['selected_trip']['departure_time'] ?? '',
+                'vehicle_type' => $_SESSION['selected_trip']['vehicle_type'] ?? '',
+                'vehicle_number' => $_SESSION['selected_trip']['vehicle_number'] ?? '',
+                'driver_name' => $_SESSION['selected_trip']['driver_name'] ?? ''
+            ]
         ];
-        $email_sent = sendBookingConfirmationEmail($confirmation_data);
-        if ($email_sent) {
-            error_log("Booking confirmation email sent successfully to: " . $passenger['email']);
+        error_log("Preparing to send email with data: " . json_encode($booking_data));
+        if (sendBookingConfirmationEmail($booking_data)) {
+            error_log("Sent confirmation email to {$booking_data['email']} for PNR {$booking_data['pnr']}");
         } else {
-            error_log("Failed to send booking confirmation email to: " . $passenger['email']);
+            error_log("Failed to send confirmation email to {$booking_data['email']} for PNR {$booking_data['pnr']}");
         }
     }
 
-    // Clear booking session data
-    unset($_SESSION['selected_trip']);
-    unset($_SESSION['selected_seats']);
-    unset($_SESSION['passenger_details']);
-    unset($_SESSION['payment_reference']);
+    // Clear session data
     unset($_SESSION['booking_ids']);
+    unset($_SESSION['passenger_details']);
+    unset($_SESSION['selected_seats']);
+    unset($_SESSION['total_amount']);
+    unset($_SESSION['payment_reference']);
 
-    jsonResponse([
+    echo json_encode([
         'success' => true,
-        'message' => 'Payment verified and bookings confirmed successfully',
-        'pnrs' => $pnrs,
-        'booking_ids' => $booking_ids,
-        'redirect_url' => "booking_confirmation.php?pnr=" . urlencode($pnrs[0])
+        'message' => 'Payment verified successfully!',
+        'redirect_url' => SITE_URL . '/bookings/confirmation.php'
     ]);
 
 } catch (Exception $e) {
     $conn->rollback();
-    error_log("Payment verification error for reference $reference: " . $e->getMessage());
-    http_response_code(500);
-    jsonResponse([
-        'success' => false,
-        'message' => 'Payment verification failed: ' . $e->getMessage(),
-        'reference' => $reference
-    ]);
+    error_log("Payment verification failed: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Payment verification failed: ' . $e->getMessage()]);
+    exit();
 } finally {
-    if (isset($stmt)) $stmt->close();
-    if (isset($stmt_payment)) $stmt_payment->close();
-    if (isset($stmt_trip)) $stmt_trip->close();
-    $conn->close();
+    if (isset($stmt) && $stmt instanceof mysqli_stmt && $stmt->errno === 0) {
+        $stmt->close();
+    }
 }
+
+ob_end_flush();
 ?>

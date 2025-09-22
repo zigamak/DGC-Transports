@@ -6,27 +6,32 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/error.log');
 
 session_start();
-require_once '../includes/db.php';
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Add debugging
 error_log("process_booking.php accessed - Method: " . $_SERVER['REQUEST_METHOD']);
 error_log("POST data received: " . print_r($_POST, true));
+error_log("Session data: " . print_r($_SESSION, true));
 
 // Simple test to verify the file is being accessed
 file_put_contents(__DIR__ . '/../logs/debug.log', date('Y-m-d H:i:s') . " - process_booking.php accessed\n", FILE_APPEND);
 
 // Check if trip and seats are selected
 if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_seats'])) {
-    header("Location: search_trips.php");
+    error_log("Missing selected_trip or selected_seats in session");
+    $_SESSION['error'] = 'Please select a trip and seats before proceeding.';
+    header("Location: " . SITE_URL . "/bookings/search_trips.php");
     exit();
 }
 
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: passenger_details.php");
+    error_log("Invalid request method: " . $_SERVER['REQUEST_METHOD']);
+    $_SESSION['error'] = 'Invalid form submission.';
+    header("Location: " . SITE_URL . "/bookings/passenger_details.php");
     exit();
 }
 
@@ -34,16 +39,69 @@ $trip = $_SESSION['selected_trip'];
 $selected_seats = $_SESSION['selected_seats'];
 $num_seats = count($selected_seats);
 
+// Calculate total amount - NO DISCOUNTS
+$total_amount = $num_seats * $trip['price'];
+
+// Check if user is logged in
+$user_id = isLoggedIn() ? $_SESSION['user']['id'] : null;
+
+// Handle referral code - ONLY STORE FOR CREDITS, NO DISCOUNT TO CURRENT USER
+if (isset($_POST['referral_code']) && !empty(trim($_POST['referral_code']))) {
+    $referral_code = strtoupper(trim($_POST['referral_code']));
+    error_log("Processing referral code from form submission: $referral_code");
+    
+    // Check if referral code exists and find the referrer
+    $stmt = $conn->prepare("SELECT u.id as referrer_id, u.first_name, u.last_name 
+                           FROM users u 
+                           WHERE u.affiliate_id = ?");
+    if ($stmt) {
+        $stmt->bind_param("s", $referral_code);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $referrer = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($referrer) {
+            // Get referral credit amount from settings (for the referrer, not discount)
+            $stmt = $conn->prepare("SELECT credits FROM referral_settings WHERE id = 1");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $referral_settings = $result->fetch_assoc();
+                $referral_credits = $referral_settings['credits'] ?? 2000;
+                $stmt->close();
+                
+                // Store in session for later use in verify_payment.php
+                $_SESSION['referral_code'] = $referral_code;
+                $_SESSION['referrer_id'] = $referrer['referrer_id'];
+                $referrer_name = $referrer['first_name'] . ' ' . $referrer['last_name'];
+                $_SESSION['referral_message'] = "Referral code valid! Referred by $referrer_name.";
+                
+                error_log("Referral code $referral_code stored: Credits for referrer: $referral_credits, Referrer ID: " . $referrer['referrer_id']);
+            }
+        } else {
+            error_log("Invalid referral code from form: $referral_code");
+            $_SESSION['referral_error'] = 'Invalid referral code';
+        }
+    }
+}
+
 // Validate required fields
 if (!isset($_POST['passengers']) || !is_array($_POST['passengers']) || count($_POST['passengers']) !== $num_seats) {
-    $_SESSION['error'] = 'Invalid passenger data provided.';
-    header("Location: passenger_details.php");
+    error_log("Invalid passenger data: " . json_encode([
+        'post_passengers' => $_POST['passengers'] ?? 'not set',
+        'expected_seats' => $num_seats,
+        'actual_count' => is_array($_POST['passengers']) ? count($_POST['passengers']) : 'not array'
+    ]));
+    $_SESSION['error'] = 'Invalid passenger data provided. Please ensure all passenger details are complete.';
+    header("Location: " . SITE_URL . "/bookings/passenger_details.php");
     exit();
 }
 
 if (!isset($_POST['terms']) || $_POST['terms'] !== 'on') {
+    error_log("Terms and conditions not accepted");
     $_SESSION['error'] = 'You must accept the terms and conditions.';
-    header("Location: passenger_details.php");
+    header("Location: " . SITE_URL . "/bookings/passenger_details.php");
     exit();
 }
 
@@ -105,9 +163,10 @@ foreach ($_POST['passengers'] as $index => $passenger) {
 
 // If there are validation errors, redirect back with errors
 if (!empty($errors)) {
+    error_log("Validation errors: " . implode('; ', $errors));
     $_SESSION['errors'] = $errors;
     $_SESSION['form_data'] = $_POST; // Preserve form data
-    header("Location: passenger_details.php");
+    header("Location: " . SITE_URL . "/bookings/passenger_details.php");
     exit();
 }
 
@@ -134,8 +193,9 @@ $stmt->close();
 
 if (!empty($booked_seats)) {
     $conflicting_seats = array_column($booked_seats, 'seat_number');
+    error_log("Conflicting seats detected: " . implode(', ', $conflicting_seats));
     $_SESSION['error'] = 'Sorry, some of your selected seats (' . implode(', ', $conflicting_seats) . ') have been booked by another passenger. Please select different seats.';
-    header("Location: seat_selection.php");
+    header("Location: " . SITE_URL . "/bookings/seat_selection.php");
     exit();
 }
 
@@ -149,14 +209,18 @@ try {
     foreach ($passenger_details as $index => $passenger) {
         // Generate unique PNR (Passenger Name Record)
         $pnr = generatePNR();
-
+        
+        // Calculate individual booking amount - FULL PRICE, NO DISCOUNT
+        $booking_amount = $trip['price'];
+        $payment_reference = null; // Initialize as NULL since payment_reference is set in verify_payment.php
+        $updated_at = null; // Initialize as NULL since updated_at is set in verify_payment.php
         
         // Insert booking record
         $stmt = $conn->prepare("
             INSERT INTO bookings 
-            (pnr, template_id, trip_date, passenger_name, email, phone, 
-             emergency_contact, special_requests, seat_number, total_amount, payment_status, status, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', NOW())
+            (pnr, template_id, trip_date, user_id, passenger_name, email, phone, 
+             emergency_contact, special_requests, seat_number, total_amount, payment_reference, payment_status, status, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', NOW(), ?)
         ");
         
         if (!$stmt) {
@@ -164,17 +228,20 @@ try {
         }
         
         $stmt->bind_param(
-            "sissssssid",
+            "sisisssssidss",
             $pnr,
             $trip['template_id'],
             $trip['trip_date'],
+            $user_id,
             $passenger['name'],
             $passenger['email'],
             $passenger['phone'],
             $passenger['emergency_contact'],
             $passenger['special_requests'],
             $passenger['seat_number'],
-            $trip['price']
+            $booking_amount,
+            $payment_reference,
+            $updated_at
         );
         
         if (!$stmt->execute()) {
@@ -199,16 +266,19 @@ try {
     // Store booking data in session
     $_SESSION['passenger_details'] = $passenger_details;
     $_SESSION['booking_ids'] = $booking_ids;
+    $_SESSION['total_amount'] = $total_amount;
     
     // Clear any previous errors
     unset($_SESSION['error']);
     unset($_SESSION['errors']);
     unset($_SESSION['form_data']);
+    unset($_SESSION['referral_error']);
     
     error_log("Successfully created " . count($booking_ids) . " bookings: " . implode(', ', $booking_ids));
+    error_log("Total amount (no discounts applied to user): ₦$total_amount");
     
     // Redirect to payment page
-    header("Location: paystack.php");
+    header("Location: " . SITE_URL . "/bookings/paystack.php");
     exit();
     
 } catch (Exception $e) {
@@ -218,7 +288,7 @@ try {
     error_log("Booking creation failed: " . $e->getMessage());
     
     $_SESSION['error'] = 'Failed to create booking. Please try again. Error: ' . $e->getMessage();
-    header("Location: passenger_details.php");
+    header("Location: " . SITE_URL . "/bookings/passenger_details.php");
     exit();
     
 } finally {

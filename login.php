@@ -1,10 +1,8 @@
 <?php
-// login.php
-
 session_start();
 require_once 'includes/db.php';
 require_once 'includes/config.php';
-require_once 'includes/auth.php'; // Include the new auth file
+require_once 'includes/auth.php'; // Include the auth file
 
 // If user is already logged in, redirect them based on their role
 if (isLoggedIn()) {
@@ -98,6 +96,11 @@ require_once 'templates/header.php';
                         <a href="signup.php" class="text-primary hover:underline font-semibold">Sign Up</a>
                     </p>
                 </div>
+
+                <div class="mt-4 text-center">
+                    <p class="text-gray-600">Join our affiliate program! Earn credits by referring others.</p>
+                    <p class="text-sm text-gray-500">Sign up to get your unique affiliate ID.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -115,3 +118,4 @@ require_once 'templates/header.php';
     </script>
 </body>
 </html>
+?>

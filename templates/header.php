@@ -23,7 +23,7 @@ require_once __DIR__ . '/../includes/auth.php';
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
 <!-- Header Navigation (to be included in <body>) -->
-<header class="bg-black text-white fixed top-0 left-0 w-full z-50 shadow-lg">
+<header class="bg-white text-gray-900 fixed top-0 left-0 w-full z-50 shadow-lg">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
             <!-- Logo (Centered on mobile) -->
@@ -36,10 +36,23 @@ require_once __DIR__ . '/../includes/auth.php';
             <!-- Navigation Menu (Desktop) -->
             <nav class="hidden md:flex space-x-8 order-3">
                 <?php if (isLoggedIn()): ?>
-                    <a href="<?= SITE_URL ?>/admin/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
-                    <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                    <?php if ($_SESSION['user']['role'] === 'customer'): ?>
+                        <a href="<?= SITE_URL ?>" class="hover:text-primary transition-colors duration-200 font-semibold">Book Trip</a>
+                        <a href="<?= SITE_URL ?>/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                        <a href="<?= SITE_URL ?>/profile.php" class="hover:text-primary transition-colors duration-200 font-semibold">Profile</a>
+                        <a href="<?= SITE_URL ?>/my-bookings.php" class="hover:text-primary transition-colors duration-200 font-semibold">My Bookings</a>
+                        <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                    <?php elseif ($_SESSION['user']['role'] === 'admin'): ?>
+                        <a href="<?= SITE_URL ?>/admin/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                        <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                    <?php elseif ($_SESSION['user']['role'] === 'staff'): ?>
+                        <a href="<?= SITE_URL ?>/staff/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                        <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                    <?php else: ?>
+                        <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <a href="<?= SITE_URL ?>/index.php" class="hover:text-primary transition-colors duration-200 font-semibold">Book a Trip</a>
+                    <a href="<?= SITE_URL ?>" class="hover:text-primary transition-colors duration-200 font-semibold">Book a Trip</a>
                     <a href="<?= SITE_URL ?>/bookings/manage_booking.php" class="hover:text-primary transition-colors duration-200 font-semibold">Manage Booking</a>
                     <a href="<?= SITE_URL ?>/contact.php" class="hover:text-primary transition-colors duration-200 font-semibold">Contact Us</a>
                     <a href="<?= SITE_URL ?>/login.php" class="hover:text-primary transition-colors duration-200 font-semibold">Login</a>
@@ -56,13 +69,26 @@ require_once __DIR__ . '/../includes/auth.php';
     </div>
 
     <!-- Mobile Menu (Hidden by default) -->
-    <div id="mobile-menu" class="md:hidden hidden bg-black">
-        <nav class="flex flex-col space-y-4 px-4 py-4">
+    <div id="mobile-menu" class="md:hidden hidden bg-white">
+        <nav class="flex flex-col space-y-4 px-4 py-4 text-gray-900">
             <?php if (isLoggedIn()): ?>
-                <a href="<?= SITE_URL ?>/admin/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
-                <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                <?php if ($_SESSION['user']['role'] === 'customer'): ?>
+                    <a href="<?= SITE_URL ?>" class="hover:text-primary transition-colors duration-200 font-semibold">Book Trip</a>
+                    <a href="<?= SITE_URL ?>/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                    <a href="<?= SITE_URL ?>/profile.php" class="hover:text-primary transition-colors duration-200 font-semibold">Profile</a>
+                    <a href="<?= SITE_URL ?>/my-bookings.php" class="hover:text-primary transition-colors duration-200 font-semibold">My Bookings</a>
+                    <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                <?php elseif ($_SESSION['user']['role'] === 'admin'): ?>
+                    <a href="<?= SITE_URL ?>/admin/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                    <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                <?php elseif ($_SESSION['user']['role'] === 'staff'): ?>
+                    <a href="<?= SITE_URL ?>/staff/dashboard.php" class="hover:text-primary transition-colors duration-200 font-semibold">Dashboard</a>
+                    <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                <?php else: ?>
+                    <a href="<?= SITE_URL ?>/logout.php" class="hover:text-primary transition-colors duration-200 font-semibold">Logout</a>
+                <?php endif; ?>
             <?php else: ?>
-                <a href="<?= SITE_URL ?>/index.php" class="hover:text-primary transition-colors duration-200 font-semibold">Book a Trip</a>
+                <a href="<?= SITE_URL ?>" class="hover:text-primary transition-colors duration-200 font-semibold">Book a Trip</a>
                 <a href="<?= SITE_URL ?>/bookings/manage_booking.php" class="hover:text-primary transition-colors duration-200 font-semibold">Manage Booking</a>
                 <a href="<?= SITE_URL ?>/contact.php" class="hover:text-primary transition-colors duration-200 font-semibold">Contact Us</a>
                 <a href="<?= SITE_URL ?>/login.php" class="hover:text-primary transition-colors duration-200 font-semibold">Login</a>
