@@ -1,8 +1,7 @@
 <?php
 // bookings/clear_session.php
-// Clear all session data
+// Simple file to clear booking confirmation from session
 session_start();
-session_unset(); // Unset all session variables
-session_destroy(); // Destroy the session
+unset($_SESSION['booking_confirmation']);
 echo json_encode(['status' => 'cleared']);
 ?>

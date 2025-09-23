@@ -1,4 +1,5 @@
 <?php
+//admin/view_bookings.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -182,89 +183,63 @@ $stmt->close();
     <title>Trip Bookings - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-        
-        :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
-            --white: #ffffff;
-            --gray: #f5f5f5;
-            --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Poppins', sans-serif;
-            display: flex;
-            min-height: 100vh;
-        }
-        
-        /* Main Content */
-        main {
-            flex: 1;
-            padding-top: 60px;
-            background: linear-gradient(135deg, var(--white), var(--gray));
-            transition: margin-left 0.3s ease-in-out;
-        }
-        
-        /* Responsive Design */
-        @media (min-width: 768px) {
-            main {
-                margin-left: 256px;
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-red': '#e30613',
+                        'dark-red': '#c70410',
+                    }
+                }
             }
         }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
-        .card {
-            background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        body {
+            font-family: 'Inter', sans-serif;
         }
         
-        .card:hover {
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        
+        .stats-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         
-        .btn-primary {
-            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
-            color: var(--white);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background 0.3s ease, transform 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
+        .stats-icon {
+            background: linear-gradient(135deg, #e30613 0%, #c70410 100%);
         }
         
-        .btn-primary:hover {
-            background: linear-gradient(to right, var(--dark-red), var(--primary-red));
-            transform: translateY(-2px);
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         
-        .btn-secondary {
-            background: #6b7280;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: 500;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            transition: background 0.3s ease;
+        .table-hover:hover {
+            background-color: #f8fafc;
         }
         
-        .btn-secondary:hover {
-            background: #4b5563;
+        .mobile-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .mobile-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
         }
         
         .status-badge {
@@ -313,60 +288,6 @@ $stmt->close();
             color: #991b1b;
         }
         
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        
-        .stats-card.revenue {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        }
-        
-        .stats-card.confirmed {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .stats-card.pending {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        
-        .stats-card.cancelled {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        
-        .error-message {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .success-message {
-            color: #10b981;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .table-header {
-            background: var(--gray);
-            color: var(--black);
-            font-weight: 600;
-        }
-        
-        .table-row:hover {
-            background: #f9fafb;
-        }
-        
         .select-status {
             padding: 4px 8px;
             border: 1px solid #d1d5db;
@@ -385,9 +306,8 @@ $stmt->close();
         
         .form-input:focus {
             outline: none;
-            border-color: var(--primary-red);
-            ring: 2px;
-            ring-color: rgba(227, 6, 19, 0.2);
+            border-color: #e30613;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
         }
         
         .pagination {
@@ -412,289 +332,415 @@ $stmt->close();
         }
         
         .pagination .current {
-            background: var(--primary-red);
+            background: #e30613;
             color: white;
-            border-color: var(--primary-red);
+            border-color: #e30613;
         }
         
-        .text-red-600 { color: #e30613; }
-        .bg-red-600 { background-color: #e30613; }
-        .hover\:bg-red-600:hover { background-color: #e30613; }
-        
-        /* Mobile responsive cards */
-        .mobile-booking-card {
-            display: none;
-            padding: 16px;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            margin-bottom: 16px;
-            background: white;
-        }
-        
-        @media (max-width: 768px) {
-            .desktop-table {
-                display: none;
-            }
-            .mobile-booking-card {
-                display: block;
-            }
+        @media (max-width: 640px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 12px;
+                gap: 0.75rem;
             }
-            .stats-card {
-                padding: 12px;
-                min-height: 100px;
-            }
-            .stats-card i {
-                font-size: 1.5rem !important;
-                margin-bottom: 8px !important;
-            }
-            .stats-card h3 {
-                font-size: 1.25rem !important;
+            .filter-grid {
+                grid-template-columns: repeat(1, 1fr);
             }
         }
         
-        @media (min-width: 769px) {
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+            .filter-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 1025px) {
             .stats-grid {
                 grid-template-columns: repeat(4, 1fr);
-                gap: 24px;
+                gap: 1.5rem;
+            }
+            .filter-grid {
+                grid-template-columns: repeat(3, 1fr);
             }
         }
         
-        @media (min-width: 1024px) {
-            .stats-grid {
-                gap: 32px;
+        .content-container {
+            overflow-y: auto;
+            max-height: calc(100vh - 4rem); /* Adjust based on header height */
+        }
+        
+        @media (min-width: 768px) {
+            .content-container {
+                max-height: 100vh;
             }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <?php if (isLoggedIn()): ?>
-        <?php include '../templates/sidebar.php'; ?>
-    <?php endif; ?>
+<body class="bg-gray-50 gradient-bg">
+    <?php include '../templates/sidebar.php'; ?>
 
-    <div class="flex-1">
-        <main class="ml-0 md:ml-64 p-4 sm:p-6 lg:p-10">
-            <div class="container mx-auto">
-                <!-- Header -->
-                <div class="card p-6 mb-6">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+    <!-- Main Content -->
+    <div class="md:ml-64 min-h-screen">
+        <div class="pt-20 md:pt-0 p-4 md:p-6 lg:p-8 content-container">
+            <!-- Header -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                            <i class="fas fa-ticket-alt text-primary-red mr-3"></i>
+                            Trip Bookings
+                        </h1>
+                        <p class="text-gray-600 mt-1"><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <a href="trips.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back to Trips
+                        </a>
+                        <button onclick="showFilterModal()" class="md:hidden inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                            <i class="fas fa-filter mr-2"></i>
+                            Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trip Details Card -->
+            <div class="bg-white rounded-xl card-shadow mb-8">
+                <div class="p-4 md:p-6">
+                    <h2 class="text-lg md:text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-bus text-primary-red mr-2"></i>
+                        Trip Details
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
-                                <i class="fas fa-ticket-alt text-red-600 mr-3"></i>Trip Bookings
-                            </h1>
-                            <p class="text-gray-600 text-sm sm:text-base lg:text-lg">
-                                <?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?>
-                                (<?= htmlspecialchars($template['vehicle_type']) ?> - <?= htmlspecialchars($template['vehicle_number']) ?>)
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Vehicle</p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Driver</p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['driver_name']) ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Time</p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Price</p>
+                            <p class="text-gray-900 font-medium">₦<?= number_format($template['price'], 0) ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Capacity</p>
+                            <p class="text-gray-900 font-medium"><?= $template['capacity'] ?> seats</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Recurrence</p>
+                            <p class="text-gray-900 font-medium">
+                                <?php
+                                if ($template['recurrence_type'] === 'day') {
+                                    echo 'One Day';
+                                } elseif ($template['recurrence_type'] === 'week') {
+                                    echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
+                                } elseif ($template['recurrence_type'] === 'month') {
+                                    echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
+                                } else {
+                                    echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
+                                }
+                                ?>
                             </p>
                         </div>
-                        <a href="trips.php" class="btn-primary mt-4 sm:mt-0">
-                            <i class="fas fa-arrow-left mr-2"></i>Back to Templates
-                        </a>
+                        <div class="col-span-2">
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Period</p>
+                            <p class="text-gray-900 font-medium"><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></p>
+                        </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Trip Details -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-                        <div class="bg-gray-50 p-3 lg:p-4 rounded-lg">
-                            <div class="flex items-center">
-                                <i class="fas fa-clock text-red-600 mr-2 text-sm lg:text-base"></i>
-                                <div>
-                                    <p class="text-xs lg:text-sm text-gray-600">Time</p>
-                                    <p class="font-semibold text-sm lg:text-base"><?= htmlspecialchars($template['departure_time']) ?> - <?= htmlspecialchars($template['arrival_time']) ?></p>
-                                </div>
-                            </div>
+            <!-- Statistics Cards -->
+            <div class="stats-grid grid mb-8">
+                <!-- Total Bookings Card -->
+                <div class="stats-card rounded-xl p-4 md:p-6">
+                    <div class="flex items-center">
+                        <div class="stats-icon p-3 rounded-lg">
+                            <i class="fas fa-ticket-alt text-white text-lg md:text-xl"></i>
                         </div>
-                        <div class="bg-gray-50 p-3 lg:p-4 rounded-lg">
-                            <div class="flex items-center">
-                                <i class="fas fa-money-bill-wave text-red-600 mr-2 text-sm lg:text-base"></i>
-                                <div>
-                                    <p class="text-xs lg:text-sm text-gray-600">Price</p>
-                                    <p class="font-semibold text-sm lg:text-base">₦<?= number_format($template['price'], 2) ?></p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-3 lg:p-4 rounded-lg">
-                            <div class="flex items-center">
-                                <i class="fas fa-users text-red-600 mr-2 text-sm lg:text-base"></i>
-                                <div>
-                                    <p class="text-xs lg:text-sm text-gray-600">Capacity</p>
-                                    <p class="font-semibold text-sm lg:text-base"><?= $template['capacity'] ?> seats</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 p-3 lg:p-4 rounded-lg">
-                            <div class="flex items-center">
-                                <i class="fas fa-user text-red-600 mr-2 text-sm lg:text-base"></i>
-                                <div>
-                                    <p class="text-xs lg:text-sm text-gray-600">Driver</p>
-                                    <p class="font-semibold text-sm lg:text-base"><?= htmlspecialchars($template['driver_name']) ?></p>
-                                </div>
-                            </div>
+                        <div class="ml-4 flex-1">
+                            <p class="text-xs md:text-sm font-medium text-gray-600 uppercase tracking-wide">Total Bookings</p>
+                            <p class="text-xl md:text-2xl font-bold text-gray-900"><?= number_format($stats['total_bookings']) ?></p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Statistics -->
-                <div class="grid stats-grid mb-8">
-                    <div class="stats-card confirmed">
-                        <i class="fas fa-chart-line text-2xl lg:text-3xl mb-2 lg:mb-3"></i>
-                        <h3 class="text-xl lg:text-2xl font-bold"><?= $stats['total_bookings'] ?></h3>
-                        <p class="text-xs lg:text-sm opacity-90">Total Bookings</p>
-                    </div>
-                    <div class="stats-card pending">
-                        <i class="fas fa-check-circle text-2xl lg:text-3xl mb-2 lg:mb-3"></i>
-                        <h3 class="text-xl lg:text-2xl font-bold"><?= $stats['confirmed_bookings'] ?></h3>
-                        <p class="text-xs lg:text-sm opacity-90">Confirmed</p>
-                    </div>
-                    <div class="stats-card cancelled">
-                        <i class="fas fa-clock text-2xl lg:text-3xl mb-2 lg:mb-3"></i>
-                        <h3 class="text-xl lg:text-2xl font-bold"><?= $stats['pending_bookings'] ?></h3>
-                        <p class="text-xs lg:text-sm opacity-90">Pending</p>
-                    </div>
-                    <div class="stats-card revenue">
-                        <i class="fas fa-naira-sign text-2xl lg:text-3xl mb-2 lg:mb-3"></i>
-                        <h3 class="text-xl lg:text-2xl font-bold">₦<?= number_format($stats['total_revenue'], 0) ?></h3>
-                        <p class="text-xs lg:text-sm opacity-90">Revenue</p>
+                <!-- Confirmed Bookings Card -->
+                <div class="stats-card rounded-xl p-4 md:p-6">
+                    <div class="flex items-center">
+                        <div class="stats-icon p-3 rounded-lg">
+                            <i class="fas fa-check-circle text-white text-lg md:text-xl"></i>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <p class="text-xs md:text-sm font-medium text-gray-600 uppercase tracking-wide">Confirmed</p>
+                            <p class="text-xl md:text-2xl font-bold text-gray-900"><?= number_format($stats['confirmed_bookings']) ?></p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Messages -->
-                <?php if (isset($success)): ?>
-                    <div class="card p-4 mb-6">
-                        <p class="success-message"><i class="fas fa-check-circle mr-2"></i><?= htmlspecialchars($success) ?></p>
+                <!-- Pending Bookings Card -->
+                <div class="stats-card rounded-xl p-4 md:p-6">
+                    <div class="flex items-center">
+                        <div class="stats-icon p-3 rounded-lg">
+                            <i class="fas fa-clock text-white text-lg md:text-xl"></i>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <p class="text-xs md:text-sm font-medium text-gray-600 uppercase tracking-wide">Pending</p>
+                            <p class="text-xl md:text-2xl font-bold text-gray-900"><?= number_format($stats['pending_bookings']) ?></p>
+                        </div>
                     </div>
-                <?php endif; ?>
-                <?php if (isset($error)): ?>
-                    <div class="card p-4 mb-6">
-                        <p class="error-message"><i class="fas fa-exclamation-circle mr-2"></i><?= htmlspecialchars($error) ?></p>
-                    </div>
-                <?php endif; ?>
+                </div>
 
-                <!-- Search and Filter -->
-                <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-search text-red-600 mr-2"></i>Search & Filter
-                    </h2>
-                    <form method="GET" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <!-- Total Revenue Card -->
+                <div class="stats-card rounded-xl p-4 md:p-6">
+                    <div class="flex items-center">
+                        <div class="stats-icon p-3 rounded-lg">
+                            <i class="fas fa-money-bill-wave text-white text-lg md:text-xl"></i>
+                        </div>
+                        <div class="ml-4 flex-1">
+                            <p class="text-xs md:text-sm font-medium text-gray-600 uppercase tracking-wide">Revenue</p>
+                            <p class="text-xl md:text-2xl font-bold text-gray-900">₦<?= number_format($stats['total_revenue'], 0) ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <?php if (isset($success)): ?>
+                <div class="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <span class="text-green-800"><?= htmlspecialchars($success) ?></span>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <?php if (isset($error)): ?>
+                <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                        <span class="text-red-800"><?= htmlspecialchars($error) ?></span>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Filter Modal for Mobile -->
+            <div id="filterModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-50 md:hidden">
+                <div class="bg-white rounded-xl p-6 max-w-lg w-full m-4 max-h-[90vh] overflow-y-auto card-shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-900">
+                            <i class="fas fa-filter text-primary-red mr-2"></i>
+                            Filter Bookings
+                        </h3>
+                        <button onclick="closeFilterModal()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-lg"></i>
+                        </button>
+                    </div>
+                    <form method="GET" class="filter-grid grid gap-4">
                         <input type="hidden" name="template_id" value="<?= $template_id ?>">
-                        
-                        <div class="lg:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                            <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" 
-                                   placeholder="PNR, name, email, phone..." class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                            <select name="status" class="form-input">
-                                <option value="">All Status</option>
-                                <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
-                                <option value="confirmed" <?= $status_filter === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
-                                <option value="cancelled" <?= $status_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment</label>
-                            <select name="payment" class="form-input">
-                                <option value="">All Payments</option>
-                                <option value="pending" <?= $payment_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
-                                <option value="paid" <?= $payment_filter === 'paid' ? 'selected' : '' ?>>Paid</option>
-                                <option value="cancelled" <?= $payment_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                            <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="form-input">
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                            <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="form-input">
-                        </div>
-                        
-                        <div class="xl:col-span-6 flex gap-2">
-                            <button type="submit" class="btn-primary">
-                                <i class="fas fa-search mr-2"></i>Search
+                        <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search PNR, name, email..." class="form-input">
+                        <select name="status" class="form-input">
+                            <option value="">All Status</option>
+                            <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="confirmed" <?= $status_filter === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                            <option value="cancelled" <?= $status_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        </select>
+                        <select name="payment" class="form-input">
+                            <option value="">All Payments</option>
+                            <option value="pending" <?= $payment_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="paid" <?= $payment_filter === 'paid' ? 'selected' : '' ?>>Paid</option>
+                            <option value="cancelled" <?= $payment_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        </select>
+                        <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="form-input">
+                        <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="form-input">
+                        <div class="flex gap-2">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                                <i class="fas fa-search mr-2"></i>
+                                Filter
                             </button>
-                            <a href="view_bookings.php?template_id=<?= $template_id ?>" class="btn-secondary">
-                                <i class="fas fa-times mr-2"></i>Clear
+                            <a href="view_bookings.php?template_id=<?= $template_id ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Clear
                             </a>
                         </div>
                     </form>
                 </div>
+            </div>
 
-                <!-- Bookings -->
-                <div class="card p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl lg:text-2xl font-bold text-gray-800">
-                            <i class="fas fa-list text-red-600 mr-3"></i>All Bookings
-                        </h2>
-                        <div class="text-sm text-gray-600">
-                            Showing <?= count($bookings) ?> of <?= $total_bookings ?> bookings
+            <!-- Filter Section for Desktop -->
+            <div class="bg-white rounded-xl card-shadow mb-8 hidden md:block">
+                <div class="p-4 md:p-6 border-b border-gray-200">
+                    <h2 class="text-lg md:text-xl font-bold text-gray-900">
+                        <i class="fas fa-filter text-primary-red mr-2"></i>
+                        Filter Bookings
+                    </h2>
+                </div>
+                <div class="p-4 md:p-6">
+                    <form method="GET" class="filter-grid grid gap-4">
+                        <input type="hidden" name="template_id" value="<?= $template_id ?>">
+                        <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search PNR, name, email..." class="form-input">
+                        <select name="status" class="form-input">
+                            <option value="">All Status</option>
+                            <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="confirmed" <?= $status_filter === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                            <option value="cancelled" <?= $status_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        </select>
+                        <select name="payment" class="form-input">
+                            <option value="">All Payments</option>
+                            <option value="pending" <?= $payment_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="paid" <?= $payment_filter === 'paid' ? 'selected' : '' ?>>Paid</option>
+                            <option value="cancelled" <?= $payment_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                        </select>
+                        <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="form-input">
+                        <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="form-input">
+                        <div class="flex gap-2">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                                <i class="fas fa-search mr-2"></i>
+                                Filter
+                            </button>
+                            <a href="view_bookings.php?template_id=<?= $template_id ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
+                                <i class="fas fa-times mr-2"></i>
+                                Clear
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Bookings Section -->
+            <div class="bg-white rounded-xl card-shadow">
+                <div class="p-4 md:p-6 border-b border-gray-200">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-lg md:text-xl font-bold text-gray-900">
+                                <i class="fas fa-list text-primary-red mr-2"></i>
+                                Bookings List
+                            </h2>
+                            <p class="text-sm text-gray-600 mt-1">Showing <?= count($bookings) ?> of <?= $total_bookings ?> bookings</p>
                         </div>
                     </div>
+                </div>
 
+                <div class="p-4 md:p-6">
                     <?php if (empty($bookings)): ?>
                         <div class="text-center py-12">
-                            <i class="fas fa-ticket-alt text-6xl text-gray-300 mb-4"></i>
-                            <h3 class="text-2xl font-bold text-gray-700 mb-2">No Bookings Found</h3>
-                            <p class="text-gray-500">No bookings match your search criteria.</p>
+                            <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="fas fa-ticket-alt text-3xl text-gray-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">No Bookings Found</h3>
+                            <p class="text-gray-600 mb-6 max-w-sm mx-auto">Try adjusting your filters or check back later.</p>
                         </div>
                     <?php else: ?>
-                        <!-- Desktop Table -->
-                        <div class="desktop-table overflow-x-auto">
-                            <table class="w-full table-auto border-collapse">
-                                <thead>
-                                    <tr class="table-header">
-                                        <th class="px-4 py-3 text-left">PNR</th>
-                                        <th class="px-4 py-3 text-left">Passenger</th>
-                                        <th class="px-4 py-3 text-left">Contact</th>
-                                        <th class="px-4 py-3 text-left">Trip Date</th>
-                                        <th class="px-4 py-3 text-left">Seat</th>
-                                        <th class="px-4 py-3 text-left">Amount</th>
-                                        <th class="px-4 py-3 text-left">Payment</th>
-                                        <th class="px-4 py-3 text-left">Status</th>
-                                        <th class="px-4 py-3 text-left">Actions</th>
+                        <!-- Mobile Cards (Hidden on desktop) -->
+                        <div class="space-y-4 md:hidden">
+                            <?php foreach ($bookings as $booking): ?>
+                                <div class="mobile-card p-4">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div>
+                                            <span class="font-semibold text-gray-900 text-sm">
+                                                <?= htmlspecialchars($booking['passenger_name']) ?>
+                                            </span>
+                                            <span class="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full ml-2">
+                                                <?= $booking['pnr'] ?>
+                                            </span>
+                                        </div>
+                                        <span class="status-badge status-<?= $booking['status'] ?> text-xs">
+                                            <?= ucfirst($booking['status']) ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="space-y-2">
+                                        <div class="flex items-center text-sm text-gray-600">
+                                            <i class="fas fa-envelope text-primary-red w-4 mr-2"></i>
+                                            <span><?= htmlspecialchars($booking['email']) ?></span>
+                                        </div>
+                                        <div class="flex items-center text-sm text-gray-600">
+                                            <i class="fas fa-phone text-primary-red w-4 mr-2"></i>
+                                            <span><?= htmlspecialchars($booking['phone']) ?></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center text-sm text-gray-600">
+                                                <i class="fas fa-calendar-alt text-primary-red w-4 mr-2"></i>
+                                                <span><?= date('M j, Y', strtotime($booking['trip_date'])) ?></span>
+                                            </div>
+                                            <div class="flex items-center text-sm text-gray-600">
+                                                <i class="fas fa-chair text-primary-red w-4 mr-2"></i>
+                                                <span><?= $booking['seat_number'] ?></span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center text-sm text-gray-600">
+                                                <i class="fas fa-money-bill-wave text-primary-red w-4 mr-2"></i>
+                                                <span>₦<?= number_format($booking['total_amount'], 0) ?></span>
+                                            </div>
+                                            <div class="payment-badge payment-<?= $booking['payment_status'] ?> text-xs">
+                                                <?= ucfirst($booking['payment_status']) ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-4 flex justify-between">
+                                        <form method="POST" class="inline">
+                                            <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
+                                            <select name="status" class="select-status text-sm" onchange="this.form.submit()">
+                                                <option value="pending" <?= $booking['status'] === 'pending' ? 'selected' : '' ?>>Pending</option>
+                                                <option value="confirmed" <?= $booking['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                                                <option value="cancelled" <?= $booking['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                                            </select>
+                                            <input type="hidden" name="update_booking" value="1">
+                                        </form>
+                                        <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-primary-red hover:text-dark-red">
+                                            <i class="fas fa-eye"></i> Details
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <!-- Desktop Table (Hidden on mobile) -->
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PNR / Passenger</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trip Date / Seat</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount / Payment</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="bg-white divide-y divide-gray-200">
                                     <?php foreach ($bookings as $booking): ?>
-                                        <tr class="table-row border-b border-gray-200">
-                                            <td class="px-4 py-3">
-                                                <span class="font-mono text-sm font-semibold"><?= htmlspecialchars($booking['pnr']) ?></span>
+                                        <tr class="table-hover">
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($booking['passenger_name']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($booking['pnr']) ?></div>
                                             </td>
-                                            <td class="px-4 py-3">
-                                                <div>
-                                                    <p class="font-semibold"><?= htmlspecialchars($booking['passenger_name']) ?></p>
-                                                    <?php if ($booking['first_name'] && $booking['last_name']): ?>
-                                                        <p class="text-sm text-gray-500">User: <?= htmlspecialchars($booking['first_name'] . ' ' . $booking['last_name']) ?></p>
-                                                    <?php endif; ?>
-                                                </div>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900"><?= htmlspecialchars($booking['email']) ?></div>
+                                                <div class="text-sm text-gray-500"><?= htmlspecialchars($booking['phone']) ?></div>
                                             </td>
-                                            <td class="px-4 py-3">
-                                                <div>
-                                                    <p class="text-sm"><?= htmlspecialchars($booking['email']) ?></p>
-                                                    <p class="text-sm text-gray-600"><?= htmlspecialchars($booking['phone']) ?></p>
-                                                </div>
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900"><?= date('M j, Y', strtotime($booking['trip_date'])) ?></div>
+                                                <div class="text-sm text-gray-500">Seat: <?= $booking['seat_number'] ?></div>
                                             </td>
-                                            <td class="px-4 py-3">
-                                                <span class="text-sm font-medium"><?= date('M j, Y', strtotime($booking['trip_date'])) ?></span>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <span class="bg-gray-100 px-3 py-1 rounded-full text-sm font-semibold"><?= $booking['seat_number'] ?></span>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <span class="font-semibold">₦<?= number_format($booking['total_amount'], 2) ?></span>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <span class="payment-badge payment-<?= $booking['payment_status'] ?>">
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm text-gray-900">₦<?= number_format($booking['total_amount'], 0) ?></div>
+                                                <span class="payment-badge payment-<?= $booking['payment_status'] ?> text-xs mt-1 inline-block">
                                                     <?= ucfirst($booking['payment_status']) ?>
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4">
                                                 <form method="POST" class="inline">
                                                     <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
                                                     <select name="status" class="select-status" onchange="this.form.submit()">
@@ -705,8 +751,8 @@ $stmt->close();
                                                     <input type="hidden" name="update_booking" value="1">
                                                 </form>
                                             </td>
-                                            <td class="px-4 py-3">
-                                                <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-blue-600 hover:text-blue-800">
+                                            <td class="px-6 py-4">
+                                                <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-primary-red hover:text-dark-red">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                             </td>
@@ -716,234 +762,141 @@ $stmt->close();
                             </table>
                         </div>
 
-                        <!-- Mobile Cards -->
-                        <?php foreach ($bookings as $booking): ?>
-                            <div class="mobile-booking-card">
-                                <div class="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 class="font-semibold text-lg"><?= htmlspecialchars($booking['passenger_name']) ?></h3>
-                                        <p class="text-sm text-gray-600 font-mono"><?= htmlspecialchars($booking['pnr']) ?></p>
-                                    </div>
-                                    <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-blue-600 hover:text-blue-800">
-                                        <i class="fas fa-eye text-lg"></i>
-                                    </button>
-                                </div>
-                                
-                                <div class="grid grid-cols-2 gap-3 mb-4">
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Trip Date</p>
-                                        <p class="font-medium"><?= date('M j, Y', strtotime($booking['trip_date'])) ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Seat</p>
-                                        <span class="bg-gray-100 px-2 py-1 rounded-full text-sm font-semibold"><?= $booking['seat_number'] ?></span>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Amount</p>
-                                        <p class="font-semibold">₦<?= number_format($booking['total_amount'], 2) ?></p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Payment</p>
-                                        <span class="payment-badge payment-<?= $booking['payment_status'] ?>">
-                                            <?= ucfirst($booking['payment_status']) ?>
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Contact</p>
-                                    <p class="text-sm"><?= htmlspecialchars($booking['email']) ?></p>
-                                    <p class="text-sm text-gray-600"><?= htmlspecialchars($booking['phone']) ?></p>
-                                </div>
-                                
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Status</p>
-                                        <form method="POST" class="inline">
-                                            <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                            <select name="status" class="select-status mt-1" onchange="this.form.submit()">
-                                                <option value="pending" <?= $booking['status'] === 'pending' ? 'selected' : '' ?>>Pending</option>
-                                                <option value="confirmed" <?= $booking['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
-                                                <option value="cancelled" <?= $booking['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                                            </select>
-                                            <input type="hidden" name="update_booking" value="1">
-                                        </form>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-xs text-gray-500">Booked</p>
-                                        <p class="text-xs"><?= date('M j, g:i A', strtotime($booking['created_at'])) ?></p>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-
                         <!-- Pagination -->
                         <?php if ($total_pages > 1): ?>
                             <div class="pagination">
                                 <?php 
-                                $current_url = $_SERVER['REQUEST_URI'];
-                                $url_parts = parse_url($current_url);
-                                parse_str($url_parts['query'] ?? '', $query_params);
+                                $query_params = $_GET;
+                                unset($query_params['page']);
                                 
-                                // Helper function to build pagination URL
-                                function buildPaginationUrl($page, $query_params) {
-                                    $query_params['page'] = $page;
-                                    return '?' . http_build_query($query_params);
-                                }
+                                $base_url = '?' . http_build_query($query_params) . (empty($query_params) ? '' : '&') . 'page=';
                                 ?>
                                 
                                 <?php if ($page > 1): ?>
-                                    <a href="<?= buildPaginationUrl(1, $query_params) ?>">
-                                        <i class="fas fa-angle-double-left"></i>
-                                    </a>
-                                    <a href="<?= buildPaginationUrl($page - 1, $query_params) ?>">
-                                        <i class="fas fa-angle-left"></i>
-                                    </a>
+                                    <a href="<?= $base_url ?>1"><i class="fas fa-angle-double-left"></i></a>
+                                    <a href="<?= $base_url . ($page - 1) ?>"><i class="fas fa-angle-left"></i></a>
                                 <?php endif; ?>
                                 
-                                <?php
-                                $start = max(1, $page - 2);
-                                $end = min($total_pages, $page + 2);
-                                
-                                for ($i = $start; $i <= $end; $i++): ?>
+                                <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
                                     <?php if ($i == $page): ?>
                                         <span class="current"><?= $i ?></span>
                                     <?php else: ?>
-                                        <a href="<?= buildPaginationUrl($i, $query_params) ?>"><?= $i ?></a>
+                                        <a href="<?= $base_url . $i ?>"><?= $i ?></a>
                                     <?php endif; ?>
                                 <?php endfor; ?>
                                 
                                 <?php if ($page < $total_pages): ?>
-                                    <a href="<?= buildPaginationUrl($page + 1, $query_params) ?>">
-                                        <i class="fas fa-angle-right"></i>
-                                    </a>
-                                    <a href="<?= buildPaginationUrl($total_pages, $query_params) ?>">
-                                        <i class="fas fa-angle-double-right"></i>
-                                    </a>
+                                    <a href="<?= $base_url . ($page + 1) ?>"><i class="fas fa-angle-right"></i></a>
+                                    <a href="<?= $base_url . $total_pages ?>"><i class="fas fa-angle-double-right"></i></a>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Booking Details Modal -->
-    <div id="bookingModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center p-4">
-        <div class="modal-content bg-white rounded-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold">Booking Details</h3>
-                <button onclick="closeBookingModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xl"></i>
+    <div id="bookingModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl p-6 max-w-lg w-full m-4 max-h-[90vh] overflow-y-auto card-shadow">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-900">Booking Details</h3>
+                <button onclick="closeBookingModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
-            <div id="bookingDetails" class="space-y-4">
-                <!-- Details will be populated by JavaScript -->
-            </div>
+            <div id="bookingDetails" class="space-y-4 text-sm"></div>
         </div>
     </div>
 
     <script>
         function showBookingDetails(booking) {
-            const modal = document.getElementById('bookingModal');
-            const detailsContainer = document.getElementById('bookingDetails');
-            
-            const emergencyContact = booking.emergency_contact ? booking.emergency_contact : 'Not provided';
-            const specialRequests = booking.special_requests ? booking.special_requests : 'None';
-            const userInfo = (booking.first_name && booking.last_name) ? 
-                `${booking.first_name} ${booking.last_name}` : 'Guest booking';
-            
-            detailsContainer.innerHTML = `
+            const details = document.getElementById('bookingDetails');
+            const emergency = booking.emergency_contact || 'Not provided';
+            const requests = booking.special_requests || 'None';
+            const user = booking.first_name && booking.last_name ? `${booking.first_name} ${booking.last_name}` : 'Guest';
+
+            details.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">PNR</label>
-                        <p class="font-mono font-semibold text-lg">${booking.pnr}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">PNR</p>
+                        <p class="text-gray-900">${booking.pnr}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Booking Type</label>
-                        <p class="font-semibold">${userInfo}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Passenger</p>
+                        <p class="text-gray-900">${booking.passenger_name}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Passenger Name</label>
-                        <p class="font-semibold">${booking.passenger_name}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">User</p>
+                        <p class="text-gray-900">${user}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <p>${booking.email}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Email</p>
+                        <p class="text-gray-900">${booking.email}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                        <p>${booking.phone}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Phone</p>
+                        <p class="text-gray-900">${booking.phone}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Trip Date</label>
-                        <p class="font-semibold">${new Date(booking.trip_date + 'T00:00:00').toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Trip Date</p>
+                        <p class="text-gray-900">${new Date(booking.trip_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Seat Number</label>
-                        <p class="font-semibold text-lg">${booking.seat_number}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Seat</p>
+                        <p class="text-gray-900">${booking.seat_number}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
-                        <p class="font-semibold text-lg">₦${parseFloat(booking.total_amount).toLocaleString()}</p>
+                    <div>
+                        <p class="text-gray-600 font-medium">Amount</p>
+                        <p class="text-gray-900">₦${Number(booking.total_amount).toLocaleString()}</p>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-                        <span class="payment-badge payment-${booking.payment_status}">
-                            ${booking.payment_status.charAt(0).toUpperCase() + booking.payment_status.slice(1)}
-                        </span>
+                    <div>
+                        <p class="text-gray-600 font-medium">Payment Status</p>
+                        <span class="payment-badge payment-${booking.payment_status}">${booking.payment_status.toUpperCase()}</span>
                     </div>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Booking Status</label>
-                        <span class="status-badge status-${booking.status}">
-                            ${booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                        </span>
+                    <div>
+                        <p class="text-gray-600 font-medium">Booking Status</p>
+                        <span class="status-badge status-${booking.status}">${booking.status.toUpperCase()}</span>
                     </div>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Emergency Contact</label>
-                    <p>${emergencyContact}</p>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Special Requests</label>
-                    <p>${specialRequests}</p>
-                </div>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Booking Date & Time</label>
-                    <p>${new Date(booking.created_at).toLocaleString()}</p>
+                    <div class="md:col-span-2">
+                        <p class="text-gray-600 font-medium">Emergency Contact</p>
+                        <p class="text-gray-900">${emergency}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="text-gray-600 font-medium">Special Requests</p>
+                        <p class="text-gray-900">${requests}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="text-gray-600 font-medium">Created At</p>
+                        <p class="text-gray-900">${new Date(booking.created_at).toLocaleString()}</p>
+                    </div>
                 </div>
             `;
-            
-            modal.classList.remove('hidden');
+            document.getElementById('bookingModal').classList.remove('hidden');
         }
 
         function closeBookingModal() {
             document.getElementById('bookingModal').classList.add('hidden');
         }
 
-        // Close modal when clicking outside
-        document.getElementById('bookingModal').addEventListener('click', function(e) {
-            if (e.target === this) {
+        document.getElementById('bookingModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('bookingModal')) {
                 closeBookingModal();
             }
         });
 
-        // Auto-submit search form on Enter key
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.querySelector('input[name="search"]');
-            if (searchInput) {
-                searchInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        this.closest('form').submit();
-                    }
-                });
+        function showFilterModal() {
+            document.getElementById('filterModal').classList.remove('hidden');
+        }
+
+        function closeFilterModal() {
+            document.getElementById('filterModal').classList.add('hidden');
+        }
+
+        document.getElementById('filterModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('filterModal')) {
+                closeFilterModal();
             }
         });
     </script>

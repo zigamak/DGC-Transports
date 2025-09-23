@@ -1,4 +1,5 @@
 <?php
+//admin/add_vehicle.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -58,8 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("INSERT INTO vehicles (vehicle_number, driver_name, vehicle_type_id) VALUES (?, ?, ?)");
         $stmt->bind_param("ssi", $vehicle_number, $driver_name, $vehicle_type_id);
         if ($stmt->execute()) {
-            $success = 'Vehicle added successfully.';
-            // Redirect to vehicles.php after 2 seconds
+            $success = 'Vehicle added successfully. Redirecting...';
             header("Refresh: 2; url=vehicles.php");
         } else {
             $errors[] = 'Failed to add vehicle. Please try again.';
@@ -77,312 +77,180 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Add Vehicle - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-red': '#e30613',
+                        'dark-red': '#c70410',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
-        :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
-            --white: #ffffff;
-            --gray: #f5f5f5;
-            --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
-            font-family: 'Poppins', sans-serif;
-            display: flex;
-            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         }
-        /* Header Styles */
-        header {
-            background: #000;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
+        
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .form-input {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.875rem;
             width: 100%;
-            z-index: 40;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
         }
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 60px;
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #e30613;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
         }
-        .header-logo img {
-            height: 40px;
-        }
-        .header-nav {
-            display: flex;
-            gap: 20px;
-        }
-        .header-nav a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .header-nav a:hover {
-            color: #dc2626;
-        }
-        /* Mobile Menu */
-        #mobile-menu {
-            display: none;
-            background: #000;
-            padding: 20px;
-        }
-        #mobile-menu.active {
-            display: block;
-        }
-        .mobile-nav a {
-            display: block;
-            color: white;
-            text-decoration: none;
-            padding: 10px;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .mobile-nav a:hover {
-            color: #dc2626;
-        }
-        /* Toggle Buttons */
-        .toggle-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            display: none;
-        }
-        .toggle-btn:hover {
-            color: #dc2626;
-        }
-        /* Main Content */
-        main {
-            flex: 1;
-            padding-top: 60px;
-            background: linear-gradient(135deg, var(--white), var(--gray));
-            transition: margin-left 0.3s ease-in-out;
-        }
-        /* Responsive Design */
-        @media (min-width: 768px) {
-            main {
-                margin-left: 256px; /* Matches w-64 (64 * 4px = 256px) */
-            }
-            .header-nav {
-                display: flex;
-            }
-            .toggle-btn {
-                display: none;
-            }
-            header.md-hidden {
-                display: none;
-            }
-        }
-        @media (max-width: 767px) {
-            .toggle-btn {
-                display: block;
-            }
-            .header-nav {
-                display: none;
-            }
-        }
-        .card {
-            background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
-            color: var(--white);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background 0.3s ease, transform 0.2s ease;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(to right, var(--dark-red), var(--primary-red));
-            transform: translateY(-2px);
-        }
-        .error-message {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        .success-message {
-            color: #10b981;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            color: var(--black);
+        
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
             margin-bottom: 0.5rem;
         }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--light-gray);
+        
+        .btn-primary {
+            background: #e30613;
+            color: white;
+            padding: 10px 20px;
             border-radius: 8px;
-            font-size: 1rem;
-            font-family: 'Poppins', sans-serif;
+            font-weight: 500;
+            transition: background 0.3s ease, transform 0.2s ease;
         }
-        .form-group select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231a1a1a'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 1.5rem;
+        
+        .btn-primary:hover {
+            background: #c70410;
+            transform: translateY(-1px);
         }
-        .text-red-600 { color: #e30613; }
-        .bg-red-600 { background-color: #e30613; }
-        .hover\:bg-red-600:hover { background-color: #e30613; }
-        .hover\:text-red-600:hover { color: #e30613; }
-        .bg-red-700 { background-color: #c70410; }
-        .hover\:bg-red-700:hover { background-color: #c70410; }
+        
+        .error-message {
+            color: #dc2626;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .success-message {
+            color: #059669;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .content-container {
+            overflow-y: auto;
+            max-height: calc(100vh - 4rem);
+        }
+        
+        @media (min-width: 768px) {
+            .content-container {
+                max-height: 100vh;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <?php if (isLoggedIn()): ?>
-        <?php include '../templates/sidebar.php'; ?>
-    <?php endif; ?>
+<body class="min-h-screen">
+    <?php include '../templates/sidebar.php'; ?>
 
-    <div class="flex-1">
-        <header class="fixed top-0 left-0 w-full bg-black text-white p-4 shadow-md flex items-center justify-between z-40 md-hidden">
-            <button id="sidebar-toggle-mobile" class="toggle-btn">
-                <i class="fas fa-bars text-xl"></i>
-            </button>
-            <div class="flex-1 text-center">
-                <a href="<?= SITE_URL ?>">
-                    <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-8 mx-auto">
-                </a>
-            </div>
-            <div class="w-10"></div>
-        </header>
-        <div id="mobile-menu" class="mobile-menu">
-            <nav class="mobile-nav">
-                <a href="<?= SITE_URL ?>/index.php">Book a Trip</a>
-                <a href="<?= SITE_URL ?>/bookings/manage_booking.php">Manage Booking</a>
-                <a href="<?= SITE_URL ?>/contact.php">Contact Us</a>
-                <a href="<?= SITE_URL ?>/login.php">Login</a>
-            </nav>
-        </div>
-
-        <main class="ml-0 md:ml-64 p-4 sm:p-6 lg:p-10">
-            <div class="container mx-auto">
-                <div class="card p-6 sm:p-8 lg:p-10">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
-                        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 sm:mb-0">
-                            <i class="fas fa-bus text-primary-red mr-3"></i>Add New Vehicle
+    <div class="md:ml-64 min-h-screen">
+        <div class="content-container p-4 md:p-6 lg:p-8">
+            <div class="max-w-2xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                            <i class="fas fa-bus text-primary-red mr-3"></i>
+                            Add New Vehicle
                         </h1>
-                        <a href="vehicles.php" class="btn-primary inline-flex items-center">
-                            <i class="fas fa-arrow-left mr-2"></i>Back to Vehicles
+                        <a href="vehicles.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back to Vehicles
                         </a>
                     </div>
+                </div>
+
+                <!-- Form Card -->
+                <div class="bg-white rounded-xl card-shadow p-6">
                     <?php if (!empty($errors)): ?>
                         <?php foreach ($errors as $error): ?>
-                            <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
+                            <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                                    <span class="text-red-800 text-sm"><?= htmlspecialchars($error) ?></span>
+                                </div>
+                            </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
                     <?php if ($success): ?>
-                        <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= htmlspecialchars($success) ?> Redirecting...</p>
+                        <div class="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                                <span class="text-green-800 text-sm"><?= htmlspecialchars($success) ?></span>
+                            </div>
+                        </div>
                     <?php endif; ?>
+
                     <form method="POST" class="space-y-6">
-                        <div class="form-group">
-                            <label for="vehicle_number">Vehicle Number</label>
-                            <input type="text" id="vehicle_number" name="vehicle_number" value="<?= isset($vehicle_number) ? htmlspecialchars($vehicle_number) : '' ?>" placeholder="Enter vehicle number (e.g., ABC123)" required>
+                        <div class="form-grid grid gap-6">
+                            <!-- Vehicle Number -->
+                            <div>
+                                <label for="vehicle_number" class="form-label block">Vehicle Number</label>
+                                <input type="text" id="vehicle_number" name="vehicle_number" value="<?= isset($vehicle_number) ? htmlspecialchars($vehicle_number) : '' ?>" placeholder="e.g., ABC123" class="form-input" required>
+                            </div>
+
+                            <!-- Driver Name -->
+                            <div>
+                                <label for="driver_name" class="form-label block">Driver Name</label>
+                                <input type="text" id="driver_name" name="driver_name" value="<?= isset($driver_name) ? htmlspecialchars($driver_name) : '' ?>" placeholder="Enter driver name" class="form-input" required>
+                            </div>
+
+                            <!-- Vehicle Type -->
+                            <div>
+                                <label for="vehicle_type_id" class="form-label block">Vehicle Type</label>
+                                <select id="vehicle_type_id" name="vehicle_type_id" class="form-input" required>
+                                    <option value="">Select a vehicle type</option>
+                                    <?php foreach ($vehicle_types as $type): ?>
+                                        <option value="<?= $type['id'] ?>" <?= isset($vehicle_type_id) && $vehicle_type_id == $type['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($type['type']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="driver_name">Driver Name</label>
-                            <input type="text" id="driver_name" name="driver_name" value="<?= isset($driver_name) ? htmlspecialchars($driver_name) : '' ?>" placeholder="Enter driver name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="vehicle_type_id">Vehicle Type</label>
-                            <select id="vehicle_type_id" name="vehicle_type_id" required>
-                                <option value="">Select a vehicle type</option>
-                                <?php foreach ($vehicle_types as $type): ?>
-                                    <option value="<?= $type['id'] ?>" <?= isset($vehicle_type_id) && $vehicle_type_id == $type['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($type['type']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="flex justify-end space-x-4">
+
+                        <!-- Buttons -->
+                        <div class="flex justify-end gap-4">
                             <button type="submit" class="btn-primary">
                                 <i class="fas fa-save mr-2"></i>Add Vehicle
                             </button>
-                            <a href="vehicles.php" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">
+                            <a href="vehicles.php" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
                                 <i class="fas fa-times mr-2"></i>Cancel
                             </a>
                         </div>
                     </form>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-            const mobileMenuCancel = document.getElementById('mobile-menu-cancel');
-            const mobileMenu = document.getElementById('mobile-menu');
-            const mobileMenuIcon = document.getElementById('mobile-menu-icon');
-            if (mobileMenuToggle && mobileMenuCancel && mobileMenu && mobileMenuIcon) {
-                mobileMenuToggle.addEventListener('click', function() {
-                    mobileMenu.classList.toggle('active');
-                    mobileMenuToggle.style.display = mobileMenu.classList.contains('active') ? 'none' : 'block';
-                    mobileMenuCancel.style.display = mobileMenu.classList.contains('active') ? 'block' : 'none';
-                    mobileMenuIcon.classList.toggle('fa-bars');
-                    mobileMenuIcon.classList.toggle('fa-times');
-                });
-                mobileMenuCancel.addEventListener('click', function() {
-                    mobileMenu.classList.remove('active');
-                    mobileMenuToggle.style.display = 'block';
-                    mobileMenuCancel.style.display = 'none';
-                    mobileMenuIcon.classList.remove('fa-times');
-                    mobileMenuIcon.classList.add('fa-bars');
-                });
-            }
-            const sidebar = document.getElementById('sidebar');
-            const sidebarOverlay = document.getElementById('sidebar-overlay');
-            const sidebarToggleMobile = document.getElementById('sidebar-toggle-mobile');
-            const sidebarClose = document.getElementById('sidebar-close');
-            if (sidebarToggleMobile && sidebarClose && sidebar && sidebarOverlay) {
-                sidebarToggleMobile.addEventListener('click', () => {
-                    sidebar.classList.remove('-translate-x-full');
-                    sidebarOverlay.classList.remove('hidden');
-                });
-                const closeSidebar = () => {
-                    sidebar.classList.add('-translate-x-full');
-                    sidebarOverlay.classList.add('hidden');
-                };
-                sidebarClose.addEventListener('click', closeSidebar);
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-        });
-    </script>
 </body>
 </html>
