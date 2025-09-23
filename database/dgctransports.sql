@@ -87,7 +87,6 @@ CREATE TABLE `trip_instances` (
   UNIQUE KEY `unique_trip` (`template_id`, `trip_date`)
 );
 
--- 8. Bookings table
 CREATE TABLE `bookings` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `user_id` INT DEFAULT NULL,
@@ -98,6 +97,7 @@ CREATE TABLE `bookings` (
   `emergency_contact` VARCHAR(255) DEFAULT NULL,
   `special_requests` TEXT DEFAULT NULL,
   `template_id` INT NOT NULL,
+  `trip_id` INT DEFAULT NULL,
   `trip_date` DATE NOT NULL,
   `seat_number` INT NOT NULL,
   `total_amount` DECIMAL(10, 2) NOT NULL,
@@ -105,10 +105,12 @@ CREATE TABLE `bookings` (
   `status` ENUM('pending', 'confirmed', 'cancelled') NOT NULL DEFAULT 'pending',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_seat` (`template_id`, `trip_date`, `seat_number`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL,
   FOREIGN KEY (`template_id`) REFERENCES `trip_templates`(`id`) ON DELETE RESTRICT,
-  UNIQUE KEY `unique_seat` (`template_id`, `trip_date`, `seat_number`)
+  FOREIGN KEY (`trip_id`) REFERENCES `trip_instances`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
 );
+
 
 -- 9. Payments table
 CREATE TABLE `payments` (

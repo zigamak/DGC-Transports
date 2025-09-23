@@ -1,4 +1,5 @@
 <?php
+//admin/trips.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -53,224 +54,51 @@ while ($row = $result->fetch_assoc()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trip Templates - DGC Transports</title>
+    <title>Manage Trips - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-red': '#e30613',
+                        'dark-red': '#c70410',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
-        :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
-            --white: #ffffff;
-            --gray: #f5f5f5;
-            --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
-            font-family: 'Poppins', sans-serif;
-            display: flex;
-            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
         }
-        /* Header Styles */
-        header {
-            background: #000;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 40;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         }
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 60px;
+        
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        .header-logo img {
-            height: 40px;
+        
+        .table-hover:hover {
+            background-color: #f8fafc;
         }
-        .header-nav {
-            display: flex;
-            gap: 20px;
+        
+        .mobile-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
         }
-        .header-nav a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
+        
+        .mobile-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
         }
-        .header-nav a:hover {
-            color: #dc2626;
-        }
-        /* Mobile Menu */
-        #mobile-menu {
-            display: none;
-            background: #000;
-            padding: 20px;
-        }
-        #mobile-menu.active {
-            display: block;
-        }
-        .mobile-nav a {
-            display: block;
-            color: white;
-            text-decoration: none;
-            padding: 10px;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .mobile-nav a:hover {
-            color: #dc2626;
-        }
-        /* Toggle Buttons */
-        .toggle-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            display: none;
-        }
-        .toggle-btn:hover {
-            color: #dc2626;
-        }
-        /* Main Content */
-        main {
-            flex: 1;
-            padding-top: 60px;
-            background: linear-gradient(135deg, var(--white), var(--gray));
-            transition: margin-left 0.3s ease-in-out;
-        }
-        /* Responsive Design */
-        @media (min-width: 768px) {
-            main {
-                margin-left: 256px; /* Matches w-64 (64 * 4px = 256px) */
-            }
-            .header-nav {
-                display: flex;
-            }
-            .toggle-btn {
-                display: none;
-            }
-            header.md-hidden {
-                display: none;
-            }
-        }
-        @media (max-width: 767px) {
-            .toggle-btn {
-                display: block;
-            }
-            .header-nav {
-                display: none;
-            }
-        }
-        .card {
-            background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
-            color: var(--white);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background 0.3s ease, transform 0.2s ease;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(to right, var(--dark-red), var(--primary-red));
-            transform: translateY(-2px);
-        }
-        .error-message {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        .success-message {
-            color: #10b981;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-        }
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-        }
-        /* Mobile-first card layout for table rows */
-        .mobile-card-row {
-            display: flex;
-            flex-direction: column;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            background-color: #fff;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-bottom: 0.75rem;
-        }
-        .mobile-card-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-        .mobile-card-item:last-child {
-            margin-bottom: 0;
-        }
-        .mobile-card-label {
-            font-weight: 600;
-            color: #4b5563;
-            width: 80px;
-            min-width: 80px;
-        }
-        .mobile-card-content {
-            flex-grow: 1;
-        }
-        /* Desktop table layout */
-        @media (min-width: 768px) {
-            .mobile-card-row {
-                display: none;
-            }
-            .table-container {
-                display: block;
-            }
-            .table-header {
-                background: var(--gray);
-                color: var(--black);
-                font-weight: 600;
-            }
-            .table-row:hover {
-                background: #f9fafb;
-            }
-        }
-        @media (max-width: 767px) {
-            .table-container {
-                display: none;
-            }
-        }
-        .text-red-600 { color: #e30613; }
-        .bg-red-600 { background-color: #e30613; }
-        .hover\:bg-red-600:hover { background-color: #e30613; }
-        .hover\:text-red-600:hover { color: #e30613; }
-        .bg-red-700 { background-color: #c70410; }
-        .hover\:bg-red-700:hover { background-color: #c70410; }
         
         /* Dropdown menu styling */
         .dropdown-menu {
@@ -332,102 +160,126 @@ while ($row = $result->fetch_assoc()) {
             border-radius: 12px;
             margin-left: 8px;
         }
+        
+        /* Modal overlay */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <?php if (isLoggedIn()): ?>
-        <?php include '../templates/sidebar.php'; ?>
-    <?php endif; ?>
+<body class="bg-gray-50 gradient-bg">
+    <?php include '../templates/sidebar.php'; ?>
 
-    <div class="flex-1">
-        <header class="fixed top-0 left-0 w-full bg-black text-white p-4 shadow-md flex items-center justify-between z-40 md-hidden">
-            <button id="sidebar-toggle-mobile" class="toggle-btn">
-                <i class="fas fa-bars text-xl"></i>
-            </button>
-            <div class="flex-1 text-center">
-                <a href="<?= SITE_URL ?>">
-                    <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-8 mx-auto">
-                </a>
-            </div>
-            <div class="w-10"></div>
-        </header>
-        <div id="mobile-menu" class="mobile-menu">
-            <nav class="mobile-nav">
-                <a href="<?= SITE_URL ?>/index.php">Book a Trip</a>
-                <a href="<?= SITE_URL ?>/bookings/manage_booking.php">Manage Booking</a>
-                <a href="<?= SITE_URL ?>/contact.php">Contact Us</a>
-                <a href="<?= SITE_URL ?>/login.php">Login</a>
-            </nav>
-        </div>
-
-        <main class="ml-0 md:ml-64 p-4 sm:p-6 lg:p-10">
-            <div class="container mx-auto">
-                <div class="card p-6 sm:p-8 lg:p-10">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
-                        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 sm:mb-0">
-                            <i class="fas fa-route text-primary-red mr-3"></i>Trip Templates
+    <!-- Main Content -->
+    <div class="md:ml-64 min-h-screen">
+        <div class="pt-20 md:pt-0 p-4 md:p-6 lg:p-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                            <i class="fas fa-road text-primary-red mr-3"></i>
+                            Manage Trips
                         </h1>
-                        <a href="add_trip.php" class="btn-primary inline-flex items-center">
-                            <i class="fas fa-plus mr-2"></i>Add New Template
+                        <p class="text-gray-600 mt-1">View and manage all active trip templates.</p>
+                    </div>
+                    <a href="add_trip.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add New Template
+                    </a>
+                     <a href="timeslot.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                        <i class="fas fa-plus mr-2"></i>
+                        Manage Timeslots
+                    </a>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <?php if (isset($success)): ?>
+                <div class="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                        <span class="text-green-800"><?= htmlspecialchars($success) ?></span>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <?php if (isset($error)): ?>
+                <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                        <span class="text-red-800"><?= htmlspecialchars($error) ?></span>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Content Card -->
+            <div class="bg-white rounded-xl card-shadow">
+                <?php if (empty($trip_templates)): ?>
+                    <div class="p-8 md:p-12 text-center">
+                        <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-road text-3xl text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg md:text-xl font-semibold text-gray-900 mb-2">No Trip Templates Found</h3>
+                        <p class="text-gray-600 mb-6 max-w-sm mx-auto">Create a new trip template to get started.</p>
+                        <a href="add_trip.php" class="inline-flex items-center px-6 py-3 bg-primary-red text-white font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                            <i class="fas fa-plus mr-2"></i>
+                            Create Trip Template
                         </a>
                     </div>
-                    <?php if (isset($success)): ?>
-                        <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= htmlspecialchars($success) ?></p>
-                    <?php endif; ?>
-                    <?php if (isset($error)): ?>
-                        <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
-                    <?php endif; ?>
-                    <?php if (empty($trip_templates)): ?>
-                        <div class="text-center py-12">
-                            <i class="fas fa-route text-6xl text-gray-300 mb-4"></i>
-                            <h3 class="text-2xl font-bold text-gray-700 mb-2">No Trip Templates Found</h3>
-                            <p class="text-gray-500 mb-6">Create a new trip template to get started.</p>
-                            <a href="add_trip.php" class="btn-primary">
-                                <i class="fas fa-plus mr-2"></i>Create Trip Template
-                            </a>
-                        </div>
-                    <?php else: ?>
-                        <!-- Mobile Cards -->
-                        <div class="space-y-4 md:hidden">
-                            <?php foreach ($trip_templates as $template): ?>
-                                <div class="mobile-card-row bg-white shadow-md rounded-xl relative">
-                                    <div class="absolute top-4 right-4">
-                                        <div class="dropdown-toggle">
-                                            <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none" onclick="toggleDropdown('mobile-<?= $template['id'] ?>')">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div id="mobile-<?= $template['id'] ?>" class="dropdown-menu">
-                                                <a href="view_bookings.php?template_id=<?= $template['id'] ?>" class="dropdown-item">
-                                                    <i class="fas fa-eye"></i>View Bookings
-                                                </a>
-                                                <a href="edit_trip.php?id=<?= $template['id'] ?>" class="dropdown-item">
-                                                    <i class="fas fa-edit"></i>Edit
-                                                </a>
-                                                <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city'], ENT_QUOTES) ?>')" class="dropdown-item">
-                                                    <i class="fas fa-trash"></i>Delete
-                                                </button>
-                                            </div>
-                                        </div>
+                <?php else: ?>
+                    <!-- Mobile Cards (Hidden on desktop) -->
+                    <div class="space-y-4 md:hidden">
+                        <?php foreach ($trip_templates as $template): ?>
+                            <div class="mobile-card p-4 relative">
+                                <div class="absolute top-2 right-2 dropdown-toggle">
+                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none rounded-full hover:bg-gray-100" onclick="toggleDropdown('mobile-<?= $template['id'] ?>')">
+                                        <i class="fas fa-ellipsis-v text-sm"></i>
+                                    </button>
+                                    <div id="mobile-<?= $template['id'] ?>" class="dropdown-menu mt-1">
+                                        <a href="view_bookings.php?template_id=<?= $template['id'] ?>" class="dropdown-item">
+                                            <i class="fas fa-eye"></i>View Bookings
+                                        </a>
+                                        <a href="edit_trip.php?id=<?= $template['id'] ?>" class="dropdown-item">
+                                            <i class="fas fa-edit"></i>Edit
+                                        </a>
+                                        <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city'], ENT_QUOTES) ?>')" class="dropdown-item text-red-600 hover:bg-red-50">
+                                            <i class="fas fa-trash"></i>Delete
+                                        </button>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
-                                        <span><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></span>
-                                        <span class="booking-badge"><?= $template['total_bookings'] ?> bookings</span>
+                                </div>
+                                
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-primary-red rounded-full mr-2"></div>
+                                        <span class="font-semibold text-gray-900 text-sm">
+                                            <?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?>
+                                        </span>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-bus text-primary-red mr-2"></i>
+                                    <span class="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                        <?= $template['total_bookings'] ?> bookings
+                                    </span>
+                                </div>
+                                
+                                <div class="space-y-2 text-sm text-gray-600">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-bus text-primary-red w-4 mr-2"></i>
                                         <span><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></span>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-clock text-primary-red mr-2"></i>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user text-primary-red w-4 mr-2"></i>
+                                        <span><?= htmlspecialchars($template['driver_name']) ?></span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-clock text-primary-red w-4 mr-2"></i>
                                         <span><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></span>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
-                                        <span>₦<?= number_format($template['price'], 2) ?></span>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-money-bill-wave text-primary-red w-4 mr-2"></i>
+                                        <span>₦<?= number_format($template['price'], 0) ?></span>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-redo text-primary-red mr-2"></i>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-redo text-primary-red w-4 mr-2"></i>
                                         <span>
                                             <?php
                                             if ($template['recurrence_type'] === 'day') {
@@ -442,126 +294,111 @@ while ($row = $result->fetch_assoc()) {
                                             ?>
                                         </span>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-calendar-alt text-primary-red w-4 mr-2"></i>
                                         <span><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></span>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
 
-                        <!-- Desktop Table -->
-                        <div class="overflow-x-auto hidden md:block">
-                            <table class="w-full table-auto border-collapse">
-                                <thead>
-                                    <tr class="table-header rounded-lg">
-                                        <th class="px-4 py-3 text-left">Route</th>
-                                        <th class="px-4 py-3 text-left">Vehicle</th>
-                                        <th class="px-4 py-3 text-left">Time</th>
-                                        <th class="px-4 py-3 text-left">Price</th>
-                                        <th class="px-4 py-3 text-left">Schedule</th>
-                                        <th class="px-4 py-3 text-left">Period</th>
-                                        <th class="px-4 py-3 text-left">Bookings</th>
-                                        <th class="px-4 py-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($trip_templates as $template): ?>
-                                        <tr class="table-row border-b border-gray-200">
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
-                                                    <span><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></span>
+                    <!-- Desktop Table (Hidden on mobile) -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle & Driver</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php foreach ($trip_templates as $template): ?>
+                                    <tr class="table-hover">
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <div class="w-2 h-2 bg-primary-red rounded-full mr-3"></div>
+                                                <div class="text-sm font-medium text-gray-900">
+                                                    <?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?>
                                                 </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-bus text-primary-red mr-2"></i>
-                                                    <div>
-                                                        <div><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></div>
-                                                        <div class="text-sm text-gray-500"><?= htmlspecialchars($template['driver_name']) ?></div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-clock text-primary-red mr-2"></i>
-                                                    <span><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
-                                                    <span>₦<?= number_format($template['price'], 2) ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-redo text-primary-red mr-2"></i>
-                                                    <span>
-                                                        <?php
-                                                        if ($template['recurrence_type'] === 'day') {
-                                                            echo 'One Day';
-                                                        } elseif ($template['recurrence_type'] === 'week') {
-                                                            echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
-                                                        } elseif ($template['recurrence_type'] === 'month') {
-                                                            echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
-                                                        } else {
-                                                            echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
-                                                        }
-                                                        ?>
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
-                                                    <span><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-users text-primary-red mr-2"></i>
-                                                    <span><?= $template['total_bookings'] ?> / <?= $template['capacity'] ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3 text-right">
-                                                <div class="dropdown-toggle">
-                                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none" onclick="toggleDropdown('desktop-<?= $template['id'] ?>')">
-                                                        <i class="fas fa-ellipsis-v"></i>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900"><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></div>
+                                            <div class="text-sm text-gray-500"><?= htmlspecialchars($template['driver_name']) ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900"><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm font-medium text-gray-900">₦<?= number_format($template['price'], 0) ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900">
+                                                <?php
+                                                if ($template['recurrence_type'] === 'day') {
+                                                    echo 'One Day';
+                                                } elseif ($template['recurrence_type'] === 'week') {
+                                                    echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
+                                                } elseif ($template['recurrence_type'] === 'month') {
+                                                    echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
+                                                } else {
+                                                    echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
+                                                }
+                                                ?>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="text-sm text-gray-900"><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-users text-primary-red mr-2"></i>
+                                                <span class="text-sm font-medium text-gray-900"><?= $template['total_bookings'] ?> / <?= $template['capacity'] ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-right">
+                                            <div class="dropdown-toggle inline-block">
+                                                <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none rounded-full hover:bg-gray-100" onclick="toggleDropdown('desktop-<?= $template['id'] ?>')">
+                                                    <i class="fas fa-ellipsis-v text-sm"></i>
+                                                </button>
+                                                <div id="desktop-<?= $template['id'] ?>" class="dropdown-menu mt-1">
+                                                    <a href="view_bookings.php?template_id=<?= $template['id'] ?>" class="dropdown-item">
+                                                        <i class="fas fa-eye"></i>View Bookings
+                                                    </a>
+                                                    <a href="edit_trip.php?id=<?= $template['id'] ?>" class="dropdown-item">
+                                                        <i class="fas fa-edit"></i>Edit
+                                                    </a>
+                                                    <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city'], ENT_QUOTES) ?>')" class="dropdown-item text-red-600 hover:bg-red-50">
+                                                        <i class="fas fa-trash"></i>Delete
                                                     </button>
-                                                    <div id="desktop-<?= $template['id'] ?>" class="dropdown-menu">
-                                                        <a href="view_bookings.php?template_id=<?= $template['id'] ?>" class="dropdown-item">
-                                                            <i class="fas fa-eye"></i>View Bookings
-                                                        </a>
-                                                        <a href="edit_trip.php?id=<?= $template['id'] ?>" class="dropdown-item">
-                                                            <i class="fas fa-edit"></i>Edit
-                                                        </a>
-                                                        <button onclick="showDeleteModal(<?= $template['id'] ?>, '<?= htmlspecialchars($template['pickup_city'] . ' → ' . $template['dropoff_city'], ENT_QUOTES) ?>')" class="dropdown-item">
-                                                            <i class="fas fa-trash"></i>Delete
-                                                        </button>
-                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center">
-        <div class="modal-content bg-white rounded-lg p-6 max-w-sm mx-auto shadow-xl">
-            <h3 class="text-xl font-bold mb-4 text-center">Confirm Deletion</h3>
+    <div id="deleteModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-xl p-6 max-w-sm mx-auto shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-center text-gray-900">Confirm Deletion</h3>
             <p id="deleteMessage" class="text-gray-700 mb-6 text-center"></p>
             <div class="flex justify-center space-x-4">
-                <button id="cancelButton" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">Cancel</button>
-                <a id="confirmDeleteLink" href="#" class="btn-primary bg-red-600 hover:bg-red-700">Delete</a>
+                <button id="cancelButton" class="px-4 py-2 bg-gray-300 text-gray-800 hover:bg-gray-400 rounded-lg transition-colors">Cancel</button>
+                <a id="confirmDeleteLink" href="#" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors">Delete</a>
             </div>
         </div>
     </div>
@@ -625,51 +462,6 @@ while ($row = $result->fetch_assoc()) {
                     deleteModal.classList.add('hidden');
                 }
             });
-
-            // Sidebar functionality
-            const sidebar = document.getElementById('sidebar');
-            const sidebarOverlay = document.getElementById('sidebar-overlay');
-            const sidebarToggleMobile = document.getElementById('sidebar-toggle-mobile');
-            const sidebarClose = document.getElementById('sidebar-close');
-
-            if (sidebarToggleMobile && sidebarClose && sidebar && sidebarOverlay) {
-                sidebarToggleMobile.addEventListener('click', () => {
-                    sidebar.classList.remove('-translate-x-full');
-                    sidebarOverlay.classList.remove('hidden');
-                });
-
-                const closeSidebar = () => {
-                    sidebar.classList.add('-translate-x-full');
-                    sidebarOverlay.classList.add('hidden');
-                };
-
-                sidebarClose.addEventListener('click', closeSidebar);
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-
-            // Mobile menu functionality
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-            const mobileMenuCancel = document.getElementById('mobile-menu-cancel');
-            const mobileMenu = document.getElementById('mobile-menu');
-            const mobileMenuIcon = document.getElementById('mobile-menu-icon');
-
-            if (mobileMenuToggle && mobileMenuCancel && mobileMenu && mobileMenuIcon) {
-                mobileMenuToggle.addEventListener('click', function() {
-                    mobileMenu.classList.toggle('active');
-                    mobileMenuToggle.style.display = mobileMenu.classList.contains('active') ? 'none' : 'block';
-                    mobileMenuCancel.style.display = mobileMenu.classList.contains('active') ? 'block' : 'none';
-                    mobileMenuIcon.classList.toggle('fa-bars');
-                    mobileMenuIcon.classList.toggle('fa-times');
-                });
-
-                mobileMenuCancel.addEventListener('click', function() {
-                    mobileMenu.classList.remove('active');
-                    mobileMenuToggle.style.display = 'block';
-                    mobileMenuCancel.style.display = 'none';
-                    mobileMenuIcon.classList.remove('fa-times');
-                    mobileMenuIcon.classList.add('fa-bars');
-                });
-            }
         });
     </script>
 </body>

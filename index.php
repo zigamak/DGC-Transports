@@ -371,6 +371,7 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
             </div>
         </div>
     </div>
+       <?php require_once __DIR__ . '/templates/footer.php'; ?>
 
     <script>
         // Store vehicle types data

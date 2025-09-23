@@ -1,9 +1,37 @@
+<?php
+// includes/templates/email_booking_confirmation.php
+require_once __DIR__ . '/../../includes/config.php';
+
+// Ensure booking_data is set and provide defaults
+$booking_data = isset($booking_data) ? $booking_data : [];
+$passenger_name = isset($booking_data['passenger_name']) ? htmlspecialchars($booking_data['passenger_name'], ENT_QUOTES, 'UTF-8') : 'Passenger';
+$pnr = isset($booking_data['pnr']) ? htmlspecialchars($booking_data['pnr'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$seat_number = isset($booking_data['seat_number']) ? htmlspecialchars($booking_data['seat_number'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$total_amount = isset($booking_data['total_amount']) ? number_format($booking_data['total_amount'], 0) : '0';
+$payment_method = isset($booking_data['payment_method']) && $booking_data['payment_method'] ? htmlspecialchars(ucfirst($booking_data['payment_method']), ENT_QUOTES, 'UTF-8') : 'Unknown';
+$payment_reference = isset($booking_data['payment_reference']) ? htmlspecialchars($booking_data['payment_reference'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$trip = isset($booking_data['trip']) ? $booking_data['trip'] : [];
+$pickup_city = isset($trip['pickup_city']) ? htmlspecialchars($trip['pickup_city'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$dropoff_city = isset($trip['dropoff_city']) ? htmlspecialchars($trip['dropoff_city'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$trip_date = isset($trip['trip_date']) ? date('D, M j, Y', strtotime($trip['trip_date'])) : 'N/A';
+$departure_time = isset($trip['departure_time']) && $trip['departure_time'] ? date('H:i', strtotime($trip['departure_time'])) : 'N/A';
+$vehicle_type = isset($trip['vehicle_type']) ? htmlspecialchars($trip['vehicle_type'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$vehicle_number = isset($trip['vehicle_number']) ? htmlspecialchars($trip['vehicle_number'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$driver_name = isset($trip['driver_name']) && $trip['driver_name'] ? htmlspecialchars($trip['driver_name'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$email = isset($booking_data['email']) ? htmlspecialchars($booking_data['email'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$phone = isset($booking_data['phone']) ? htmlspecialchars($booking_data['phone'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$emergency_contact = isset($booking_data['emergency_contact']) ? htmlspecialchars($booking_data['emergency_contact'], ENT_QUOTES, 'UTF-8') : '';
+$special_requests = isset($booking_data['special_requests']) ? htmlspecialchars($booking_data['special_requests'], ENT_QUOTES, 'UTF-8') : '';
+
+ob_start();
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Confirmation - <?= SITE_NAME ?></title>
+    <title>Booking Confirmation - <?= htmlspecialchars(SITE_NAME) ?></title>
     <style>
         body {
             margin: 0;
@@ -220,7 +248,7 @@
     <div class="email-container">
         <!-- Header -->
         <div class="header">
-            <h1><?= SITE_NAME ?></h1>
+            <h1><?= htmlspecialchars(SITE_NAME) ?></h1>
             <p>Your Trusted Travel Partner</p>
             <div class="success-badge">✓ BOOKING CONFIRMED</div>
         </div>
@@ -228,13 +256,13 @@
         <!-- Content -->
         <div class="content">
             <!-- Greeting -->
-            <h2 style="color: #1f2937; margin: 0 0 10px 0;">Hello <?= htmlspecialchars($booking['passenger_name']) ?>!</h2>
-            <p style="color: #6b7280; margin: 0 0 20px 0;">Thank you for choosing <?= SITE_NAME ?>. Your booking has been successfully confirmed.</p>
+            <h2 style="color: #1f2937; margin: 0 0 10px 0;">Hello <?= $passenger_name ?>!</h2>
+            <p style="color: #6b7280; margin: 0 0 20px 0;">Thank you for choosing <?= htmlspecialchars(SITE_NAME) ?>. Your booking has been successfully confirmed.</p>
 
             <!-- PNR Section -->
             <div class="pnr-section">
                 <h3>Your Booking Reference (PNR)</h3>
-                <div class="pnr-code"><?= htmlspecialchars($booking['pnr']) ?></div>
+                <div class="pnr-code"><?= $pnr ?></div>
                 <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">Keep this reference number for your records</p>
             </div>
 
@@ -245,42 +273,41 @@
                 </div>
                 
                 <div class="trip-route">
-                    <div class="route-city"><?= htmlspecialchars($booking['trip']['pickup_city']) ?></div>
+                    <div class="route-city"><?= $pickup_city ?></div>
                     <div class="route-arrow">→</div>
-                    <div class="route-city"><?= htmlspecialchars($booking['trip']['dropoff_city']) ?></div>
+                    <div class="route-city"><?= $dropoff_city ?></div>
                 </div>
 
                 <div class="details-grid">
                     <div class="detail-item">
                         <span class="detail-label">📅 Travel Date</span>
-                        <span class="detail-value"><?= date('D, M j, Y', strtotime($booking['trip']['trip_date'])) ?></span>
+                        <span class="detail-value"><?= $trip_date ?></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">🕐 Departure</span>
-                        <span class="detail-value"><?= date('H:i', strtotime($booking['trip']['departure_time'])) ?></span>
+                        <span class="detail-value"><?= $departure_time ?></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">🚐 Vehicle Type</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['trip']['vehicle_type']) ?></span>
+                        <span class="detail-value"><?= $vehicle_type ?></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">🔢 Vehicle Number</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['trip']['vehicle_number']) ?></span>
+                        <span class="detail-value"><?= $vehicle_number ?></span>
                     </div>
-                    <?php if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])): ?>
+                    <?php if ($driver_name !== 'N/A'): ?>
                     <div class="detail-item" style="grid-column: 1 / -1;">
                         <span class="detail-label">👨‍✈️ Driver</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['trip']['driver_name']) ?></span>
+                        <span class="detail-value"><?= $driver_name ?></span>
                     </div>
                     <?php endif; ?>
                 </div>
 
                 <!-- Seats -->
                 <div class="seats-section">
-                    <h4 style="margin: 0 0 10px 0; color: #1f2937;">🪑 Your Seat(s)</h4>
+                    <h4 style="margin: 0 0 10px 0; color: #1f2937;">🪑 Your Seat</h4>
                     <div class="seats-container">
-                        <!-- Fixed: Use seat_number from booking data -->
-                        <span class="seat-badge">Seat <?= htmlspecialchars($booking['seat_number']) ?></span>
+                        <span class="seat-badge">Seat <?= $seat_number ?></span>
                     </div>
                 </div>
             </div>
@@ -291,26 +318,26 @@
                 <div class="details-grid" style="grid-template-columns: 1fr;">
                     <div class="detail-item">
                         <span class="detail-label">Name</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['passenger_name']) ?></span>
+                        <span class="detail-value"><?= $passenger_name ?></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Email</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['email']) ?></span>
+                        <span class="detail-value"><?= $email ?></span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">Phone</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['phone']) ?></span>
+                        <span class="detail-value"><?= $phone ?></span>
                     </div>
-                    <?php if (isset($booking['emergency_contact']) && !empty($booking['emergency_contact'])): ?>
+                    <?php if ($emergency_contact): ?>
                     <div class="detail-item">
                         <span class="detail-label">Emergency Contact</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['emergency_contact']) ?></span>
+                        <span class="detail-value"><?= $emergency_contact ?></span>
                     </div>
                     <?php endif; ?>
-                    <?php if (isset($booking['special_requests']) && !empty($booking['special_requests'])): ?>
+                    <?php if ($special_requests): ?>
                     <div class="detail-item">
                         <span class="detail-label">Special Requests</span>
-                        <span class="detail-value"><?= htmlspecialchars($booking['special_requests']) ?></span>
+                        <span class="detail-value"><?= $special_requests ?></span>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -320,12 +347,12 @@
             <div class="payment-summary">
                 <h3 style="color: #1f2937; margin: 0 0 10px 0;">💳 Payment Summary</h3>
                 <p style="margin: 5px 0; color: #6b7280;">
-                    1 seat × ₦<?= number_format($booking['total_amount'], 0) ?>
+                    Total: ₦<?= $total_amount ?>
                 </p>
-                <div class="amount-paid">₦<?= number_format($booking['total_amount'], 0) ?></div>
+                <div class="amount-paid">₦<?= $total_amount ?></div>
                 <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">
-                    Payment Method: <?= ucfirst($booking['payment_method']) ?><br>
-                    Reference: <?= htmlspecialchars($booking['payment_reference']) ?>
+                    Payment Method: <?= $payment_method ?><br>
+                    Reference: <?= $payment_reference ?>
                 </p>
             </div>
 
@@ -335,7 +362,7 @@
                 <ul>
                     <li><strong>Arrive Early:</strong> Please be at the terminal at least 30 minutes before departure time</li>
                     <li><strong>Valid ID Required:</strong> Bring a government-issued photo ID for verification</li>
-                    <li><strong>Keep Your PNR:</strong> Save this email and your PNR (<?= htmlspecialchars($booking['pnr']) ?>) for reference</li>
+                    <li><strong>Keep Your PNR:</strong> Save this email and your PNR (<?= $pnr ?>) for reference</li>
                     <li><strong>Luggage Policy:</strong> One carry-on bag and one checked bag are included</li>
                     <li><strong>Contact Support:</strong> Call us immediately if you need to make changes to your booking</li>
                 </ul>
@@ -352,8 +379,8 @@
             <h3>Need Help?</h3>
             <div class="contact-info">
                 <p><strong>Customer Support</strong></p>
-                <p>📧 Email: support@dgctransports.com</p>
-                <p>📞 Phone: +234 XXX XXX XXXX</p>
+                <p>📧 Email: <?= htmlspecialchars(SITE_EMAIL) ?></p>
+                <p>📞 Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
                 <p>🕐 Available 24/7</p>
             </div>
             
@@ -363,7 +390,7 @@
                     For support, please contact us using the information above.
                 </p>
                 <p style="margin: 10px 0 0 0; font-size: 12px; color: #9ca3af;">
-                    © <?= date('Y') ?> <?= SITE_NAME ?>. All rights reserved.<br>
+                    © <?= date('Y') ?> <?= htmlspecialchars(SITE_NAME) ?>. All rights reserved.<br>
                     Safe travels and thank you for choosing us!
                 </p>
             </div>
@@ -371,3 +398,8 @@
     </div>
 </body>
 </html>
+
+<?php
+$email_content = ob_get_clean();
+echo $email_content;
+?>

@@ -21,6 +21,8 @@ require_once __DIR__ . '/../includes/auth.php';
     }
 </script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<link rel="icon" type="image/png" href="<?= SITE_URL ?>/assets/images/icon-2.png" sizes="32x32">
+<link rel="shortcut icon" href="<?= SITE_URL ?>/assets/images/icon.png" type="image/png">
 
 <!-- Header Navigation (to be included in <body>) -->
 <header class="bg-white text-gray-900 fixed top-0 left-0 w-full z-50 shadow-lg">
@@ -29,7 +31,7 @@ require_once __DIR__ . '/../includes/auth.php';
             <!-- Logo (Centered on mobile) -->
             <div class="flex-shrink-0 order-2">
                 <a href="<?= SITE_URL ?>">
-                    <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-10 w-auto">
+                    <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="Logo" class="h-10 w-auto">
                 </a>
             </div>
 
@@ -61,7 +63,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
             <!-- Mobile Menu Button -->
             <div class="md:hidden order-3">
-                <button id="mobile-menu-button" class="focus:outline-none">
+                <button id="mobile-menu-button" class="focus:outline-none" aria-label="Toggle mobile menu">
                     <i class="fas fa-bars text-2xl hover:text-primary transition-colors duration-200"></i>
                 </button>
             </div>

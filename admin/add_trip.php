@@ -102,8 +102,6 @@ $time_slots = [];
 while ($row = $time_slots_result->fetch_assoc()) {
     $time_slots[] = $row;
 }
-
-require_once '../templates/sidebar.php';
 ?>
 
 <!DOCTYPE html>
@@ -114,70 +112,236 @@ require_once '../templates/sidebar.php';
     <title>Add Trip Template - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-red': '#e30613',
+                        'dark-red': '#c70410',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
-            --white: #ffffff;
-            --gray: #f5f5f5;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
         body {
-            background: linear-gradient(to bottom right, var(--white), var(--gray));
             font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         }
-        .container {
-            max-width: 1200px;
+        
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        .card {
-            background: var(--white);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        
+        .form-input {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            width: 100%;
+            transition: all 0.2s ease;
         }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #e30613;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
         }
+        
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        
         .btn-primary {
-            background: var(--primary-red);
-            color: var(--white);
+            background: #e30613;
+            color: white;
             padding: 10px 20px;
             border-radius: 8px;
-            transition: background 0.3s ease;
+            font-weight: 500;
+            transition: background 0.3s ease, transform 0.2s ease;
         }
+        
         .btn-primary:hover {
-            background: var(--dark-red);
+            background: #c70410;
+            transform: translateY(-1px);
         }
-        .input-field {
-            border: 1px solid var(--black);
-            border-radius: 6px;
-            padding: 8px;
-            width: 100%;
-            color: var(--black);
-        }
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary-red);
-            box-shadow: 0 0 5px rgba(227, 6, 19, 0.3);
-        }
-        .label {
-            font-weight: 600;
-            color: var(--black);
-        }
+        
         .error-message {
-            color: var(--primary-red);
-            font-size: 0.9rem;
+            color: #dc2626;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
         }
-        .success-message {
-            color: #10b981;
-            font-size: 0.9rem;
+        
+        .content-container {
+            overflow-y: auto;
+            max-height: calc(100vh - 4rem);
+        }
+        
+        @media (min-width: 768px) {
+            .content-container {
+                max-height: 100vh;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (min-width: 641px) {
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
+</head>
+<body class="min-h-screen">
+    <?php include '../templates/sidebar.php'; ?>
+
+    <div class="md:ml-64 min-h-screen">
+        <div class="content-container p-4 md:p-6 lg:p-8">
+            <div class="max-w-4xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                        <i class="fas fa-plus text-primary-red mr-3"></i>
+                        Add New Trip Template
+                    </h1>
+                </div>
+
+                <!-- Form Card -->
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <?php if (isset($error)): ?>
+                        <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                                <span class="text-red-800 text-sm"><?= htmlspecialchars($error) ?></span>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" class="form-grid grid gap-6" onsubmit="return validateForm()">
+                        <!-- Pickup City -->
+                        <div>
+                            <label for="pickup_city_id" class="form-label block">Pickup City</label>
+                            <select id="pickup_city_id" name="pickup_city_id" class="form-input" required>
+                                <option value="">Select Pickup City</option>
+                                <?php foreach ($cities as $city): ?>
+                                    <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Dropoff City -->
+                        <div>
+                            <label for="dropoff_city_id" class="form-label block">Dropoff City</label>
+                            <select id="dropoff_city_id" name="dropoff_city_id" class="form-input" required>
+                                <option value="">Select Dropoff City</option>
+                                <?php foreach ($cities as $city): ?>
+                                    <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Vehicle Type -->
+                        <div>
+                            <label for="vehicle_type_id" class="form-label block">Vehicle Type</label>
+                            <select id="vehicle_type_id" name="vehicle_type_id" class="form-input" required>
+                                <option value="">Select Vehicle Type</option>
+                                <?php foreach ($vehicle_types as $vt): ?>
+                                    <option value="<?= $vt['id'] ?>"><?= htmlspecialchars($vt['type']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Vehicle -->
+                        <div>
+                            <label for="vehicle_id" class="form-label block">Vehicle</label>
+                            <select id="vehicle_id" name="vehicle_id" class="form-input" required>
+                                <option value="">Select Vehicle</option>
+                                <?php foreach ($vehicles as $vehicle): ?>
+                                    <option value="<?= $vehicle['id'] ?>">
+                                        <?= htmlspecialchars($vehicle['vehicle_number'] . ' (' . $vehicle['driver_name'] . ')') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Time Slot -->
+                        <div>
+                            <label for="time_slot_id" class="form-label block">Time Slot</label>
+                            <select id="time_slot_id" name="time_slot_id" class="form-input" required>
+                                <option value="">Select Time Slot</option>
+                                <?php foreach ($time_slots as $slot): ?>
+                                    <option value="<?= $slot['id'] ?>">
+                                        <?= htmlspecialchars($slot['departure_time'] . ' - ' . $slot['arrival_time']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Price -->
+                        <div>
+                            <label for="price" class="form-label block">Price (₦)</label>
+                            <input type="number" id="price" name="price" step="0.01" min="0" class="form-input" required>
+                        </div>
+
+                        <!-- Start Date -->
+                        <div>
+                            <label for="start_date" class="form-label block">Start Date</label>
+                            <input type="date" id="start_date" name="start_date" class="form-input" min="<?= date('Y-m-d') ?>" required>
+                        </div>
+
+                        <!-- Recurrence Type -->
+                        <div>
+                            <label for="recurrence_type" class="form-label block">Recurrence Type</label>
+                            <select id="recurrence_type" name="recurrence_type" class="form-input" onchange="toggleRecurrenceDays()" required>
+                                <option value="day">One Day</option>
+                                <option value="week">Weekly</option>
+                                <option value="month">Monthly</option>
+                                <option value="year">Yearly</option>
+                            </select>
+                        </div>
+
+                        <!-- Recurrence Days -->
+                        <div id="recurrence_days_section" class="col-span-1 md:col-span-2" style="display: none;">
+                            <label class="form-label block">Days (for Weekly Schedule)</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <?php
+                                $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                                foreach ($days as $day): ?>
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" name="recurrence_days[]" value="<?= $day ?>" class="form-checkbox h-4 w-4 text-primary-red">
+                                        <span class="ml-2 text-sm text-gray-700"><?= $day ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="col-span-1 md:col-span-2">
+                            <button type="submit" class="btn-primary w-full md:w-auto">
+                                <i class="fas fa-plus mr-2"></i>Create Trip Template
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleRecurrenceDays() {
             const type = document.getElementById('recurrence_type').value;
-            document.getElementById('recurrence_days_section').style.display = (type === 'week') ? 'block' : 'none';
+            document.getElementById('recurrence_days_section').style.display = type === 'week' ? 'block' : 'none';
         }
 
         function validateForm() {
@@ -190,104 +354,5 @@ require_once '../templates/sidebar.php';
             return true;
         }
     </script>
-</head>
-<body>
-    <div class="container mx-auto mt-10 p-6">
-        <div class="card p-8">
-            <h1 class="text-3xl font-bold mb-6">
-                <i class="fas fa-plus text-red-600 mr-2"></i>Add New Trip Template
-            </h1>
-
-            <?php if (isset($error)): ?>
-                <p class="error-message mb-4"><?= htmlspecialchars($error) ?></p>
-            <?php endif; ?>
-
-            <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6" onsubmit="return validateForm()">
-                <div>
-                    <label for="pickup_city_id" class="label block mb-2">Pickup City</label>
-                    <select id="pickup_city_id" name="pickup_city_id" class="input-field" required>
-                        <option value="">Select Pickup City</option>
-                        <?php foreach ($cities as $city): ?>
-                            <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="dropoff_city_id" class="label block mb-2">Dropoff City</label>
-                    <select id="dropoff_city_id" name="dropoff_city_id" class="input-field" required>
-                        <option value="">Select Dropoff City</option>
-                        <?php foreach ($cities as $city): ?>
-                            <option value="<?= $city['id'] ?>"><?= htmlspecialchars($city['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="vehicle_type_id" class="label block mb-2">Vehicle Type</label>
-                    <select id="vehicle_type_id" name="vehicle_type_id" class="input-field" required>
-                        <option value="">Select Vehicle Type</option>
-                        <?php foreach ($vehicle_types as $vt): ?>
-                            <option value="<?= $vt['id'] ?>"><?= htmlspecialchars($vt['type']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="vehicle_id" class="label block mb-2">Vehicle</label>
-                    <select id="vehicle_id" name="vehicle_id" class="input-field" required>
-                        <option value="">Select Vehicle</option>
-                        <?php foreach ($vehicles as $vehicle): ?>
-                            <option value="<?= $vehicle['id'] ?>">
-                                <?= htmlspecialchars($vehicle['vehicle_number'] . ' (' . $vehicle['driver_name'] . ')') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="time_slot_id" class="label block mb-2">Time Slot</label>
-                    <select id="time_slot_id" name="time_slot_id" class="input-field" required>
-                        <option value="">Select Time Slot</option>
-                        <?php foreach ($time_slots as $slot): ?>
-                            <option value="<?= $slot['id'] ?>">
-                                <?= htmlspecialchars($slot['departure_time'] . ' - ' . $slot['arrival_time']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="price" class="label block mb-2">Price (₦)</label>
-                    <input type="number" id="price" name="price" step="0.01" min="0" class="input-field" required>
-                </div>
-                <div>
-                    <label for="start_date" class="label block mb-2">Start Date</label>
-                    <input type="date" id="start_date" name="start_date" class="input-field" min="<?= date('Y-m-d') ?>" required>
-                </div>
-                <div>
-                    <label for="recurrence_type" class="label block mb-2">Recurrence Type</label>
-                    <select id="recurrence_type" name="recurrence_type" class="input-field" onchange="toggleRecurrenceDays()" required>
-                        <option value="day">One Day</option>
-                        <option value="week">Weekly</option>
-                        <option value="month">Monthly</option>
-                        <option value="year">Yearly</option>
-                    </select>
-                </div>
-                <div id="recurrence_days_section" style="display: none;">
-                    <label class="label block mb-2">Days (for Weekly Schedule)</label>
-                    <select multiple name="recurrence_days[]" class="input-field">
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                        <option value="Sunday">Sunday</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2">
-                    <button type="submit" class="btn-primary">
-                        <i class="fas fa-plus mr-2"></i>Create Trip Template
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 </body>
 </html>

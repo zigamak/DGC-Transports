@@ -7,8 +7,16 @@ require_once 'includes/auth.php';
 // Require login
 requireLogin();
 
-// Get current user
+// Get current user details from the session
 $user = $_SESSION['user'];
+
+// Re-fetch the user data from the database to ensure it's up-to-date, including credits
+$stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+$stmt->bind_param("i", $user['id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc(); // Overwrite the session user data with the latest from the DB
+$stmt->close();
 
 // Fetch user's bookings (by user_id OR email)
 $stmt = $conn->prepare("
@@ -48,7 +56,7 @@ require_once 'templates/header.php';
       .btn-copy {
           display: flex;
           align-items: center;
-          background: linear-gradient(to right, #2563eb, #1d4ed8);
+          background: linear-gradient(to right, #dc2626, #b91c1c);
           color: white;
           font-weight: 600;
           padding: 0.5rem 1rem;
@@ -58,39 +66,44 @@ require_once 'templates/header.php';
       }
       .btn-copy:hover {
           transform: scale(1.05);
-          background: linear-gradient(to right, #1d4ed8, #2563eb);
+          background: linear-gradient(to right, #b91c1c, #dc2626);
+      }
+      .table-header {
+          background-color: #f3f4f6; /* A light gray for the header */
+          color: #1a202c;
+      }
+      .table-row-hover:hover {
+          background-color: #f3f4f6;
       }
   </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-white text-gray-800 font-sans">
   <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
     <div class="w-full dashboard-card mx-auto">
       
-      <!-- Welcome Section -->
-      <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8 text-gray-900">
         <div class="text-center mb-6">
-          <h1 class="text-4xl font-bold text-gray-900 mb-2">
+          <h1 class="text-4xl font-extrabold mb-2 text-gray-900">
             Welcome, <?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?>
           </h1>
           <p class="text-gray-600 text-lg">Your DGC Transports Dashboard</p>
         </div>
         
-        <!-- Affiliate Section -->
-        <div class="bg-blue-50 rounded-xl p-6 mb-6">
-          <h2 class="text-2xl font-bold text-blue-700 mb-4">
-            <i class="fas fa-link mr-2"></i>Affiliate Program
+        <div class="bg-red-50 rounded-xl p-6 mb-6">
+          <h2 class="text-2xl font-bold text-red-700 mb-4">
+            <i class="fas fa-gift mr-2"></i>Affiliate Program
           </h2>
           <div class="flex items-center justify-between flex-wrap gap-4">
             <div>
               <p class="text-gray-700 mb-2">
                 Your unique affiliate ID: 
-                <span id="affiliateId" class="font-mono bg-gray-200 px-2 py-1 rounded">
+                <span id="affiliateId" class="font-mono bg-gray-200 text-gray-900 px-2 py-1 rounded">
                   <?= htmlspecialchars($user['affiliate_id'] ?? 'Not generated') ?>
                 </span>
               </p>
               <p class="text-gray-600">
                 Share this ID to earn credits on referrals. Current credits: 
-                <span class="font-bold"><?= number_format($user['credits'] ?? 0, 2) ?> NGN</span>
+                <span class="font-bold text-red-600"><?= number_format($user['credits'] ?? 0, 2) ?> NGN</span>
               </p>
             </div>
             <button id="copyBtn" class="btn-copy">
@@ -99,48 +112,46 @@ require_once 'templates/header.php';
           </div>
         </div>
         
-        <!-- Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <a href="book_trip.php" class="bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
+          <a href="book_trip.php" class="bg-gradient-to-r from-red-600 to-red-800 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
             <i class="fas fa-bus mr-2"></i>Book a Trip
           </a>
-          <a href="profile.php" class="bg-gradient-to-r from-green-500 to-green-700 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
+          <a href="profile.php" class="bg-gradient-to-r from-gray-700 to-gray-900 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
             <i class="fas fa-user-edit mr-2"></i>Update Profile
           </a>
-          <a href="logout.php" class="bg-gradient-to-r from-red-500 to-red-700 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
+          <a href="logout.php" class="bg-gradient-to-r from-gray-500 to-gray-700 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
             <i class="fas fa-sign-out-alt mr-2"></i>Logout
           </a>
         </div>
       </div>
 
-      <!-- Bookings Section -->
-      <div class="bg-white rounded-3xl shadow-2xl p-8">
-        <h2 class="text-3xl font-bold text-gray-900 mb-6">
+      <div class="bg-gray-100 rounded-3xl shadow-2xl p-8">
+        <h2 class="text-3xl font-bold mb-6 text-gray-900">
           <i class="fas fa-ticket-alt mr-2"></i>Your Bookings
         </h2>
 
         <?php if (empty($bookings)): ?>
-          <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg mb-6">
+          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
             <p>No bookings found. Book your first trip today!</p>
           </div>
         <?php else: ?>
           <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 rounded-xl overflow-hidden shadow">
-              <thead class="bg-gray-100">
+            <table class="min-w-full rounded-xl overflow-hidden shadow">
+              <thead class="table-header">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">PNR</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Date</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Route</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Time</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Seat</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Amount</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">PNR</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Route</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Time</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Seat</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Amount</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="bg-white divide-y divide-gray-200 text-gray-800">
                 <?php foreach ($bookings as $booking): ?>
-                  <tr class="<?= $booking['status'] === 'cancelled' ? 'bg-red-50' : ($booking['status'] === 'confirmed' ? 'bg-green-50' : '') ?>">
+                  <tr class="table-row-hover <?= $booking['status'] === 'cancelled' ? 'bg-red-50' : ($booking['status'] === 'confirmed' ? 'bg-green-50' : '') ?>">
                     <td class="px-6 py-4 whitespace-nowrap font-mono"><?= htmlspecialchars($booking['pnr']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap"><?= date('d M Y', strtotime($booking['trip_date'])) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -160,14 +171,14 @@ require_once 'templates/header.php';
                         <?= ucfirst($booking['status']) ?>
                       </span>
                       <br>
-                      <small><?= ucfirst($booking['payment_status']) ?></small>
+                      <small class="text-gray-500"><?= ucfirst($booking['payment_status']) ?></small>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap space-x-2">
                       <a href="view_booking.php?id=<?= $booking['id'] ?>" class="text-blue-600 hover:underline">
                         <i class="fas fa-eye"></i> View
                       </a>
                       <?php if ($booking['status'] !== 'cancelled' && strtotime($booking['trip_date']) > time()): ?>
-                        | <a href="cancel_booking.php?id=<?= $booking['id'] ?>" class="text-red-600 hover:underline" onclick="return confirm('Are you sure?')">
+                        | <a href="cancel_booking.php?id=<?= $booking['id'] ?>" class="text-red-600 hover:underline" onclick="return confirm('Are you sure you want to cancel this booking?')">
                           <i class="fas fa-times"></i> Cancel
                         </a>
                       <?php endif; ?>
@@ -188,13 +199,16 @@ require_once 'templates/header.php';
 
     copyBtn.addEventListener("click", () => {
       navigator.clipboard.writeText(affiliateId).then(() => {
+        const originalText = copyBtn.querySelector("span").innerText;
+        const originalIcon = copyBtn.querySelector("i").className;
+        
         copyBtn.querySelector("span").innerText = "Copied!";
         copyBtn.querySelector("i").classList.remove("fa-copy");
         copyBtn.querySelector("i").classList.add("fa-check");
+        
         setTimeout(() => {
-          copyBtn.querySelector("span").innerText = "Copy ID";
-          copyBtn.querySelector("i").classList.remove("fa-check");
-          copyBtn.querySelector("i").classList.add("fa-copy");
+          copyBtn.querySelector("span").innerText = originalText;
+          copyBtn.querySelector("i").className = originalIcon;
         }, 2000);
       });
     });

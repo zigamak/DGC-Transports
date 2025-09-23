@@ -1,5 +1,5 @@
 <?php
-//admin/view_bookings.php
+// admin/view_trip.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -9,11 +9,12 @@ require_once '../includes/functions.php';
 // Enforce admin-only access
 requireRole('admin', '/login.php');
 
-// Get template ID from URL
-$template_id = isset($_GET['template_id']) ? (int)$_GET['template_id'] : 0;
+// Get trip ID and date from URL
+$trip_id = isset($_GET['trip_id']) ? (int)$_GET['trip_id'] : 0;
+$trip_date = isset($_GET['trip_date']) ? $_GET['trip_date'] : '';
 
-if (!$template_id) {
-    header('Location: trips.php');
+if (!$trip_id || !$trip_date) {
+    header('Location: dashboard.php');
     exit;
 }
 
@@ -35,46 +36,48 @@ if (isset($_POST['update_booking']) && isset($_POST['booking_id']) && isset($_PO
     }
 }
 
-// Get search and filter parameters
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
-$payment_filter = isset($_GET['payment']) ? $_GET['payment'] : '';
-$date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
-$date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$per_page = 20;
-$offset = ($page - 1) * $per_page;
-
-// Get trip template details
-$template_query = "
-    SELECT tt.id, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type, 
+// Get trip instance details
+$instance_query = "
+    SELECT ti.id, ti.trip_date, ti.booked_seats, ti.status, ti.template_id,
+           c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type, 
            v.vehicle_number, v.driver_name, ts.departure_time, ts.arrival_time, 
            tt.price, tt.recurrence_type, tt.recurrence_days, tt.start_date, tt.end_date,
            vt.capacity
-    FROM trip_templates tt
+    FROM trip_instances ti
+    JOIN trip_templates tt ON ti.template_id = tt.id
     JOIN cities c1 ON tt.pickup_city_id = c1.id
     JOIN cities c2 ON tt.dropoff_city_id = c2.id
     JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
     JOIN vehicles v ON tt.vehicle_id = v.id
     JOIN time_slots ts ON tt.time_slot_id = ts.id
-    WHERE tt.id = ? AND tt.status = 'active'
+    WHERE ti.id = ? AND ti.trip_date = ? AND tt.status = 'active'
 ";
 
-$stmt = $conn->prepare($template_query);
-$stmt->bind_param("i", $template_id);
+$stmt = $conn->prepare($instance_query);
+$stmt->bind_param("is", $trip_id, $trip_date);
 $stmt->execute();
-$template_result = $stmt->get_result();
-$template = $template_result->fetch_assoc();
+$instance_result = $stmt->get_result();
+$instance = $instance_result->fetch_assoc();
 $stmt->close();
 
-if (!$template) {
-    header('Location: trips.php');
+if (!$instance) {
+    header('Location: dashboard.php');
     exit;
 }
 
-// Build the WHERE clause for filtering
-$where_conditions = ["b.template_id = ?"];
-$params = [$template_id];
+$template_id = $instance['template_id'];
+
+// Get search and filter parameters
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
+$payment_filter = isset($_GET['payment']) ? $_GET['payment'] : '';
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$per_page = 20;
+$offset = ($page - 1) * $per_page;
+
+// Build the WHERE clause for filtering bookings
+$where_conditions = ["b.trip_id = ?"];
+$params = [$trip_id];
 $param_types = "i";
 
 if (!empty($search)) {
@@ -93,18 +96,6 @@ if (!empty($status_filter)) {
 if (!empty($payment_filter)) {
     $where_conditions[] = "b.payment_status = ?";
     $params[] = $payment_filter;
-    $param_types .= "s";
-}
-
-if (!empty($date_from)) {
-    $where_conditions[] = "b.trip_date >= ?";
-    $params[] = $date_from;
-    $param_types .= "s";
-}
-
-if (!empty($date_to)) {
-    $where_conditions[] = "b.trip_date <= ?";
-    $params[] = $date_to;
     $param_types .= "s";
 }
 
@@ -137,7 +128,7 @@ $bookings_query = "
     FROM bookings b
     LEFT JOIN users u ON b.user_id = u.id
     WHERE $where_clause
-    ORDER BY b.trip_date DESC, b.created_at DESC
+    ORDER BY b.created_at DESC
     LIMIT ? OFFSET ?
 ";
 
@@ -155,7 +146,7 @@ while ($row = $bookings_result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Get statistics (for all bookings, not just filtered)
+// Get statistics for bookings for this trip instance
 $stats_query = "
     SELECT 
         COUNT(*) as total_bookings,
@@ -164,11 +155,11 @@ $stats_query = "
         SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_bookings,
         SUM(CASE WHEN status != 'cancelled' AND payment_status = 'paid' THEN total_amount ELSE 0 END) as total_revenue
     FROM bookings 
-    WHERE template_id = ?
+    WHERE trip_id = ?
 ";
 
 $stmt = $conn->prepare($stats_query);
-$stmt->bind_param("i", $template_id);
+$stmt->bind_param("i", $trip_id);
 $stmt->execute();
 $stats_result = $stmt->get_result();
 $stats = $stats_result->fetch_assoc();
@@ -180,7 +171,7 @@ $stmt->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trip Bookings - DGC Transports</title>
+    <title>Trip Bookings - <?= date('M j, Y', strtotime($instance['trip_date'])) ?> - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -369,7 +360,7 @@ $stmt->close();
         
         .content-container {
             overflow-y: auto;
-            max-height: calc(100vh - 4rem); /* Adjust based on header height */
+            max-height: calc(100vh - 4rem);
         }
         
         @media (min-width: 768px) {
@@ -391,19 +382,23 @@ $stmt->close();
                     <div>
                         <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
                             <i class="fas fa-ticket-alt text-primary-red mr-3"></i>
-                            Trip Bookings
+                            Trip Bookings - <?= date('M j, Y', strtotime($instance['trip_date'])) ?>
                         </h1>
-                        <p class="text-gray-600 mt-1"><?= htmlspecialchars($template['pickup_city']) ?> → <?= htmlspecialchars($template['dropoff_city']) ?></p>
+                        <p class="text-gray-600 mt-1"><?= htmlspecialchars($instance['pickup_city']) ?> → <?= htmlspecialchars($instance['dropoff_city']) ?></p>
                     </div>
                     <div class="flex items-center space-x-3">
-                        <a href="trips.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                        <a href="dashboard.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
                             <i class="fas fa-arrow-left mr-2"></i>
-                            Back to Trips
+                            Back to Dashboard
                         </a>
                         <button onclick="showFilterModal()" class="md:hidden inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
                             <i class="fas fa-filter mr-2"></i>
                             Filter
                         </button>
+                        <a href="view_bookings.php?template_id=<?= $template_id ?>" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
+                            <i class="fas fa-list mr-2"></i>
+                            View All Template Bookings
+                        </a>
                     </div>
                 </div>
             </div>
@@ -418,43 +413,35 @@ $stmt->close();
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                             <p class="text-sm text-gray-600 uppercase tracking-wide">Vehicle</p>
-                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['vehicle_type'] . ' - ' . $template['vehicle_number']) ?></p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($instance['vehicle_type'] . ' - ' . $instance['vehicle_number']) ?></p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-600 uppercase tracking-wide">Driver</p>
-                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['driver_name']) ?></p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($instance['driver_name']) ?></p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-600 uppercase tracking-wide">Time</p>
-                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($template['departure_time'] . ' - ' . $template['arrival_time']) ?></p>
+                            <p class="text-gray-900 font-medium"><?= htmlspecialchars($instance['departure_time'] . ' - ' . $instance['arrival_time']) ?></p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-600 uppercase tracking-wide">Price</p>
-                            <p class="text-gray-900 font-medium">₦<?= number_format($template['price'], 0) ?></p>
+                            <p class="text-gray-900 font-medium">₦<?= number_format($instance['price'], 0) ?></p>
                         </div>
                         <div>
                             <p class="text-sm text-gray-600 uppercase tracking-wide">Capacity</p>
-                            <p class="text-gray-900 font-medium"><?= $template['capacity'] ?> seats</p>
+                            <p class="text-gray-900 font-medium"><?= $instance['capacity'] ?> seats</p>
                         </div>
                         <div>
-                            <p class="text-sm text-gray-600 uppercase tracking-wide">Recurrence</p>
-                            <p class="text-gray-900 font-medium">
-                                <?php
-                                if ($template['recurrence_type'] === 'day') {
-                                    echo 'One Day';
-                                } elseif ($template['recurrence_type'] === 'week') {
-                                    echo 'Weekly (' . htmlspecialchars($template['recurrence_days'] ?: 'None') . ')';
-                                } elseif ($template['recurrence_type'] === 'month') {
-                                    echo 'Monthly (Day ' . date('j', strtotime($template['start_date'])) . ')';
-                                } else {
-                                    echo 'Yearly (' . date('M j', strtotime($template['start_date'])) . ')';
-                                }
-                                ?>
-                            </p>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Booked Seats</p>
+                            <p class="text-gray-900 font-medium"><?= $instance['booked_seats'] ?> seats</p>
                         </div>
-                        <div class="col-span-2">
-                            <p class="text-sm text-gray-600 uppercase tracking-wide">Period</p>
-                            <p class="text-gray-900 font-medium"><?= date('M j, Y', strtotime($template['start_date'])) ?> - <?= date('M j, Y', strtotime($template['end_date'])) ?></p>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Trip Date</p>
+                            <p class="text-gray-900 font-medium"><?= date('M j, Y', strtotime($instance['trip_date'])) ?></p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 uppercase tracking-wide">Status</p>
+                            <p class="text-gray-900 font-medium"><?= ucfirst($instance['status']) ?></p>
                         </div>
                     </div>
                 </div>
@@ -546,7 +533,8 @@ $stmt->close();
                         </button>
                     </div>
                     <form method="GET" class="filter-grid grid gap-4">
-                        <input type="hidden" name="template_id" value="<?= $template_id ?>">
+                        <input type="hidden" name="trip_id" value="<?= $trip_id ?>">
+                        <input type="hidden" name="trip_date" value="<?= htmlspecialchars($trip_date) ?>">
                         <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search PNR, name, email..." class="form-input">
                         <select name="status" class="form-input">
                             <option value="">All Status</option>
@@ -560,14 +548,12 @@ $stmt->close();
                             <option value="paid" <?= $payment_filter === 'paid' ? 'selected' : '' ?>>Paid</option>
                             <option value="cancelled" <?= $payment_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                         </select>
-                        <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="form-input">
-                        <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="form-input">
                         <div class="flex gap-2">
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
                                 <i class="fas fa-search mr-2"></i>
                                 Filter
                             </button>
-                            <a href="view_bookings.php?template_id=<?= $template_id ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
+                            <a href="view_trip.php?trip_id=<?= $trip_id ?>&trip_date=<?= htmlspecialchars($trip_date) ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
                                 <i class="fas fa-times mr-2"></i>
                                 Clear
                             </a>
@@ -586,7 +572,8 @@ $stmt->close();
                 </div>
                 <div class="p-4 md:p-6">
                     <form method="GET" class="filter-grid grid gap-4">
-                        <input type="hidden" name="template_id" value="<?= $template_id ?>">
+                        <input type="hidden" name="trip_id" value="<?= $trip_id ?>">
+                        <input type="hidden" name="trip_date" value="<?= htmlspecialchars($trip_date) ?>">
                         <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search PNR, name, email..." class="form-input">
                         <select name="status" class="form-input">
                             <option value="">All Status</option>
@@ -600,14 +587,12 @@ $stmt->close();
                             <option value="paid" <?= $payment_filter === 'paid' ? 'selected' : '' ?>>Paid</option>
                             <option value="cancelled" <?= $payment_filter === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                         </select>
-                        <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="form-input">
-                        <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="form-input">
                         <div class="flex gap-2">
                             <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
                                 <i class="fas fa-search mr-2"></i>
                                 Filter
                             </button>
-                            <a href="view_bookings.php?template_id=<?= $template_id ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
+                            <a href="view_trip.php?trip_id=<?= $trip_id ?>&trip_date=<?= htmlspecialchars($trip_date) ?>" class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200">
                                 <i class="fas fa-times mr-2"></i>
                                 Clear
                             </a>
@@ -625,7 +610,7 @@ $stmt->close();
                                 <i class="fas fa-list text-primary-red mr-2"></i>
                                 Bookings List
                             </h2>
-                            <p class="text-sm text-gray-600 mt-1">Showing <?= count($bookings) ?> of <?= $total_bookings ?> bookings</p>
+                            <p class="text-sm text-gray-600 mt-1">Showing <?= count($bookings) ?> of <?= $total_bookings ?> bookings for <?= date('M j, Y', strtotime($instance['trip_date'])) ?></p>
                         </div>
                     </div>
                 </div>
@@ -637,7 +622,7 @@ $stmt->close();
                                 <i class="fas fa-ticket-alt text-3xl text-gray-400"></i>
                             </div>
                             <h3 class="text-lg font-semibold text-gray-900 mb-2">No Bookings Found</h3>
-                            <p class="text-gray-600 mb-6 max-w-sm mx-auto">Try adjusting your filters or check back later.</p>
+                            <p class="text-gray-600 mb-6 max-w-sm mx-auto">No bookings found for this trip on <?= date('M j, Y', strtotime($instance['trip_date'])) ?>. Try adjusting your filters.</p>
                         </div>
                     <?php else: ?>
                         <!-- Mobile Cards (Hidden on desktop) -->

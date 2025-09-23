@@ -1,4 +1,5 @@
 <?php
+//staff/pnr.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -14,6 +15,9 @@ $booking = null;
 $error = '';
 $success = '';
 $qr_code_path = '';
+
+// Get current date for comparison
+$current_date = date('Y-m-d');
 
 // Handle PNR search (manual)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'search') {
@@ -47,6 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         if (!$booking) {
             $error = 'No booking found with the provided PNR.';
+        } else {
+            // Validate booking date against current date
+            $booking_date = date('Y-m-d', strtotime($booking['trip_date']));
+            if ($booking_date !== $current_date) {
+                $error = $booking_date < $current_date 
+                    ? 'This booking is for a past date (' . formatDate($booking['trip_date'], 'j M, Y') . ').'
+                    : 'This booking is for a future date (' . formatDate($booking['trip_date'], 'j M, Y') . ').';
+                $booking = null; // Clear booking to prevent further processing
+            }
         }
     } else {
         $error = 'Please enter a valid PNR.';
@@ -58,41 +71,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $booking_id = (int)$_POST['booking_id'];
     $pnr_to_update = trim($_POST['pnr'] ?? '');
     
-    $stmt = $conn->prepare("UPDATE bookings SET status = 'has boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
-    $stmt->bind_param("i", $booking_id);
-    if ($stmt->execute() && $stmt->affected_rows > 0) {
-        $success = 'Passenger has been marked as boarded successfully!';
-        
-        // Re-fetch booking details to show updated status
-        $stmt2 = $conn->prepare("
-            SELECT
-                b.*,
-                vt.type as vehicle_type,
-                v.vehicle_number,
-                v.driver_name,
-                ts.departure_time,
-                ts.arrival_time,
-                pc.name as pickup_city,
-                dc.name as dropoff_city,
-                tt.price
-            FROM bookings b
-            JOIN trip_templates tt ON b.template_id = tt.id
-            JOIN cities pc ON tt.pickup_city_id = pc.id
-            JOIN cities dc ON tt.dropoff_city_id = dc.id
-            JOIN time_slots ts ON tt.time_slot_id = ts.id
-            JOIN vehicles v ON tt.vehicle_id = v.id
-            JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
-            WHERE b.pnr = ?
-        ");
-        $stmt2->bind_param("s", $pnr_to_update);
-        $stmt2->execute();
-        $booking = $stmt2->get_result()->fetch_assoc();
-        $stmt2->close();
-        $pnr = $pnr_to_update;
-    } else {
-        $error = 'Failed to update boarding status. Passenger may already be boarded or booking not found.';
-    }
+    // Verify booking date before updating
+    $stmt = $conn->prepare("SELECT trip_date FROM bookings WHERE id = ? AND pnr = ?");
+    $stmt->bind_param("is", $booking_id, $pnr_to_update);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
+    if ($result) {
+        $booking_date = date('Y-m-d', strtotime($result['trip_date']));
+        if ($booking_date !== $current_date) {
+            $error = $booking_date < $current_date 
+                ? 'Cannot update: This booking is for a past date (' . formatDate($result['trip_date'], 'j M, Y') . ').'
+                : 'Cannot update: This booking is for a future date (' . formatDate($result['trip_date'], 'j M, Y') . ').';
+        } else {
+            $stmt = $conn->prepare("UPDATE bookings SET status = 'has boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
+            $stmt->bind_param("i", $booking_id);
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $success = 'Passenger has been marked as boarded successfully!';
+                
+                // Re-fetch booking details to show updated status
+                $stmt2 = $conn->prepare("
+                    SELECT
+                        b.*,
+                        vt.type as vehicle_type,
+                        v.vehicle_number,
+                        v.driver_name,
+                        ts.departure_time,
+                        ts.arrival_time,
+                        pc.name as pickup_city,
+                        dc.name as dropoff_city,
+                        tt.price
+                    FROM bookings b
+                    JOIN trip_templates tt ON b.template_id = tt.id
+                    JOIN cities pc ON tt.pickup_city_id = pc.id
+                    JOIN cities dc ON tt.dropoff_city_id = dc.id
+                    JOIN time_slots ts ON tt.time_slot_id = ts.id
+                    JOIN vehicles v ON tt.vehicle_id = v.id
+                    JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+                    WHERE b.pnr = ?
+                ");
+                $stmt2->bind_param("s", $pnr_to_update);
+                $stmt2->execute();
+                $booking = $stmt2->get_result()->fetch_assoc();
+                $stmt2->close();
+                $pnr = $pnr_to_update;
+            } else {
+                $error = 'Failed to update boarding status. Passenger may already be boarded or booking not found.';
+            }
+            $stmt->close();
+        }
+    } else {
+        $error = 'Booking not found.';
+    }
 }
 
 // Handle general status update
@@ -102,44 +133,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $pnr_to_update = trim($_POST['pnr'] ?? '');
     $valid_statuses = ['confirmed', 'has boarded', 'arrived', 'cancelled'];
     
-    if (!in_array($new_status, $valid_statuses)) {
-        $error = 'Invalid status selected.';
-    } else {
-        $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ?");
-        $stmt->bind_param("si", $new_status, $booking_id);
-        if ($stmt->execute()) {
-            $success = 'Booking status updated to ' . htmlspecialchars(ucfirst($new_status)) . '.';
-            
-            // Re-fetch booking details
-            $stmt2 = $conn->prepare("
-                SELECT
-                    b.*,
-                    vt.type as vehicle_type,
-                    v.vehicle_number,
-                    v.driver_name,
-                    ts.departure_time,
-                    ts.arrival_time,
-                    pc.name as pickup_city,
-                    dc.name as dropoff_city,
-                    tt.price
-                FROM bookings b
-                JOIN trip_templates tt ON b.template_id = tt.id
-                JOIN cities pc ON tt.pickup_city_id = pc.id
-                JOIN cities dc ON tt.dropoff_city_id = dc.id
-                JOIN time_slots ts ON tt.time_slot_id = ts.id
-                JOIN vehicles v ON tt.vehicle_id = v.id
-                JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
-                WHERE b.pnr = ?
-            ");
-            $stmt2->bind_param("s", $pnr_to_update);
-            $stmt2->execute();
-            $booking = $stmt2->get_result()->fetch_assoc();
-            $stmt2->close();
-            $pnr = $pnr_to_update;
+    // Verify booking date before updating
+    $stmt = $conn->prepare("SELECT trip_date FROM bookings WHERE id = ? AND pnr = ?");
+    $stmt->bind_param("is", $booking_id, $pnr_to_update);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($result) {
+        $booking_date = date('Y-m-d', strtotime($result['trip_date']));
+        if ($booking_date !== $current_date) {
+            $error = $booking_date < $current_date 
+                ? 'Cannot update: This booking is for a past date (' . formatDate($result['trip_date'], 'j M, Y') . ').'
+                : 'Cannot update: This booking is for a future date (' . formatDate($result['trip_date'], 'j M, Y') . ').';
         } else {
-            $error = 'Failed to update booking status.';
+            if (!in_array($new_status, $valid_statuses)) {
+                $error = 'Invalid status selected.';
+            } else {
+                $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ?");
+                $stmt->bind_param("si", $new_status, $booking_id);
+                if ($stmt->execute()) {
+                    $success = 'Booking status updated to ' . htmlspecialchars(ucfirst($new_status)) . '.';
+                    
+                    // Re-fetch booking details
+                    $stmt2 = $conn->prepare("
+                        SELECT
+                            b.*,
+                            vt.type as vehicle_type,
+                            v.vehicle_number,
+                            v.driver_name,
+                            ts.departure_time,
+                            ts.arrival_time,
+                            pc.name as pickup_city,
+                            dc.name as dropoff_city,
+                            tt.price
+                        FROM bookings b
+                        JOIN trip_templates tt ON b.template_id = tt.id
+                        JOIN cities pc ON tt.pickup_city_id = pc.id
+                        JOIN cities dc ON tt.dropoff_city_id = dc.id
+                        JOIN time_slots ts ON tt.time_slot_id = ts.id
+                        JOIN vehicles v ON tt.vehicle_id = v.id
+                        JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+                        WHERE b.pnr = ?
+                    ");
+                    $stmt2->bind_param("s", $pnr_to_update);
+                    $stmt2->execute();
+                    $booking = $stmt2->get_result()->fetch_assoc();
+                    $stmt2->close();
+                    $pnr = $pnr_to_update;
+                } else {
+                    $error = 'Failed to update booking status.';
+                }
+                $stmt->close();
+            }
         }
-        $stmt->close();
+    } else {
+        $error = 'Booking not found.';
     }
 }
 ?>
@@ -149,224 +198,187 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff PNR Management - <?= SITE_NAME ?></title>
+    <title>PNR Management - <?= SITE_NAME ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
+            --primary-red: #dc2626;
+            --dark-red: #b91c1c;
+            --black: #111827;
             --white: #ffffff;
-            --gray: #ffffff; /* Solid white background */
+            --gray: #f3f4f6;
             --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
+            --accent-blue: #2563eb;
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+
         body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--gray); /* Solid white background */
-            color: #1a1a1a; /* Adjusted text color for contrast */
+            font-family: 'Inter', sans-serif;
+            background: var(--gray);
+            color: var(--black);
             min-height: 100vh;
+            margin: 0;
             overscroll-behavior: none;
         }
-        
+
         .card {
             background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        
+
         .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
         }
-        
+
         .btn-primary {
             background: linear-gradient(to right, var(--primary-red), var(--dark-red));
             color: var(--white);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
             border: none;
             cursor: pointer;
         }
-        
+
         .btn-primary:hover {
             background: linear-gradient(to right, var(--dark-red), var(--primary-red));
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
-        
+
         .btn-success {
             background: linear-gradient(to right, #10b981, #059669);
             color: var(--white);
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
             border: none;
             cursor: pointer;
         }
-        
+
         .btn-success:hover {
             background: linear-gradient(to right, #059669, #047857);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
-        
+
         .btn-stop {
-            background: #f8b400;
-            color: #0f2027;
+            background: #f59e0b;
+            color: var(--black);
             border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 20px;
-            font-weight: bold;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.3s ease;
-            margin-top: 20px;
-            display: none; /* Initially hidden */
+            transition: all 0.2s ease;
+            margin-top: 16px;
+            display: none;
         }
-        
+
         .btn-stop:hover {
-            background: #e0a800;
+            background: #d97706;
         }
-        
+
         .input-field {
             border: 1px solid var(--light-gray);
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 6px;
+            padding: 10px;
             width: 100%;
-            font-size: 1rem;
-            font-family: 'Poppins', sans-serif;
-            transition: border-color 0.3s ease;
+            font-size: 0.875rem;
+            font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s ease;
         }
-        
+
         .input-field:focus {
             outline: none;
             border-color: var(--primary-red);
-            box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.1);
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
         }
-        
+
         .error-message {
             color: var(--primary-red);
-            font-size: 0.9rem;
-            margin-bottom: 16px;
+            font-size: 0.875rem;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
+            gap: 6px;
         }
-        
+
         .success-message {
             color: #10b981;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
+            font-size: 0.875rem;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
+            gap: 6px;
         }
-        
+
         .scanner-container {
             position: relative;
             width: 100%;
-            max-width: 400px;
-            margin: 20px auto;
+            max-width: 320px;
+            margin: 16px auto;
         }
-        
+
         #video {
             width: 100%;
             height: auto;
-            border: 4px solid #f8b400;
-            border-radius: 12px;
-            box-shadow: 0 0 15px rgba(248, 180, 0, 0.7);
+            border: 3px solid #f59e0b;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
             display: none;
         }
-        
+
         .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
             text-transform: uppercase;
         }
-        
-        .status-confirmed {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        
-        .status-boarded {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        
-        .status-arrived {
-            background: #e0e7ff;
-            color: #3730a3;
-        }
-        
-        .status-cancelled {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        
-        .status-pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        
+
+        .status-confirmed { background: #dbeafe; color: #1e40af; }
+        .status-boarded { background: #d1fae5; color: #065f46; }
+        .status-arrived { background: #e0e7ff; color: #3730a3; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+
         .gradient-bg {
             background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
-        }
-        
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: .5;
-            }
         }
 
         #scan-overlay {
             position: absolute;
-            top: 20%;
-            left: 20%;
-            right: 20%;
-            bottom: 20%;
-            border: 3px solid #f8b400;
-            border-radius: 8px;
+            top: 15%;
+            left: 15%;
+            right: 15%;
+            bottom: 15%;
+            border: 2px solid #f59e0b;
+            border-radius: 6px;
             pointer-events: none;
-            background: rgba(248, 180, 0, 0.2);
-            box-sizing: border-box;
+            background: rgba(245, 158, 11, 0.15);
             display: none;
         }
-        
+
         #scan-overlay::before {
             content: 'Place QR Code Here';
             position: absolute;
-            top: -30px;
+            top: -28px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: #f8b400;
-            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #f59e0b;
+            padding: 6px 12px;
             border-radius: 4px;
-            font-size: 16px;
-            font-weight: bold;
-            white-space: nowrap;
+            font-size: 14px;
+            font-weight: 500;
         }
-        
+
         .modal {
             display: none;
             position: fixed;
@@ -374,120 +386,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.7);
             justify-content: center;
             align-items: center;
             z-index: 1000;
         }
-        
+
         .modal-content {
-            background: #fff;
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 500px;
+            background: var(--white);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 480px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 0 20px rgba(248, 180, 0, 0.5);
-            color: #0f2027;
-            position: relative;
+            box-shadow: 0 0 16px rgba(0, 0, 0, 0.2);
+            color: var(--black);
         }
-        
+
         .modal-content p {
-            font-size: 24px;
+            font-size: 1.125rem;
             line-height: 1.5;
-            margin: 10px 0;
+            margin: 8px 0;
         }
-        
-        .modal-content .status.success {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4caf50;
-        }
-        
-        .modal-content .status.warning {
-            font-size: 28px;
-            font-weight: bold;
-            color: #e74c3c;
-        }
-        
-        .modal-content .status.failed {
-            font-size: 28px;
-            font-weight: bold;
-            color: #e74c3c;
-        }
-        
+
+        .modal-content .status.success { color: #10b981; font-size: 1.5rem; font-weight: 600; }
+        .modal-content .status.warning { color: #f59e0b; font-size: 1.5rem; font-weight: 600; }
+        .modal-content .status.failed { color: #dc2626; font-size: 1.5rem; font-weight: 600; }
         .modal-content .passenger-name,
         .modal-content .route-details,
         .modal-content .vehicle-details,
         .modal-content .seat-number {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 1rem;
+            font-weight: 500;
         }
-        
+
         .modal-content button {
-            background: #f8b400;
-            color: #0f2027;
+            background: #f59e0b;
+            color: var(--black);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: background 0.2s ease;
+        }
+
+        .modal-content button:hover {
+            background: #d97706;
+        }
+
+        #start-camera-button {
+            background: #f59e0b;
+            color: var(--black);
             border: none;
             padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            margin-top: 20px;
-            transition: background 0.3s ease;
+            transition: background 0.2s ease;
+            margin-top: 16px;
         }
-        
-        .modal-content button:hover {
-            background: #e0a800;
-        }
-        
-        #start-camera-button {
-            background: #f8b400;
-            color: #0f2027;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            margin-top: 20px;
-        }
-        
+
         #start-camera-button:hover {
-            background: #e0a800;
+            background: #d97706;
         }
-        
+
         #start-button-container {
             width: 100%;
-            max-width: 400px;
-            margin: 20px auto;
+            max-width: 320px;
+            margin: 16px auto;
         }
-        
-        @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            .modal-content {
-                padding: 20px;
-            }
-            .modal-content p {
-                font-size: 20px;
-            }
+
+        @media (max-width: 768px) {
+            body { padding-top: 64px; }
+            .modal-content { padding: 16px; }
+            .modal-content p { font-size: 1rem; }
             .modal-content .status.success,
             .modal-content .status.warning,
-            .modal-content .status.failed {
-                font-size: 24px;
-            }
+            .modal-content .status.failed { font-size: 1.25rem; }
             .modal-content .passenger-name,
             .modal-content .route-details,
             .modal-content .vehicle-details,
-            .modal-content .seat-number {
-                font-size: 18px;
-            }
+            .modal-content .seat-number { font-size: 0.875rem; }
             .modal-content button, #start-camera-button, .btn-stop {
-                padding: 10px 20px;
-                font-size: 16px;
+                padding: 8px 16px;
+                font-size: 0.875rem;
             }
         }
     </style>
@@ -497,46 +483,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <?php include '../templates/sidebar.php'; ?>
     <?php endif; ?>
 
-    <div class="flex-1 ml-0 md:ml-64 p-4 sm:p-6 lg:p-10">
-        <div class="max-w-6xl mx-auto">
+    <div class="min-h-screen flex-1 md:ml-64 p-4 sm:p-6 lg:p-8 bg-gray-100">
+        <div class="max-w-7xl mx-auto">
             <!-- Header -->
-            <div class="card p-6 sm:p-8 mb-8">
-                <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">
-                    <i class="fas fa-qrcode text-red-600 mr-3"></i>Staff PNR Management
-                </h1>
-                <p class="text-gray-600 text-lg">Search by PNR or scan QR code to manage passenger bookings</p>
+            <div class="mb-6">
+                <p class="text-gray-600 text-sm sm:text-base">Manage passenger bookings by searching PNR or scanning QR codes</p>
             </div>
 
-            <!-- Search Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Search and Scanner Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Manual PNR Search -->
-                <div class="card p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-search text-red-600 mr-2"></i>Manual PNR Search
+                <div class="card p-5 sm:p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-search text-red-600 mr-2"></i> Search by PNR
                     </h2>
                     
                     <?php if ($error): ?>
-                        <p class="error-message"><i class="fas fa-exclamation-circle mr-2"></i><?= htmlspecialchars($error) ?></p>
+                        <p class="error-message"><i class="fas fa-exclamation-circle"></i><?= htmlspecialchars($error) ?></p>
                     <?php endif; ?>
                     <?php if ($success): ?>
-                        <p class="success-message"><i class="fas fa-check-circle mr-2"></i><?= htmlspecialchars($success) ?></p>
+                        <p class="success-message"><i class="fas fa-check-circle"></i><?= htmlspecialchars($success) ?></p>
                     <?php endif; ?>
 
                     <form method="POST" class="mb-4">
                         <input type="hidden" name="action" value="search">
-                        <div class="flex flex-col sm:flex-row gap-4">
+                        <div class="flex flex-col sm:flex-row gap-3">
                             <input type="text" name="pnr" value="<?= htmlspecialchars($pnr) ?>" class="input-field flex-1" placeholder="Enter PNR (e.g., DGC123456)" required>
-                            <button type="submit" class="btn-primary flex items-center justify-center">
-                                <i class="fas fa-search mr-2"></i>Search
+                            <button type="submit" class="btn-primary flex items-center justify-center gap-2">
+                                <i class="fas fa-search"></i>Search
                             </button>
                         </div>
                     </form>
                 </div>
 
                 <!-- QR Code Scanner -->
-                <div class="card p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">
-                        <i class="fas fa-camera text-red-600 mr-2"></i>QR Code Scanner
+                <div class="card p-5 sm:p-6">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-camera text-red-600 mr-2"></i> Scan QR Code
                     </h2>
                     <div class="text-center">
                         <div id="start-button-container">
@@ -548,7 +531,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <button id="stop-camera-button" class="btn-stop">Stop Scanning</button>
                         </div>
                         <canvas id="canvas" style="display:none;"></canvas>
-                        <div id="output">Press 'Start Scanning' to begin...</div>
+                        <div id="output" class="text-sm text-gray-600">Press 'Start Scanning' to begin...</div>
                     </div>
                 </div>
             </div>
@@ -568,27 +551,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <!-- Booking Details -->
             <?php if ($booking): ?>
                 <div class="card mb-8">
-                    <!-- Header with status -->
-                    <div class="gradient-bg text-white p-6 rounded-t-2xl">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                    <!-- Header -->
+                    <div class="gradient-bg text-white p-5 rounded-t-xl">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div>
-                                <h2 class="text-2xl font-bold"><?= SITE_NAME ?></h2>
-                                <p class="text-red-100">Passenger Booking Details</p>
+                                <h2 class="text-xl font-semibold"><?= SITE_NAME ?> Booking</h2>
+                                <p class="text-red-100 text-sm">Passenger Details</p>
                             </div>
-                            <div class="mt-4 sm:mt-0 text-center sm:text-right">
-                                <div class="text-sm text-red-100">PNR</div>
-                                <div class="text-2xl font-bold"><?= htmlspecialchars($booking['pnr']) ?></div>
+                            <div class="text-center sm:text-right">
+                                <div class="text-xs text-red-100">PNR</div>
+                                <div class="text-lg font-semibold"><?= htmlspecialchars($booking['pnr']) ?></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Booking Content -->
-                    <div class="p-6">
-                        <!-- Status and Action Buttons -->
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 p-4 bg-gray-50 rounded-lg">
-                            <div class="mb-4 sm:mb-0">
-                                <span class="text-gray-600 text-sm">Current Status:</span>
-                                <span class="status-badge status-<?= $booking['status'] === 'has boarded' ? 'boarded' : ($booking['status'] === 'confirmed' ? 'confirmed' : ($booking['status'] === 'arrived' ? 'arrived' : ($booking['status'] === 'cancelled' ? 'cancelled' : 'pending'))) ?> ml-2">
+                    <div class="p-5 sm:p-6">
+                        <!-- Status and Actions -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 p-4 bg-gray-50 rounded-lg gap-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600 text-sm">Status:</span>
+                                <span class="status-badge status-<?= $booking['status'] === 'has boarded' ? 'boarded' : ($booking['status'] === 'confirmed' ? 'confirmed' : ($booking['status'] === 'arrived' ? 'arrived' : ($booking['status'] === 'cancelled' ? 'cancelled' : 'pending'))) ?>">
                                     <?= htmlspecialchars(ucfirst($booking['status'])) ?>
                                 </span>
                             </div>
@@ -598,111 +581,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <input type="hidden" name="action" value="mark_boarded">
                                     <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
                                     <input type="hidden" name="pnr" value="<?= htmlspecialchars($booking['pnr']) ?>">
-                                    <button type="submit" class="btn-success flex items-center">
-                                        <i class="fas fa-check-circle mr-2"></i>Mark as Boarded
+                                    <button type="submit" class="btn-success flex items-center gap-2">
+                                        <i class="fas fa-check-circle"></i>Mark as Boarded
                                     </button>
                                 </form>
                             <?php elseif ($booking['status'] === 'has boarded'): ?>
-                                <div class="flex items-center text-green-600">
-                                    <i class="fas fa-check-circle mr-2 text-xl"></i>
-                                    <span class="font-semibold">Passenger has boarded</span>
+                                <div class="flex items-center text-green-600 gap-2">
+                                    <i class="fas fa-check-circle text-lg"></i>
+                                    <span class="font-medium">Passenger has boarded</span>
                                 </div>
                             <?php elseif ($booking['status'] === 'arrived'): ?>
-                                <div class="flex items-center text-blue-600">
-                                    <i class="fas fa-flag-checkered mr-2 text-xl"></i>
-                                    <span class="font-semibold">Journey completed</span>
+                                <div class="flex items-center text-blue-600 gap-2">
+                                    <i class="fas fa-flag-checkered text-lg"></i>
+                                    <span class="font-medium">Journey completed</span>
                                 </div>
                             <?php endif; ?>
                         </div>
 
-                        <!-- Trip and Passenger Details Grid -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Details Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <!-- Trip Details -->
                             <div>
-                                <h3 class="text-xl font-bold mb-4 flex items-center">
-                                    <i class="fas fa-route text-red-600 mr-3"></i>Trip Details
+                                <h3 class="text-lg font-semibold mb-3 flex items-center">
+                                    <i class="fas fa-route text-red-600 mr-2"></i>Trip Details
                                 </h3>
-                                <div class="space-y-3">
+                                <div class="space-y-2 text-sm">
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Route:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['pickup_city']) ?> → <?= htmlspecialchars($booking['dropoff_city']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['pickup_city']) ?> → <?= htmlspecialchars($booking['dropoff_city']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Date:</span>
-                                        <span class="font-semibold"><?= formatDate($booking['trip_date'], 'j M, Y') ?></span>
+                                        <span class="font-medium"><?= formatDate($booking['trip_date'], 'j M, Y') ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Departure:</span>
-                                        <span class="font-semibold"><?= formatTime($booking['departure_time'], 'g:i A') ?></span>
+                                        <span class="font-medium"><?= formatTime($booking['departure_time'], 'g:i A') ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Arrival:</span>
-                                        <span class="font-semibold"><?= $booking['arrival_time'] ? formatTime($booking['arrival_time'], 'g:i A') : 'N/A' ?></span>
+                                        <span class="font-medium"><?= $booking['arrival_time'] ? formatTime($booking['arrival_time'], 'g:i A') : 'N/A' ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Vehicle:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['vehicle_type']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['vehicle_type']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Vehicle No:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['vehicle_number']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['vehicle_number']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Driver:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['driver_name']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['driver_name']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2">
                                         <span class="text-gray-600">Seat:</span>
-                                        <span class="font-semibold bg-red-100 text-red-800 px-2 py-1 rounded"><?= htmlspecialchars($booking['seat_number']) ?></span>
+                                        <span class="font-medium bg-red-50 text-red-700 px-2 py-1 rounded"><?= htmlspecialchars($booking['seat_number']) ?></span>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Passenger Details -->
                             <div>
-                                <h3 class="text-xl font-bold mb-4 flex items-center">
-                                    <i class="fas fa-user text-red-600 mr-3"></i>Passenger Information
+                                <h3 class="text-lg font-semibold mb-3 flex items-center">
+                                    <i class="fas fa-user text-red-600 mr-2"></i>Passenger Information
                                 </h3>
-                                <div class="space-y-3">
+                                <div class="space-y-2 text-sm">
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Name:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['passenger_name']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['passenger_name']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Email:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['email']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['email']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Phone:</span>
-                                        <span class="font-semibold"><?= htmlspecialchars($booking['phone']) ?></span>
+                                        <span class="font-medium"><?= htmlspecialchars($booking['phone']) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Booking Date:</span>
-                                        <span class="font-semibold"><?= formatDate($booking['booking_date'], 'j M, Y g:i A') ?></span>
+                                        <span class="font-medium"><?= formatDate($booking['created_at'], 'j M, Y g:i A') ?></span>
                                     </div>
                                 </div>
 
                                 <!-- Payment Details -->
-                                <h4 class="text-lg font-bold mt-6 mb-3 flex items-center">
+                                <h4 class="text-base font-semibold mt-5 mb-2 flex items-center">
                                     <i class="fas fa-credit-card text-red-600 mr-2"></i>Payment Details
                                 </h4>
-                                <div class="space-y-3">
+                                <div class="space-y-2 text-sm">
                                     <div class="flex justify-between py-2 border-b border-gray-100">
                                         <span class="text-gray-600">Amount:</span>
-                                        <span class="font-semibold text-green-600">₦<?= number_format($booking['total_amount'], 0) ?></span>
+                                        <span class="font-medium text-green-600">₦<?= number_format($booking['total_amount'], 0) ?></span>
                                     </div>
                                     <div class="flex justify-between py-2">
                                         <span class="text-gray-600">Payment Status:</span>
-                                        <span class="font-semibold"><?= ucfirst(htmlspecialchars($booking['payment_status'])) ?></span>
+                                        <span class="font-medium"><?= ucfirst(htmlspecialchars($booking['payment_status'])) ?></span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Advanced Status Management -->
-                        <div class="mt-8 p-4 bg-gray-50 rounded-lg">
-                            <h4 class="text-lg font-bold mb-4">Advanced Status Management</h4>
-                            <form method="POST" class="flex flex-col sm:flex-row gap-4">
+                        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                            <h4 class="text-base font-semibold mb-3">Update Booking Status</h4>
+                            <form method="POST" class="flex flex-col sm:flex-row gap-3">
                                 <input type="hidden" name="action" value="update_status">
                                 <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
                                 <input type="hidden" name="pnr" value="<?= htmlspecialchars($booking['pnr']) ?>">
@@ -713,8 +696,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     <option value="arrived" <?= $booking['status'] === 'arrived' ? 'selected' : '' ?>>Arrived</option>
                                     <option value="cancelled" <?= $booking['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                                 </select>
-                                <button type="submit" class="btn-primary">
-                                    <i class="fas fa-save mr-2"></i>Update Status
+                                <button type="submit" class="btn-primary flex items-center gap-2">
+                                    <i class="fas fa-save"></i>Update Status
                                 </button>
                             </form>
                         </div>
@@ -850,7 +833,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     
                     if (result.status === 'success') {
                         playFeedback(true);
-                        elements.output.innerHTML = `<span class="success">Boarded Successfully</span><br>Boarding Time: ${result.boarding_time || new Date().toLocaleString()}`;
+                        elements.output.innerHTML = `<span class="text-green-600">Boarded Successfully</span><br>Boarding Time: ${result.boarding_time || new Date().toLocaleString()}`;
                         showModal(
                             'Boarded Successfully',
                             result.passenger_name,
@@ -860,7 +843,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         );
                     } else if (result.status === 'warning') {
                         playFeedback(false);
-                        elements.output.innerHTML = `<span class="warning">Passenger Already Boarded</span><br>Boarding Time: ${result.boarding_time}`;
+                        elements.output.innerHTML = `<span class="text-yellow-600">Passenger Already Boarded</span><br>Boarding Time: ${result.boarding_time}`;
                         showModal(
                             'Passenger Already Boarded',
                             result.passenger_name,
@@ -868,16 +851,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             `${result.vehicle_type} (${result.vehicle_number})`,
                             result.seat_number
                         );
+                    } else if (result.status === 'date_error') {
+                        playFeedback(false);
+                        elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
+                        showModal(result.message, null, null, null, null);
                     } else {
                         playFeedback(false);
-                        elements.output.innerHTML = `<span class="failed">${result.message}</span>`;
+                        elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
                         showModal(result.message, null, null, null, null);
                     }
                     
                 } catch (error) {
                     console.error('Error during fetch or processing:', error);
                     playFeedback(false);
-                    elements.output.innerHTML = `<span class="failed">Scanner Error: ${error.message}</span>`;
+                    elements.output.innerHTML = `<span class="text-red-600">Scanner Error: ${error.message}</span>`;
                     showModal('Scanner Error: ' + error.message, null, null, null, null);
                 }
             }
@@ -896,10 +883,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 const videoWidth = elements.video.videoWidth;
                 const videoHeight = elements.video.videoHeight;
                 
-                const roiX = videoWidth * 0.2;
-                const roiY = videoHeight * 0.2;
-                const roiWidth = videoWidth * 0.6;
-                const roiHeight = videoHeight * 0.6;
+                const roiX = videoWidth * 0.15;
+                const roiY = videoHeight * 0.15;
+                const roiWidth = videoWidth * 0.7;
+                const roiHeight = videoHeight * 0.7;
 
                 elements.canvas.width = roiWidth;
                 elements.canvas.height = roiHeight;
@@ -934,7 +921,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     elements.video.srcObject = stream;
                     await elements.video.play();
                     
-                    // Show video, overlay, and stop button; hide start button
                     elements.video.style.display = 'block';
                     elements.scanOverlay.style.display = 'block';
                     elements.startCameraButton.style.display = 'none';
@@ -980,13 +966,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             });
 
-            // Auto-focus on PNR input
             const pnrInput = document.querySelector('input[name="pnr"]');
             if (pnrInput && !pnrInput.value) {
                 pnrInput.focus();
             }
 
-            // Keyboard shortcuts
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
                     e.preventDefault();

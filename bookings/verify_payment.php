@@ -102,9 +102,29 @@ try {
         if (!$stmt->execute()) {
             throw new Exception('Failed to update booking ID ' . $booking_id . ': ' . $stmt->error);
         }
-        error_log("Updated booking ID $booking_id to paid and confirmed");
+        error_log("Updated booking ID $booking_id to paid and confirmed (ref: $reference)");
     }
     $stmt->close();
+
+    // Insert payment details into payments table
+    $payment_method = $tranx['data']['channel'] ?? 'unknown';
+    $stmt_payment = $conn->prepare("
+        INSERT INTO payments (booking_id, amount, transaction_reference, gateway_reference, payment_method, status, gateway_response, created_at)
+        VALUES (?, ?, ?, ?, ?, 'completed', ?, NOW())
+    ");
+    if (!$stmt_payment) {
+        throw new Exception('Failed to prepare payment insert query: ' . $conn->error);
+    }
+
+    $gateway_response = json_encode($tranx['data']); // Store full Paystack response
+    foreach ($booking_ids as $booking_id) {
+        $stmt_payment->bind_param("idssss", $booking_id, $total_amount, $reference, $reference, $payment_method, $gateway_response);
+        if (!$stmt_payment->execute()) {
+            throw new Exception('Failed to insert payment for booking ID ' . $booking_id . ': ' . $stmt_payment->error);
+        }
+        error_log("Inserted payment for booking ID $booking_id: method=$payment_method, ref=$reference, amount=$total_amount");
+    }
+    $stmt_payment->close();
 
     // Handle referral credits if applicable
     if (isset($_SESSION['referral_code']) && isset($_SESSION['referrer_id'])) {
@@ -182,13 +202,33 @@ try {
     $conn->commit();
 
     // Send confirmation email to all passengers
-    foreach ($passenger_details as $passenger) {
+    $pnrs = []; // Store PNRs for confirmation page
+    foreach ($passenger_details as $index => $passenger) {
+        // Fetch PNR for each booking
+        $stmt_pnr = $conn->prepare("SELECT pnr FROM bookings WHERE id = ?");
+        if (!$stmt_pnr) {
+            throw new Exception('Failed to prepare PNR query: ' . $conn->error);
+        }
+        $stmt_pnr->bind_param("i", $booking_ids[$index]);
+        $stmt_pnr->execute();
+        $result = $stmt_pnr->get_result();
+        $booking = $result->fetch_assoc();
+        $stmt_pnr->close();
+
+        if (!$booking || !isset($booking['pnr'])) {
+            throw new Exception('Failed to fetch PNR for booking ID ' . $booking_ids[$index]);
+        }
+
+        $pnrs[] = $booking['pnr'];
+
         $booking_data = [
             'email' => $passenger['email'],
-            'passenger_name' => $passenger['name'],
-            'pnr' => $passenger['pnr'],
+            'passenger_name' => $passenger['passenger_name'], // Updated to match bookings table
+            'pnr' => $booking['pnr'],
             'seat_number' => $passenger['seat_number'],
             'total_amount' => $total_amount,
+            'payment_method' => $payment_method,
+            'payment_reference' => $reference,
             'trip' => [
                 'pickup_city' => $_SESSION['selected_trip']['pickup_city'],
                 'dropoff_city' => $_SESSION['selected_trip']['dropoff_city'],
@@ -201,23 +241,33 @@ try {
         ];
         error_log("Preparing to send email with data: " . json_encode($booking_data));
         if (sendBookingConfirmationEmail($booking_data)) {
-            error_log("Sent confirmation email to {$booking_data['email']} for PNR {$booking_data['pnr']}");
+            error_log("Booking confirmation email sent successfully to: {$booking_data['email']} for PNR {$booking_data['pnr']}");
         } else {
             error_log("Failed to send confirmation email to {$booking_data['email']} for PNR {$booking_data['pnr']}");
         }
     }
 
-    // Clear session data
+    // Store PNRs in session for confirmation page
+    $_SESSION['confirmed_pnrs'] = $pnrs;
+    $_SESSION['confirmed_trip'] = $_SESSION['selected_trip'];
+    $_SESSION['confirmed_total_amount'] = $total_amount;
+    $_SESSION['first_pnr'] = $pnrs[0] ?? ''; // For redirect
+
+    // Clear other session data
     unset($_SESSION['booking_ids']);
     unset($_SESSION['passenger_details']);
     unset($_SESSION['selected_seats']);
     unset($_SESSION['total_amount']);
     unset($_SESSION['payment_reference']);
+    unset($_SESSION['selected_trip']);
+
+    // Redirect to confirmation with first PNR
+    $redirect_url = SITE_URL . '/bookings/confirmation.php?pnr=' . urlencode($pnrs[0] ?? '');
 
     echo json_encode([
         'success' => true,
         'message' => 'Payment verified successfully!',
-        'redirect_url' => SITE_URL . '/bookings/confirmation.php'
+        'redirect_url' => $redirect_url
     ]);
 
 } catch (Exception $e) {
@@ -225,10 +275,6 @@ try {
     error_log("Payment verification failed: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Payment verification failed: ' . $e->getMessage()]);
     exit();
-} finally {
-    if (isset($stmt) && $stmt instanceof mysqli_stmt && $stmt->errno === 0) {
-        $stmt->close();
-    }
 }
 
 ob_end_flush();

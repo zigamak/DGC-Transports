@@ -1,0 +1,474 @@
+[23-Sep-2025 14:35:59 Europe/Berlin] process_booking.php accessed - Method: POST
+[23-Sep-2025 14:35:59 Europe/Berlin] POST data received: Array
+(
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Hermione Larson
+                    [seat_number] => 3
+                    [email] => caluhypime@mailinator.com
+                    [phone] => +1 (811) 842-9879
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[23-Sep-2025 14:35:59 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-23
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D75426P
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D75426P
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-25
+            [template_id] => 1
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D75426P
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-23
+            [template_id] => 2
+            [trip_date] => 2025-09-23
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+)
+
+[23-Sep-2025 14:35:59 Europe/Berlin] Conflicting seats detected: 3
+[23-Sep-2025 14:35:59 Europe/Berlin] Booking creation failed: Sorry, some of your selected seats (3) have been booked by another passenger.
+[23-Sep-2025 14:36:39 Europe/Berlin] process_booking.php accessed - Method: POST
+[23-Sep-2025 14:36:39 Europe/Berlin] POST data received: Array
+(
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Hermione Larson
+                    [seat_number] => 3
+                    [email] => caluhypime@mailinator.com
+                    [phone] => +1 (344) 818-6602
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[23-Sep-2025 14:36:39 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-25
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-25
+            [template_id] => 1
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-25
+            [template_id] => 2
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+)
+
+[23-Sep-2025 14:36:39 Europe/Berlin] Booking creation failed: No active trip instance found for template_id 2 and date 2025-09-25
+[23-Sep-2025 14:39:10 Europe/Berlin] process_booking.php accessed - Method: POST
+[23-Sep-2025 14:39:10 Europe/Berlin] POST data received: Array
+(
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Hermione Larson
+                    [seat_number] => 3
+                    [email] => diqotebu@mailinator.com
+                    [phone] => +1 (479) 472-4882
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[23-Sep-2025 14:39:10 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-25
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-25
+            [template_id] => 1
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-25
+            [template_id] => 2
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+    [error] => Failed to create booking. Please try again. Error: No active trip instance found for template_id 2 and date 2025-09-25
+)
+
+[23-Sep-2025 14:39:10 Europe/Berlin] Selected trip details: {"virtual_trip_id":"2-2025-09-25","template_id":2,"trip_date":"2025-09-25","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":"John Doe","departure_time":"09:00:00","arrival_time":"13:00:00"}
+[23-Sep-2025 14:39:10 Europe/Berlin] Booking creation failed: Unknown column 'created_at' in 'field list'
+[23-Sep-2025 14:44:00 Europe/Berlin] process_booking.php accessed - Method: POST
+[23-Sep-2025 14:44:00 Europe/Berlin] POST data received: Array
+(
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Hermione Larson
+                    [seat_number] => 3
+                    [email] => caluhypime@mailinator.com
+                    [phone] => +1 (811) 842-9879
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[23-Sep-2025 14:44:00 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-25
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-25
+            [template_id] => 1
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-25
+            [template_id] => 2
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+    [error] => Failed to create booking. Please try again. Error: Unknown column &#039;created_at&#039; in &#039;field list&#039;
+)
+
+[23-Sep-2025 14:44:00 Europe/Berlin] Selected trip details: {"virtual_trip_id":"2-2025-09-25","template_id":2,"trip_date":"2025-09-25","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":"John Doe","departure_time":"09:00:00","arrival_time":"13:00:00"}
+[23-Sep-2025 14:44:00 Europe/Berlin] Created new trip instance with ID: 8 for template_id 2 and trip_date 2025-09-25
+[23-Sep-2025 14:44:00 Europe/Berlin] Created booking ID: 25 with PNR: D47826C for passenger: Hermione Larson
+[23-Sep-2025 14:44:00 Europe/Berlin] Successfully created 1 bookings: 25
+[23-Sep-2025 14:44:00 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[23-Sep-2025 14:44:00 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 48
+[23-Sep-2025 14:44:00 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 154
+[23-Sep-2025 14:44:00 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 154
+[23-Sep-2025 14:44:21 Europe/Berlin] verify_payment.php accessed - Method: POST
+[23-Sep-2025 14:44:21 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d296106b604_1758631440
+)
+
+[23-Sep-2025 14:44:21 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-25
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D47826C
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D02487I
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-25
+            [template_id] => 1
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-25
+            [template_id] => 2
+            [trip_date] => 2025-09-25
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => John Doe
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => Hermione Larson
+                    [email] => caluhypime@mailinator.com
+                    [phone] => +18118429879
+                    [seat_number] => 3
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D47826C
+                    [booking_id] => 25
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 25
+        )
+
+    [total_amount] => 5000
+    [payment_reference] => DGC_68d296106b604_1758631440
+)
+
+[23-Sep-2025 14:44:22 Europe/Berlin] Updated booking ID 25 to paid and confirmed (ref: DGC_68d296106b604_1758631440)
+[23-Sep-2025 14:44:22 Europe/Berlin] Inserted payment for booking ID 25: method=card, ref=DGC_68d296106b604_1758631440, amount=5000
+[23-Sep-2025 14:44:22 Europe/Berlin] Preparing to send email with data: {"email":"caluhypime@mailinator.com","passenger_name":"Hermione Larson","pnr":"D47826C","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d296106b604_1758631440","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-25","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":"John Doe"}}
+[23-Sep-2025 14:44:25 Europe/Berlin] Booking confirmation email sent successfully to: caluhypime@mailinator.com
+[23-Sep-2025 14:44:25 Europe/Berlin] Booking confirmation email sent successfully to: caluhypime@mailinator.com for PNR D47826C

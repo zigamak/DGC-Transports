@@ -234,15 +234,17 @@ function createPlainTextVersion($booking) {
     $text .= "PNR: " . $booking['pnr'] . "\n";
     $text .= "Route: " . $booking['trip']['pickup_city'] . " to " . $booking['trip']['dropoff_city'] . "\n";
     $text .= "Date: " . date('M j, Y', strtotime($booking['trip']['trip_date'])) . "\n";
-    $text .= "Departure: " . date('H:i', strtotime($booking['trip']['departure_time'])) . "\n";
-    $text .= "Vehicle: " . $booking['trip']['vehicle_type'] . " - " . $booking['trip']['vehicle_number'] . "\n";
+    $text .= "Departure: " . date('h:i A', strtotime($booking['trip']['departure_time'] ?? '00:00')) . "\n"; // FIXED: Use 12-hour format
+    $text .= "Vehicle: " . ($booking['trip']['vehicle_type'] ?? 'N/A') . " - " . ($booking['trip']['vehicle_number'] ?? 'N/A') . "\n";
     
     if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
         $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
     }
     
     $text .= "Seat: " . $booking['seat_number'] . "\n";
-    $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n\n";
+    $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n";
+    $text .= "Payment Method: " . (isset($booking['payment_method']) ? ucfirst($booking['payment_method']) : 'N/A') . "\n"; // NEW: Include payment_method
+    $text .= "Payment Reference: " . (isset($booking['payment_reference']) ? $booking['payment_reference'] : 'N/A') . "\n\n"; // NEW: Include payment_reference
     $text .= "Please arrive at the terminal 30 minutes before departure.\n";
     $text .= "Bring a valid ID for verification.\n\n";
     $text .= "Thank you for choosing " . SITE_NAME . "!";
