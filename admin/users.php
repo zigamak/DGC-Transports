@@ -1,4 +1,7 @@
 <?php
+// admin/users.php
+
+// --- PHP Logic ---
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -23,6 +26,8 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         $error = 'Failed to delete user.';
     }
     $stmt->close();
+    header("Location: users.php" . (!empty($success) ? '?msg=' . urlencode($success) : '') . (!empty($error) ? '?err=' . urlencode($error) : ''));
+    exit;
 }
 
 // Handle add user request
@@ -52,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     // Insert user and send setup password email if no errors
     if (empty($errors)) {
         // Generate temporary password
-        $temp_password = bin2hex(random_bytes(8)); // 16-character random password
+        $temp_password = bin2hex(random_bytes(8));
         $hashed_password = password_hash($temp_password, PASSWORD_DEFAULT);
 
         // Insert user
@@ -65,16 +70,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
             $stmt = $conn->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
             $stmt->bind_param("sss", $email, $token, $expires_at);
             if ($stmt->execute()) {
-                // Send setup password email
+                // Prepare reset data for email
                 $reset_data = [
                     'email' => $email,
                     'token' => $token,
                     'expires_at' => $expires_at
                 ];
-                if (sendPasswordResetEmail($reset_data)) {
-                    $add_success = 'User added successfully. A link to set up their password has been sent to their email.';
+                // Check if email template exists
+                $template_path = __DIR__ . '/../includes/templates/email_set_password.php';
+                if (!file_exists($template_path)) {
+                    $errors[] = 'Email template not found. Please contact support.';
+                    error_log("Email template not found: $template_path");
                 } else {
-                    $errors[] = 'Failed to send password setup email.';
+                    // Send setup password email
+                    if (function_exists('sendPasswordEmail') && sendPasswordEmail($reset_data, 'set_password')) {
+                        $add_success = 'User added successfully. A link to set up their password has been sent to their email.';
+                    } else {
+                        $add_success = 'User added successfully, but failed to send the password setup email. Please contact the user directly.';
+                        error_log("Failed to send set_password email to: $email");
+                    }
                 }
             } else {
                 $errors[] = 'Failed to generate password setup token.';
@@ -83,7 +97,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
             $errors[] = 'Failed to add user.';
         }
         $stmt->close();
+        // Redirect on successful add to clear POST data and show success message
+        if (empty($errors)) {
+            header("Location: users.php?msg=" . urlencode($add_success));
+            exit;
+        }
     }
+}
+
+// Handle edit user request (via AJAX)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_user'])) {
+    header('Content-Type: application/json');
+    $user_id = (int)($_POST['user_id'] ?? 0);
+    $email = trim($_POST['email'] ?? '');
+    $role = trim($_POST['role'] ?? '');
+
+    // Validate inputs
+    $edit_errors = [];
+    if ($user_id <= 0) {
+        $edit_errors[] = 'Invalid User ID.';
+    }
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $edit_errors[] = 'A valid email is required.';
+    } else {
+        // Check if email is unique (excluding current user)
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt->bind_param("si", $email, $user_id);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) {
+            $edit_errors[] = 'Email already exists.';
+        }
+        $stmt->close();
+    }
+    if (!in_array($role, $valid_roles)) {
+        $edit_errors[] = 'Invalid role selected.';
+    }
+
+    if (empty($edit_errors)) {
+        $stmt = $conn->prepare("UPDATE users SET email = ?, role = ? WHERE id = ?");
+        $stmt->bind_param("ssi", $email, $role, $user_id);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'User updated successfully.', 'email' => htmlspecialchars($email), 'role' => ucfirst(htmlspecialchars($role))]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to update user.']);
+        }
+        $stmt->close();
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'message' => implode('<br>', $edit_errors)]);
+        exit;
+    }
+}
+
+// Handle GET messages after redirect
+if (isset($_GET['msg'])) {
+    $success = htmlspecialchars($_GET['msg']);
+}
+if (isset($_GET['err'])) {
+    $error = htmlspecialchars($_GET['err']);
 }
 
 // Fetch users with search filter
@@ -114,308 +185,210 @@ $stmt->close();
     <title>Manage Users - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-red': '#e30613',
+                        'dark-red': '#c70410',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
         
-        :root {
-            --primary-red: #e30613;
-            --dark-red: #c70410;
-            --black: #1a1a1a;
-            --white: #ffffff;
-            --gray: #f5f5f5;
-            --light-gray: #e5e7eb;
-            --accent-blue: #3b82f6;
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
             font-family: 'Poppins', sans-serif;
-            display: flex;
-            min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         }
-        header {
-            background: #000;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
+        
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .form-input {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.875rem;
             width: 100%;
-            z-index: 40;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
         }
-        .header-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 60px;
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #e30613;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
         }
-        .header-logo img {
-            height: 40px;
-        }
-        .header-nav {
-            display: flex;
-            gap: 20px;
-        }
-        .header-nav a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .header-nav a:hover {
-            color: #dc2626;
-        }
-        #mobile-menu {
-            display: none;
-            background: #000;
-            padding: 20px;
-        }
-        #mobile-menu.active {
+        
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
             display: block;
         }
-        .mobile-nav a {
-            display: block;
-            color: white;
-            text-decoration: none;
-            padding: 10px;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .mobile-nav a:hover {
-            color: #dc2626;
-        }
-        .toggle-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            display: none;
-        }
-        .toggle-btn:hover {
-            color: #dc2626;
-        }
-        main {
-            flex: 1;
-            padding-top: 60px;
-            background: linear-gradient(135deg, var(--white), var(--gray));
-            transition: margin-left 0.3s ease-in-out;
-        }
-        @media (min-width: 768px) {
-            main {
-                margin-left: 256px;
-            }
-            .header-nav {
-                display: flex;
-            }
-            .toggle-btn {
-                display: none;
-            }
-            header.md-hidden {
-                display: none;
-            }
-        }
-        @media (max-width: 767px) {
-            .toggle-btn {
-                display: block;
-            }
-            .header-nav {
-                display: none;
-            }
-        }
-        .card {
-            background: var(--white);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-        }
+        
         .btn-primary {
-            background: linear-gradient(to right, var(--primary-red), var(--dark-red));
-            color: var(--white);
+            background: #e30613;
+            color: white;
             padding: 10px 20px;
             border-radius: 8px;
-            font-weight: 600;
+            font-weight: 500;
             transition: background 0.3s ease, transform 0.2s ease;
+            white-space: nowrap;
         }
+        
         .btn-primary:hover {
-            background: linear-gradient(to right, var(--dark-red), var(--primary-red));
-            transform: translateY(-2px);
+            background: #c70410;
+            transform: translateY(-1px);
         }
+
+        .btn-icon {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-edit {
+            color: #1e40af;
+            background-color: #eff6ff;
+        }
+        .btn-edit:hover {
+            background-color: #dbeafe;
+        }
+        .btn-delete {
+            color: #dc2626;
+            background-color: #fee2e2;
+        }
+        .btn-delete:hover {
+            background-color: #fecaca;
+        }
+
         .error-message {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
+            color: #dc2626;
+            font-size: 0.875rem;
             display: flex;
             align-items: center;
         }
+        
         .success-message {
             color: #10b981;
-            font-size: 0.9rem;
-            margin-bottom: 16px;
+            font-size: 0.875rem;
             display: flex;
             align-items: center;
         }
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
+
+        .mobile-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
         }
-        .mobile-card-row {
-            display: flex;
-            flex-direction: column;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            background-color: #fff;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-bottom: 0.75rem;
+
+        .table-row:hover {
+            background-color: #f8fafc;
         }
-        .mobile-card-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-        .mobile-card-item:last-child {
-            margin-bottom: 0;
-        }
-        .mobile-card-label {
-            font-weight: 600;
-            color: #4b5563;
-            width: 100px;
-            min-width: 100px;
-        }
-        .mobile-card-content {
-            flex-grow: 1;
-        }
-        @media (min-width: 768px) {
-            .mobile-card-row {
-                display: none;
-            }
-            .table-container {
-                display: block;
-            }
-            .table-header {
-                background: var(--gray);
-                color: var(--black);
-                font-weight: 600;
-            }
-            .table-row:hover {
-                background: #f9fafb;
-            }
-        }
-        @media (max-width: 767px) {
-            .table-container {
-                display: none;
-            }
-        }
-        .text-red-600 { color: #e30613; }
-        .bg-red-600 { background-color: #e30613; }
-        .hover\:bg-red-600:hover { background-color: #e30613; }
-        .hover\:text-red-600:hover { color: #e30613; }
-        .bg-red-700 { background-color: #c70410; }
-        .hover\:bg-red-700:hover { background-color: #c70410; }
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        .form-group label {
+        
+        .display-view {
             display: block;
-            font-weight: 600;
-            color: var(--black);
-            margin-bottom: 0.5rem;
         }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--light-gray);
-            border-radius: 8px;
-            font-size: 1rem;
-            font-family: 'Poppins', sans-serif;
+
+        .edit-form-row {
+            display: none;
         }
-        .form-group select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231a1a1a'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 1.5rem;
+
+        .edit-form-row.active {
+            display: table-row;
+        }
+
+        .mobile-card .edit-form {
+            display: none;
+        }
+        .mobile-card .edit-form.active {
+            display: block;
+        }
+        
+        @media (min-width: 768px) {
+            .mobile-view {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .desktop-view {
+                display: none;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <?php if (isLoggedIn()): ?>
-        <?php include '../templates/sidebar.php'; ?>
-    <?php endif; ?>
+<body class="min-h-screen">
+    <?php include '../templates/sidebar.php'; ?>
 
-    <div class="flex-1">
-        <header class="fixed top-0 left-0 w-full bg-black text-white p-4 shadow-md flex items-center justify-between z-40 md-hidden">
-            <button id="sidebar-toggle-mobile" class="toggle-btn">
-                <i class="fas fa-bars text-xl"></i>
-            </button>
-            <div class="flex-1 text-center">
-                <a href="<?= SITE_URL ?>">
-                    <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="Logo" class="h-8 mx-auto">
-                </a>
-            </div>
-            <div class="w-10"></div>
-        </header>
-        <div id="mobile-menu" class="mobile-menu">
-            <nav class="mobile-nav">
-                <a href="<?= SITE_URL ?>/index.php">Book a Trip</a>
-                <a href="<?= SITE_URL ?>/bookings/manage_booking.php">Manage Booking</a>
-                <a href="<?= SITE_URL ?>/contact.php">Contact Us</a>
-                <a href="<?= SITE_URL ?>/login.php">Login</a>
-            </nav>
-        </div>
-
-        <main class="ml-0 md:ml-64 p-4 sm:p-6 lg:p-10">
-            <div class="container mx-auto">
-                <div class="card p-6 sm:p-8 lg:p-10">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
-                        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4 sm:mb-0">
-                            <i class="fas fa-users text-primary-red mr-3"></i>Manage Users
+    <div class="md:ml-64 min-h-screen">
+        <div class="p-4 md:p-6 lg:p-8">
+            <div class="max-w-4xl mx-auto">
+                <div class="mb-8">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
+                            <i class="fas fa-users text-primary-red mr-3"></i>
+                            Manage Users
                         </h1>
                         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                             <form method="GET" class="flex items-center">
-                                <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search by email" class="border border-gray-300 rounded-lg p-2 w-full sm:w-64">
-                                <button type="submit" class="btn-primary ml-2"><i class="fas fa-search mr-2"></i>Search</button>
+                                <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search by email" class="form-input w-full sm:w-64">
+                                <button type="submit" class="btn-primary ml-2"><i class="fas fa-search"></i></button>
                             </form>
                             <button onclick="toggleAddUserForm()" class="btn-primary inline-flex items-center">
                                 <i class="fas fa-plus mr-2"></i>Add New User
                             </button>
                         </div>
                     </div>
-                    <?php if (!empty($errors)): ?>
+                </div>
+
+                <?php if (!empty($errors)): ?>
+                    <div class="mb-6 bg-red-100 border border-red-300 rounded-lg p-4">
                         <?php foreach ($errors as $error): ?>
-                            <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                                <span class="text-red-800 text-sm"><?= htmlspecialchars($error) ?></span>
+                            </div>
                         <?php endforeach; ?>
-                    <?php endif; ?>
-                    <?php if ($add_success): ?>
-                        <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= htmlspecialchars($add_success) ?></p>
-                    <?php endif; ?>
-                    <?php if (isset($success)): ?>
-                        <p class="success-message"><i class="fas fa-check-circle mr-1"></i><?= htmlspecialchars($success) ?></p>
-                    <?php endif; ?>
-                    <?php if (isset($error)): ?>
-                        <p class="error-message"><i class="fas fa-exclamation-circle mr-1"></i><?= htmlspecialchars($error) ?></p>
-                    <?php endif; ?>
-                    <!-- Add User Form -->
-                    <div id="add-user-form" class="hidden mb-8">
-                        <form method="POST" class="space-y-6">
-                            <input type="hidden" name="add_user" value="1">
+                    </div>
+                <?php endif; ?>
+                <?php if (isset($success)): ?>
+                    <div class="mb-6 bg-green-100 border border-green-300 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                            <span class="text-green-800 text-sm"><?= htmlspecialchars($success) ?></span>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <?php if (isset($error) && !isset($_GET['err'])): ?>
+                    <div class="mb-6 bg-red-100 border border-red-300 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                            <span class="text-red-800 text-sm"><?= htmlspecialchars($error) ?></span>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <div id="add-user-form" class="bg-white rounded-xl card-shadow p-6 mb-8 <?= !empty($errors) ? 'block' : 'hidden' ?>">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-900">Add New User</h2>
+                    <form method="POST" class="space-y-4">
+                        <input type="hidden" name="add_user" value="1">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="email" id="email" name="email" value="<?= isset($email) ? htmlspecialchars($email) : '' ?>" placeholder="Enter user email" required>
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" id="email" name="email" value="<?= isset($email) ? htmlspecialchars($email) : '' ?>" placeholder="Enter user email" class="form-input" required>
                             </div>
                             <div class="form-group">
-                                <label for="role">Role</label>
-                                <select id="role" name="role" required>
+                                <label for="role" class="form-label">Role</label>
+                                <select id="role" name="role" class="form-input" required>
                                     <option value="">Select a role</option>
                                     <?php foreach ($valid_roles as $r): ?>
                                         <option value="<?= $r ?>" <?= isset($role) && $role == $r ? 'selected' : '' ?>>
@@ -424,204 +397,304 @@ $stmt->close();
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="flex justify-end space-x-4">
-                                <button type="submit" class="btn-primary">
-                                    <i class="fas fa-save mr-2"></i>Add User
-                                </button>
-                                <button type="button" onclick="toggleAddUserForm()" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">
-                                    <i class="fas fa-times mr-2"></i>Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    <!-- Users List -->
-                    <?php if (empty($users)): ?>
-                        <div class="text-center py-12">
-                            <i class="fas fa-users text-6xl text-gray-300 mb-4"></i>
-                            <h3 class="text-2xl font-bold text-gray-700 mb-2">No Users Found</h3>
-                            <p class="text-gray-500 mb-6">Add a new user to get started.</p>
-                            <button onclick="toggleAddUserForm()" class="btn-primary">
-                                <i class="fas fa-plus mr-2"></i>Add User
+                        </div>
+                        <div class="flex justify-end space-x-4 pt-2">
+                            <button type="submit" class="btn-primary">
+                                <i class="fas fa-save mr-2"></i>Add User
+                            </button>
+                            <button type="button" onclick="toggleAddUserForm()" class="px-4 py-2 bg-gray-300 text-gray-800 hover:bg-gray-400 rounded-lg transition-colors inline-flex items-center">
+                                <i class="fas fa-times mr-2"></i>Cancel
                             </button>
                         </div>
-                    <?php else: ?>
-                        <div class="space-y-4 md:hidden">
-                            <?php foreach ($users as $user): ?>
-                                <div class="mobile-card-row bg-white shadow-md rounded-xl relative">
-                                    <div class="absolute top-4 right-4">
-                                        <div class="relative inline-block text-left">
-                                            <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $user['id'] ?>">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </button>
-                                            <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $user['id'] ?>">
-                                                <div class="py-1">
-                                                    <button onclick="showDeleteModal(<?= $user['id'] ?>, '<?= htmlspecialchars($user['email']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
-                                                        <i class="fas fa-trash mr-2"></i>Delete
-                                                    </button>
-                                                </div>
-                                            </div>
+                    </form>
+                </div>
+
+                <?php if (empty($users)): ?>
+                    <div class="bg-white rounded-xl card-shadow p-8 text-center">
+                        <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-users text-3xl text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">No Users Found</h3>
+                        <p class="text-gray-600 mb-6">Add a new user to get started.</p>
+                        <button onclick="toggleAddUserForm()" class="btn-primary">
+                            <i class="fas fa-plus mr-2"></i>Add User
+                        </button>
+                    </div>
+                <?php else: ?>
+                    
+                    <div class="space-y-4 mobile-view">
+                        <h2 class="text-xl font-semibold mb-2 text-gray-900">User Accounts</h2>
+                        <?php foreach ($users as $user): ?>
+                            <div class="mobile-card p-4 relative">
+                                <div id="display-card-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="display-view">
+                                    <div class="text-lg font-medium text-gray-900 mb-2"><?= htmlspecialchars($user['email']) ?></div>
+                                    <div class="space-y-1 text-sm text-gray-600">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-user-tag text-primary-red w-4 mr-2"></i>
+                                            <span>Role: <?= htmlspecialchars(ucfirst($user['role'])) ?></span>
                                         </div>
                                     </div>
-                                    <div class="mobile-card-item">
-                                        <span class="mobile-card-label"><i class="fas fa-envelope text-primary-red mr-2"></i>Email:</span>
-                                        <span class="mobile-card-content"><?= htmlspecialchars($user['email']) ?></span>
-                                    </div>
-                                    <div class="mobile-card-item">
-                                        <span class="mobile-card-label"><i class="fas fa-user-tag text-primary-red mr-2"></i>Role:</span>
-                                        <span class="mobile-card-content"><?= htmlspecialchars(ucfirst($user['role'])) ?></span>
+                                    <div class="flex justify-end space-x-2 mt-4">
+                                        <button type="button" class="btn-icon btn-edit inline-flex items-center" onclick="showEditForm(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)">
+                                            <i class="fas fa-edit mr-1"></i>Edit
+                                        </button>
+                                        <button type="button" class="btn-icon btn-delete inline-flex items-center" onclick="showDeleteModal(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>, '<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>')">
+                                            <i class="fas fa-trash mr-1"></i>Delete
+                                        </button>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="overflow-x-auto hidden md:block">
-                            <table class="w-full table-auto border-collapse">
-                                <thead>
-                                    <tr class="table-header rounded-lg">
-                                        <th class="px-4 py-3 text-left">Email</th>
-                                        <th class="px-4 py-3 text-left">Role</th>
-                                        <th class="px-4 py-3 text-right">Actions</th>
+                                <div id="edit-form-card-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="edit-form p-0">
+                                    <h3 class="text-lg font-semibold mb-3 text-gray-900">Edit User</h3>
+                                    <form onsubmit="submitEditForm(event, <?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)">
+                                        <input type="hidden" name="edit_user" value="1">
+                                        <input type="hidden" name="user_id" value="<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>">
+                                        <div class="form-group mb-4">
+                                            <label for="edit-email-mobile-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="form-label">Email</label>
+                                            <input type="email" id="edit-email-mobile-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" name="email" value="<?= htmlspecialchars($user['email']) ?>" class="form-input" required>
+                                        </div>
+                                        <div class="form-group mb-4">
+                                            <label for="edit-role-mobile-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="form-label">Role</label>
+                                            <select id="edit-role-mobile-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" name="role" class="form-input" required>
+                                                <?php foreach ($valid_roles as $r): ?>
+                                                    <option value="<?= $r ?>" <?= $user['role'] == $r ? 'selected' : '' ?>>
+                                                        <?= ucfirst($r) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="flex justify-end space-x-4">
+                                            <button type="submit" class="btn-primary flex items-center">
+                                                <i class="fas fa-save mr-2"></i>Save
+                                            </button>
+                                            <button type="button" onclick="hideEditForm(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)" class="px-4 py-2 bg-gray-300 text-gray-800 hover:bg-gray-400 rounded-lg transition-colors flex items-center">
+                                                <i class="fas fa-times mr-2"></i>Cancel
+                                            </button>
+                                        </div>
+                                        <div id="edit-error-card-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="error-message mt-2 hidden"></div>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="desktop-view overflow-x-auto bg-white rounded-xl card-shadow">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Role</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php foreach ($users as $user): ?>
+                                    <tr id="display-row-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="table-row display-view">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-envelope text-primary-red mr-2"></i>
+                                                <span><?= htmlspecialchars($user['email']) ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" id="display-role-text-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>">
+                                            <div class="flex items-center">
+                                                <i class="fas fa-user-tag text-primary-red mr-2"></i>
+                                                <span><?= htmlspecialchars(ucfirst($user['role'])) ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div class="flex justify-end space-x-2">
+                                                <button type="button" class="btn-icon btn-edit inline-flex items-center" onclick="showEditForm(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button type="button" class="btn-icon btn-delete inline-flex items-center" onclick="showDeleteModal(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>, '<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($users as $user): ?>
-                                        <tr class="table-row border-b border-gray-200">
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-envelope text-primary-red mr-2"></i>
-                                                    <span><?= htmlspecialchars($user['email']) ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center">
-                                                    <i class="fas fa-user-tag text-primary-red mr-2"></i>
-                                                    <span><?= htmlspecialchars(ucfirst($user['role'])) ?></span>
-                                                </div>
-                                            </td>
-                                            <td class="px-4 py-3 text-right relative">
-                                                <div class="relative inline-block text-left">
-                                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $user['id'] ?>">
-                                                        <i class="fas fa-ellipsis-v"></i>
-                                                    </button>
-                                                    <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $user['id'] ?>">
-                                                        <div class="py-1">
-                                                            <button onclick="showDeleteModal(<?= $user['id'] ?>, '<?= htmlspecialchars($user['email']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
-                                                                <i class="fas fa-trash mr-2"></i>Delete
-                                                            </button>
-                                                        </div>
+
+                                    <tr id="edit-form-row-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="edit-form-row bg-gray-50">
+                                        <td colspan="3" class="px-6 py-4">
+                                            <form onsubmit="submitEditForm(event, <?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)" class="space-y-4">
+                                                <input type="hidden" name="edit_user" value="1">
+                                                <input type="hidden" name="user_id" value="<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>">
+                                                <div class="flex items-end gap-4">
+                                                    <div class="flex-grow">
+                                                        <label for="edit-email-desktop-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="form-label">Email</label>
+                                                        <input type="email" id="edit-email-desktop-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" name="email" value="<?= htmlspecialchars($user['email']) ?>" class="form-input" required>
+                                                    </div>
+                                                    <div class="w-40">
+                                                        <label for="edit-role-desktop-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="form-label">Role</label>
+                                                        <select id="edit-role-desktop-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" name="role" class="form-input" required>
+                                                            <?php foreach ($valid_roles as $r): ?>
+                                                                <option value="<?= $r ?>" <?= $user['role'] == $r ? 'selected' : '' ?>>
+                                                                    <?= ucfirst($r) ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="flex space-x-2">
+                                                        <button type="submit" class="btn-primary py-2 px-3 flex items-center">
+                                                            <i class="fas fa-save"></i>
+                                                        </button>
+                                                        <button type="button" onclick="hideEditForm(<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>)" class="px-3 py-2 bg-gray-300 text-gray-800 hover:bg-gray-400 rounded-lg transition-colors flex items-center">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                                                <div id="edit-error-desktop-<?= htmlspecialchars($user['id'], ENT_QUOTES) ?>" class="error-message hidden"></div>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
-        </main>
+        </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div id="deleteModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center modal-overlay">
-        <div class="modal-content bg-white rounded-lg p-6 max-w-sm mx-auto shadow-xl">
-            <h3 class="text-xl font-bold mb-4 text-center">Confirm Deletion</h3>
+    <div id="deleteModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay transition-opacity duration-300 ease-in-out opacity-0">
+        <div class="bg-white rounded-xl p-6 max-w-sm mx-auto shadow-2xl transform scale-95 transition-transform duration-300 ease-in-out">
+            <h3 class="text-xl font-bold mb-4 text-center text-gray-900">Confirm Deletion</h3>
             <p id="deleteMessage" class="text-gray-700 mb-6 text-center"></p>
             <div class="flex justify-center space-x-4">
-                <button id="cancelButton" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">Cancel</button>
-                <a id="confirmDeleteLink" href="#" class="btn-primary bg-red-600 hover:bg-red-700">Delete</a>
+                <button id="cancelButton" class="px-4 py-2 bg-gray-300 text-gray-800 hover:bg-gray-400 rounded-lg transition-colors">Cancel</button>
+                <a id="confirmDeleteLink" href="#" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors">Delete</a>
             </div>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Delete Modal
-            const deleteModal = document.getElementById('deleteModal');
-            const deleteMessage = document.getElementById('deleteMessage');
-            const confirmDeleteLink = document.getElementById('confirmDeleteLink');
+        function toggleAddUserForm() {
+            const form = document.getElementById('add-user-form');
+            form.classList.toggle('hidden');
+        }
+
+        function showDeleteModal(userId, userEmail) {
+            const modal = document.getElementById('deleteModal');
+            const message = document.getElementById('deleteMessage');
+            const deleteLink = document.getElementById('confirmDeleteLink');
             const cancelButton = document.getElementById('cancelButton');
-            window.showDeleteModal = (id, email) => {
-                deleteMessage.textContent = `Are you sure you want to delete the user ${email}?`;
-                confirmDeleteLink.href = `users.php?delete=${id}`;
-                deleteModal.classList.remove('hidden');
+
+            message.innerHTML = `Are you sure you want to delete user <strong>${userEmail}</strong>? This action cannot be undone.`;
+            deleteLink.href = `users.php?delete=${userId}`;
+            
+            modal.classList.remove('hidden', 'opacity-0');
+            modal.classList.add('flex', 'opacity-100');
+
+            const closeModal = () => {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
             };
-            cancelButton.addEventListener('click', () => {
-                deleteModal.classList.add('hidden');
-            });
-            window.addEventListener('click', (event) => {
-                if (event.target === deleteModal) {
-                    deleteModal.classList.add('hidden');
+
+            cancelButton.onclick = closeModal;
+            modal.onclick = (e) => {
+                if (e.target.id === 'deleteModal') {
+                    closeModal();
+                }
+            };
+        }
+
+        function showEditForm(userId) {
+            const displayRow = document.getElementById(`display-row-${userId}`);
+            const editFormRow = document.getElementById(`edit-form-row-${userId}`);
+            if (displayRow) displayRow.classList.add('hidden');
+            if (editFormRow) editFormRow.classList.add('active');
+
+            const displayCard = document.getElementById(`display-card-${userId}`);
+            const editFormCard = document.getElementById(`edit-form-card-${userId}`);
+            if (displayCard) displayCard.classList.add('hidden');
+            if (editFormCard) editFormCard.classList.add('active');
+        }
+
+        function hideEditForm(userId) {
+            const displayRow = document.getElementById(`display-row-${userId}`);
+            const editFormRow = document.getElementById(`edit-form-row-${userId}`);
+            if (displayRow) displayRow.classList.remove('hidden');
+            if (editFormRow) editFormRow.classList.remove('active');
+
+            const displayCard = document.getElementById(`display-card-${userId}`);
+            const editFormCard = document.getElementById(`edit-form-card-${userId}`);
+            if (displayCard) displayCard.classList.remove('hidden');
+            if (editFormCard) editFormCard.classList.remove('active');
+        }
+
+        function submitEditForm(event, userId) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const errorDesktop = document.getElementById(`edit-error-desktop-${userId}`);
+            const errorCard = document.getElementById(`edit-error-card-${userId}`);
+
+            if (errorDesktop) {
+                errorDesktop.classList.add('hidden');
+                errorDesktop.innerHTML = '';
+            }
+            if (errorCard) {
+                errorCard.classList.add('hidden');
+                errorCard.innerHTML = '';
+            }
+
+            fetch('users.php', {
+                method: 'POST',
+                body: new URLSearchParams(formData),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const displayRoleText = document.getElementById(`display-role-text-${userId}`);
+                    const desktopEmailDisplay = document.getElementById(`display-row-${userId}`).querySelector('td:first-child span');
+                    const mobileDisplay = document.getElementById(`display-card-${userId}`);
+                    const mobileEmailDisplay = mobileDisplay.querySelector('.text-lg.font-medium');
+                    const mobileRoleDisplay = mobileDisplay.querySelector('.space-y-1 .flex:last-child span');
+
+                    if (displayRoleText) {
+                        displayRoleText.querySelector('span').textContent = data.role;
+                    }
+                    if (desktopEmailDisplay) {
+                        desktopEmailDisplay.textContent = data.email;
+                    }
+                    if (mobileEmailDisplay) mobileEmailDisplay.textContent = data.email;
+                    if (mobileRoleDisplay) mobileRoleDisplay.textContent = `Role: ${data.role}`;
+
+                    hideEditForm(userId);
+
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'mb-6 bg-green-100 border border-green-300 rounded-lg p-4';
+                    successDiv.innerHTML = `<div class="flex items-center"><i class="fas fa-check-circle text-green-600 mr-2"></i><span class="text-green-800 text-sm">${data.message}</span></div>`;
+                    document.querySelector('.max-w-4xl.mx-auto').insertBefore(successDiv, document.querySelector('.max-w-4xl.mx-auto').children[1]);
+                    setTimeout(() => successDiv.remove(), 5000);
+                } else {
+                    if (errorDesktop) {
+                        errorDesktop.classList.remove('hidden');
+                        errorDesktop.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i>${data.message}`;
+                    }
+                    if (errorCard) {
+                        errorCard.classList.remove('hidden');
+                        errorCard.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i>${data.message}`;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const errorMessage = 'An unexpected error occurred. Please try again.';
+                if (errorDesktop) {
+                    errorDesktop.classList.remove('hidden');
+                    errorDesktop.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i>${errorMessage}`;
+                }
+                if (errorCard) {
+                    errorCard.classList.remove('hidden');
+                    errorCard.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i>${errorMessage}`;
                 }
             });
-
-            // Dropdown Menu
-            const menuToggles = document.querySelectorAll('.menu-toggle');
-            menuToggles.forEach(toggle => {
-                toggle.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    const id = toggle.dataset.id;
-                    const menu = document.querySelector(`.menu-content[data-id="${id}"]`);
-                    document.querySelectorAll('.menu-content').forEach(otherMenu => {
-                        if (otherMenu !== menu) {
-                            otherMenu.classList.add('hidden');
-                        }
-                    });
-                    menu.classList.toggle('hidden');
-                });
-            });
-            window.addEventListener('click', (event) => {
-                document.querySelectorAll('.menu-content').forEach(menu => {
-                    if (!menu.classList.contains('hidden')) {
-                        menu.classList.add('hidden');
-                    }
-                });
-            });
-
-            // Add User Form Toggle
-            window.toggleAddUserForm = () => {
-                const form = document.getElementById('add-user-form');
-                form.classList.toggle('hidden');
-            };
-
-            // Sidebar and Mobile Menu
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-            const mobileMenuCancel = document.getElementById('mobile-menu-cancel');
-            const mobileMenu = document.getElementById('mobile-menu');
-            const mobileMenuIcon = document.getElementById('mobile-menu-icon');
-            if (mobileMenuToggle && mobileMenuCancel && mobileMenu && mobileMenuIcon) {
-                mobileMenuToggle.addEventListener('click', function() {
-                    mobileMenu.classList.toggle('active');
-                    mobileMenuToggle.style.display = mobileMenu.classList.contains('active') ? 'none' : 'block';
-                    mobileMenuCancel.style.display = mobileMenu.classList.contains('active') ? 'block' : 'none';
-                    mobileMenuIcon.classList.toggle('fa-bars');
-                    mobileMenuIcon.classList.toggle('fa-times');
-                });
-                mobileMenuCancel.addEventListener('click', function() {
-                    mobileMenu.classList.remove('active');
-                    mobileMenuToggle.style.display = 'block';
-                    mobileMenuCancel.style.display = 'none';
-                    mobileMenuIcon.classList.remove('fa-times');
-                    mobileMenuIcon.classList.add('fa-bars');
-                });
-            }
-            const sidebar = document.getElementById('sidebar');
-            const sidebarOverlay = document.getElementById('sidebar-overlay');
-            const sidebarToggleMobile = document.getElementById('sidebar-toggle-mobile');
-            const sidebarClose = document.getElementById('sidebar-close');
-            if (sidebarToggleMobile && sidebarClose && sidebar && sidebarOverlay) {
-                sidebarToggleMobile.addEventListener('click', () => {
-                    sidebar.classList.remove('-translate-x-full');
-                    sidebarOverlay.classList.remove('hidden');
-                });
-                const closeSidebar = () => {
-                    sidebar.classList.add('-translate-x-full');
-                    sidebarOverlay.classList.add('hidden');
-                };
-                sidebarClose.addEventListener('click', closeSidebar);
-                sidebarOverlay.addEventListener('click', closeSidebar);
-            }
-        });
+        }
     </script>
 </body>
 </html>

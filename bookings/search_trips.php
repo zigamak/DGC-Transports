@@ -1,8 +1,13 @@
 <?php
-//bookings/search_trips.php
+// bookings/search_trips.php
 session_start();
-require_once '../includes/db.php';
+
+// Verify config inclusion
+if (!file_exists('../includes/config.php')) {
+    die('Error: Configuration file not found at ../includes/config.php');
+}
 require_once '../includes/config.php';
+require_once '../includes/db.php';
 require_once '../templates/header.php';
 
 // Handle form submission
@@ -43,16 +48,26 @@ if (empty($search)) {
 
 // Get city names
 $pickup_city_query = $conn->prepare("SELECT name FROM cities WHERE id = ?");
-$pickup_city_query->bind_param("i", $search['pickup_city_id']);
-$pickup_city_query->execute();
-$pickup_city = $pickup_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
-$pickup_city_query->close();
+if (!$pickup_city_query) {
+    error_log("Pickup city query prepare failed: " . $conn->error);
+    $error = "An error occurred while fetching city data.";
+} else {
+    $pickup_city_query->bind_param("i", $search['pickup_city_id']);
+    $pickup_city_query->execute();
+    $pickup_city = $pickup_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
+    $pickup_city_query->close();
+}
 
 $dropoff_city_query = $conn->prepare("SELECT name FROM cities WHERE id = ?");
-$dropoff_city_query->bind_param("i", $search['dropoff_city_id']);
-$dropoff_city_query->execute();
-$dropoff_city = $dropoff_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
-$dropoff_city_query->close();
+if (!$dropoff_city_query) {
+    error_log("Dropoff city query prepare failed: " . $conn->error);
+    $error = "An error occurred while fetching city data.";
+} else {
+    $dropoff_city_query->bind_param("i", $search['dropoff_city_id']);
+    $dropoff_city_query->execute();
+    $dropoff_city = $dropoff_city_query->get_result()->fetch_assoc()['name'] ?? 'Unknown';
+    $dropoff_city_query->close();
+}
 
 // Query to fetch valid trip templates and instances, including arrival time
 $trips_query = "
@@ -69,13 +84,14 @@ $trips_query = "
         ts.departure_time,
         ts.arrival_time,
         ? AS trip_date,
-        COALESCE(ti.booked_seats, 0) AS booked_seats_count,
-        (vt.capacity - COALESCE(ti.booked_seats, 0)) AS available_seats
+        COALESCE(COUNT(b.id), 0) AS booked_seats_count,
+        (vt.capacity - COALESCE(COUNT(b.id), 0)) AS available_seats
     FROM trip_templates tt
     JOIN vehicles v ON tt.vehicle_id = v.id
     JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
     JOIN time_slots ts ON tt.time_slot_id = ts.id
     LEFT JOIN trip_instances ti ON tt.id = ti.template_id AND ti.trip_date = ? AND ti.status = 'active'
+    LEFT JOIN bookings b ON ti.id = b.trip_id AND b.trip_date = ? AND b.payment_status = 'paid' AND b.status != 'cancelled'
     WHERE tt.pickup_city_id = ?
         AND tt.dropoff_city_id = ?
         AND tt.vehicle_type_id = ?
@@ -87,28 +103,39 @@ $trips_query = "
             OR (tt.recurrence_type = 'month')
             OR (tt.recurrence_type = 'year' AND DATE_FORMAT(?, '%m-%d') = DATE_FORMAT(tt.start_date, '%m-%d'))
         )
-        AND (vt.capacity - COALESCE(ti.booked_seats, 0)) >= ?
+    GROUP BY tt.id, v.id, vt.id, ts.id, ti.id
+    HAVING available_seats >= ?
     ORDER BY ts.departure_time
 ";
 
 $stmt = $conn->prepare($trips_query);
-$stmt->bind_param(
-    "sssiisssssi",
-    $search['departure_date'],
-    $search['departure_date'],
-    $search['departure_date'],
-    $search['pickup_city_id'],
-    $search['dropoff_city_id'],
-    $search['vehicle_type_id'],
-    $search['departure_date'],
-    $search['departure_date'],
-    $search['departure_date'],
-    $search['departure_date'],
-    $search['num_seats']
-);
-$stmt->execute();
-$trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+if (!$stmt) {
+    error_log("Trips query prepare failed: " . $conn->error);
+    $error = "An error occurred while fetching trips. Please try again.";
+} else {
+    $stmt->bind_param(
+        "ssssiiissssi",
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['pickup_city_id'],
+        $search['dropoff_city_id'],
+        $search['vehicle_type_id'],
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['departure_date'],
+        $search['num_seats']
+    );
+    if (!$stmt->execute()) {
+        error_log("Trips query execute failed: " . $stmt->error);
+        $error = "An error occurred while fetching trips. Please try again.";
+    } else {
+        $trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+    $stmt->close();
+}
 
 // Query for similar trips (same route, different date or vehicle type)
 $similar_trips = [];
@@ -129,35 +156,46 @@ if (empty($trips)) {
             ts.departure_time,
             ts.arrival_time,
             ti.trip_date,
-            COALESCE(ti.booked_seats, 0) AS booked_seats_count,
-            (vt.capacity - COALESCE(ti.booked_seats, 0)) AS available_seats
+            COALESCE(COUNT(b.id), 0) AS booked_seats_count,
+            (vt.capacity - COALESCE(COUNT(b.id), 0)) AS available_seats
         FROM trip_templates tt
         JOIN vehicles v ON tt.vehicle_id = v.id
         JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
         JOIN time_slots ts ON tt.time_slot_id = ts.id
         LEFT JOIN trip_instances ti ON tt.id = ti.template_id AND ti.trip_date BETWEEN ? AND ? AND ti.status = 'active'
+        LEFT JOIN bookings b ON ti.id = b.trip_id AND b.trip_date BETWEEN ? AND ? AND b.payment_status = 'paid' AND b.status != 'cancelled'
         WHERE tt.pickup_city_id = ?
             AND tt.dropoff_city_id = ?
             AND tt.status = 'active'
             AND ti.trip_date BETWEEN ? AND ?
-            AND (vt.capacity - COALESCE(ti.booked_seats, 0)) >= ?
+        GROUP BY tt.id, v.id, vt.id, ts.id, ti.id, ti.trip_date
+        HAVING available_seats >= ?
         ORDER BY ti.trip_date, ts.departure_time
         LIMIT 5
     ";
     $stmt = $conn->prepare($similar_trips_query);
-    $stmt->bind_param(
-        "ssiissi",
-        $date_range_start,
-        $date_range_end,
-        $search['pickup_city_id'],
-        $search['dropoff_city_id'],
-        $date_range_start,
-        $date_range_end,
-        $search['num_seats']
-    );
-    $stmt->execute();
-    $similar_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    if (!$stmt) {
+        error_log("Similar trips query prepare failed: " . $conn->error);
+    } else {
+        $stmt->bind_param(
+            "ssiissi",
+            $date_range_start,
+            $date_range_end,
+            $date_range_start,
+            $date_range_end,
+            $search['pickup_city_id'],
+            $search['dropoff_city_id'],
+            $date_range_start,
+            $date_range_end,
+            $search['num_seats']
+        );
+        if (!$stmt->execute()) {
+            error_log("Similar trips query execute failed: " . $stmt->error);
+        } else {
+            $similar_trips = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        }
+        $stmt->close();
+    }
 }
 
 ?>
@@ -167,7 +205,7 @@ if (empty($trips)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Available Trips - <?= SITE_NAME ?></title>
+    <title>Available Trips - <?= defined('SITE_NAME') ? SITE_NAME : 'DGC Transports' ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -60,6 +60,7 @@
 
                     <li><a href="<?= SITE_URL ?>/about-us.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">About Us</a></li>
                     <li><a href="<?= SITE_URL ?>/contact.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Contact Us</a></li>
+                    <li><a href="<?= SITE_URL ?>/Charter.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Charter a Vehicle</a></li>
 
 
                 </ul>

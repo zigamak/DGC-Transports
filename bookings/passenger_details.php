@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 try {
+    require_once __DIR__ . '/../includes/functions.php';
     require_once __DIR__ . '/../templates/header.php';
 } catch (Exception $e) {
     error_log("Failed to include header.php: " . $e->getMessage());
@@ -33,6 +34,37 @@ if ($num_seats !== $trip['num_seats']) {
 // Check if user is logged in
 $is_logged_in = isLoggedIn();
 
+// Check for free booking eligibility
+$free_booking = false;
+if ($is_logged_in) {
+    $user_id = $_SESSION['user']['id'];
+    $query = "SELECT COUNT(*) as booking_count, MAX(free_booking_used) as free_booking_used 
+              FROM bookings 
+              WHERE user_id = ? AND payment_status = 'paid'";
+    try {
+        $stmt = $conn->prepare($query);
+        if (!$stmt) {
+            error_log("Failed to prepare query: " . $conn->error);
+            echo '<div class="error-message"><i class="fas fa-exclamation-circle"></i>Database error. Please try again later.</div>';
+            exit();
+        }
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row['booking_count'] >= 5 && !$row['free_booking_used']) {
+            $free_booking = true;
+            $total_amount = 0;
+        }
+    } catch (Exception $e) {
+        error_log("Database query error: " . $e->getMessage());
+        echo '<div class="error-message"><i class="fas fa-exclamation-circle"></i>Database error. Please try again later.</div>';
+        exit();
+    }
+}
+
 // Referral message (no discount applied to user)
 $referral_message = '';
 if (isset($_SESSION['referral_message'])) {
@@ -48,6 +80,15 @@ if (isset($_SESSION['referral_message'])) {
     <title>Passenger Details - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .error-message {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <div class="min-h-screen py-8 bg-gray-50">
@@ -63,6 +104,14 @@ if (isset($_SESSION['referral_message'])) {
                 <div class="text-sm text-gray-600">
                     Please provide passenger information for <?= $num_seats ?> seat(s): <?= implode(', ', array_map(function($seat) { return "Seat $seat"; }, $selected_seats)) ?>
                 </div>
+                <?php if ($free_booking): ?>
+                    <div class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div class="flex items-start text-sm text-green-700">
+                            <i class="fas fa-gift text-green-500 mr-2 mt-1 flex-shrink-0"></i>
+                            <span>Congratulations! This booking is free as you have 5 paid bookings.</span>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -164,7 +213,8 @@ if (isset($_SESSION['referral_message'])) {
 
                 <!-- Passenger Forms -->
                 <div class="lg:col-span-2">
-                    <form id="passengerForm" action="<?= SITE_URL ?>/bookings/process_booking.php" method="POST" class="space-y-6">
+                    <form id="passengerForm" action="<?= $free_booking ? SITE_URL . '/bookings/free_booking_confirmation.php' : SITE_URL . '/bookings/process_booking.php' ?>" method="POST" class="space-y-6">
+                        <input type="hidden" name="free_booking" value="<?= $free_booking ? '1' : '0' ?>">
                         <?php for ($i = 0; $i < $num_seats; $i++): ?>
                             <div class="bg-white rounded-xl shadow-lg p-6 passenger-card">
                                 <h3 class="text-xl font-bold mb-6 flex items-center">
@@ -288,7 +338,7 @@ if (isset($_SESSION['referral_message'])) {
                             <button type="submit" 
                                     class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 px-6 rounded-xl hover:from-secondary hover:to-primary transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
                                 <i class="fas fa-credit-card mr-2"></i>
-                                Proceed to Payment - ₦<?= number_format($total_amount, 0) ?>
+                                <?= $free_booking ? 'Confirm Free Booking' : 'Proceed to Payment - ₦' . number_format($total_amount, 0) ?>
                             </button>
                         </div>
                     </form>
@@ -352,7 +402,7 @@ if (isset($_SESSION['referral_message'])) {
                             <div class="space-y-2 mb-4">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Price per seat:</span>
-                                    <span class="font-semibold">₦<?= number_format($trip['price'], 0) ?></span>
+                                    <span class="font-semibold"><?= $free_booking ? 'Free' : '₦' . number_format($trip['price'], 0) ?></span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Number of seats:</span>
@@ -362,7 +412,7 @@ if (isset($_SESSION['referral_message'])) {
                             
                             <div class="flex justify-between items-center text-lg font-bold border-t pt-3">
                                 <span>Total Amount:</span>
-                                <span class="text-primary text-xl">₦<?= number_format($total_amount, 0) ?></span>
+                                <span class="text-primary text-xl"><?= $free_booking ? 'Free' : '₦' . number_format($total_amount, 0) ?></span>
                             </div>
                         </div>
 
@@ -376,7 +426,7 @@ if (isset($_SESSION['referral_message'])) {
                         <div class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                             <div class="flex items-start text-sm text-green-700">
                                 <i class="fas fa-shield-alt text-green-500 mr-2 mt-1 flex-shrink-0"></i>
-                                <span>Your booking is protected and secure. Payment is processed through encrypted channels.</span>
+                                <span>Your booking is protected and secure. <?= $free_booking ? 'This free booking will be confirmed immediately.' : 'Payment is processed through encrypted channels.' ?></span>
                             </div>
                         </div>
                     </div>
@@ -592,7 +642,7 @@ if (isset($_SESSION['referral_message'])) {
                 // Re-enable submit button
                 const submitBtn = e.target.querySelector('button[type="submit"]');
                 if (submitBtn && !submitBtn.name) {
-                    submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i>Proceed to Payment - ₦<?= number_format($total_amount, 0) ?>';
+                    submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i><?= $free_booking ? "Confirm Free Booking" : "Proceed to Payment - ₦" . number_format($total_amount, 0) ?>';
                     submitBtn.disabled = false;
                 }
                 return false;

@@ -233,54 +233,9 @@ $stmt->close();
             background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
         }
-        /* Mobile-first card layout for table rows */
-        .mobile-card-row {
-            display: flex;
-            flex-direction: column;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            background-color: #fff;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-bottom: 0.75rem;
-        }
-        .mobile-card-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-        .mobile-card-item:last-child {
-            margin-bottom: 0;
-        }
-        .mobile-card-label {
-            font-weight: 600;
-            color: #4b5563;
-            width: 120px;
-            min-width: 120px;
-        }
-        .mobile-card-content {
-            flex-grow: 1;
-        }
-        /* Desktop table layout */
-        @media (min-width: 768px) {
-            .mobile-card-row {
-                display: none;
-            }
-            .table-container {
-                display: block;
-            }
-            .table-header {
-                background: var(--gray);
-                color: var(--black);
-                font-weight: 600;
-            }
-            .table-row:hover {
-                background: #f9fafb;
-            }
-        }
-        @media (max-width: 767px) {
-            .table-container {
-                display: none;
-            }
+        /* Desktop Table Hover */
+        .table-row:hover {
+            background-color: #f8fafc;
         }
         .text-red-600 { color: #e30613; }
         .bg-red-600 { background-color: #e30613; }
@@ -292,6 +247,18 @@ $stmt->close();
         .details-content {
             max-height: 80vh;
             overflow-y: auto;
+        }
+        /* Utility classes for toggling views */
+        @media (min-width: 768px) {
+            .mobile-view {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .desktop-view {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -346,7 +313,7 @@ $stmt->close();
                             <p class="text-gray-500 mb-6">No bookings match your search criteria.</p>
                         </div>
                     <?php else: ?>
-                        <div class="space-y-4 md:hidden">
+                        <div class="space-y-4 mobile-view">
                             <?php foreach ($bookings as $booking): ?>
                                 <div class="mobile-card-row bg-white shadow-md rounded-xl relative">
                                     <div class="absolute top-4 right-4">
@@ -392,62 +359,73 @@ $stmt->close();
                                         <span class="mobile-card-label"><i class="fas fa-info-circle text-primary-red mr-2"></i>Status:</span>
                                         <span class="mobile-card-content"><?= htmlspecialchars($booking['status']) ?></span>
                                     </div>
+                                    <div class="mobile-card-item">
+                                        <span class="mobile-card-label"><i class="fas fa-calendar-check text-primary-red mr-2"></i>Reservation Date:</span>
+                                        <span class="mobile-card-content"><?= date('M j, Y H:i', strtotime($booking['created_at'])) ?></span>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <div class="overflow-x-auto hidden md:block">
-                            <table class="w-full table-auto border-collapse">
-                                <thead>
-                                    <tr class="table-header rounded-lg">
-                                        <th class="px-4 py-3 text-left">PNR</th>
-                                        <th class="px-4 py-3 text-left">Passenger</th>
-                                        <th class="px-4 py-3 text-left">Route</th>
-                                        <th class="px-4 py-3 text-left">Trip Date</th>
-                                        <th class="px-4 py-3 text-left">Amount</th>
-                                        <th class="px-4 py-3 text-left">Status</th>
-                                        <th class="px-4 py-3 text-right">Actions</th>
+                        <div class="overflow-x-auto desktop-view bg-white rounded-xl card-shadow">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PNR</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passenger</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trip Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservation Date</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="bg-white divide-y divide-gray-200">
                                     <?php foreach ($bookings as $booking): ?>
-                                        <tr class="table-row border-b border-gray-200">
-                                            <td class="px-4 py-3">
+                                        <tr class="table-row">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-ticket-alt text-primary-red mr-2"></i>
                                                     <span><?= htmlspecialchars($booking['pnr']) ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-user text-primary-red mr-2"></i>
                                                     <span><?= htmlspecialchars($booking['passenger_name']) ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-map-marker-alt text-primary-red mr-2"></i>
                                                     <span><?= htmlspecialchars($booking['pickup_city'] ?? 'N/A') ?> → <?= htmlspecialchars($booking['dropoff_city'] ?? 'N/A') ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-calendar-alt text-primary-red mr-2"></i>
                                                     <span><?= date('M j, Y', strtotime($booking['trip_date'])) ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
                                                     <span>₦<?= number_format($booking['total_amount'], 2) ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-info-circle text-primary-red mr-2"></i>
                                                     <span><?= htmlspecialchars($booking['status']) ?></span>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-right relative">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <div class="flex items-center">
+                                                    <i class="fas fa-calendar-check text-primary-red mr-2"></i>
+                                                    <span><?= date('M j, Y H:i', strtotime($booking['created_at'])) ?></span>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div class="relative inline-block text-left">
                                                     <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $booking['id'] ?>">
                                                         <i class="fas fa-ellipsis-v"></i>
@@ -546,7 +524,7 @@ $stmt->close();
                         <p><strong>Transaction Reference:</strong> ${booking.transaction_reference || 'N/A'}</p>
                         <p><strong>Payment Method:</strong> ${booking.payment_method || 'N/A'}</p>
                         <p><strong>Payment Status Detail:</strong> ${booking.payment_status_detail || 'N/A'}</p>
-                        <p><strong>Created At:</strong> ${new Date(booking.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}</p>
+                        <p><strong>Reservation Date:</strong> ${new Date(booking.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}</p>
                     `;
                     detailsModal.classList.remove('hidden');
                 }

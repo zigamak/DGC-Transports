@@ -73,6 +73,17 @@ function generateSeatLayout($capacity) {
             ],
             'type' => 'minibus'
         ],
+        14 => [
+            'rows' => [
+                ['driver', 1],     // Front row: driver + 1 passenger
+                [2, 3],            // Row 2: 2 seats
+                [4, 5, 6],         // Row 3: 3 seats
+                [7, 8, 9],         // Row 4: 3 seats
+                [10, 11, 12],      // Row 5: 3 seats
+                [13, 14]           // Row 6: 2 seats
+            ],
+            'type' => 'minibus'
+        ],
         18 => [
             'rows' => [
                 ['driver', 1, 2],  // Front row: driver + 2 passengers
@@ -86,7 +97,7 @@ function generateSeatLayout($capacity) {
         ]
     ];
     
-    return $layouts[$capacity] ?? $layouts[12]; // Default to 12-seater if not found
+    return $layouts[$capacity] ?? $layouts[14]; // Default to 14-seater if not found
 }
 
 $layout = generateSeatLayout($trip_details['capacity']);
@@ -241,7 +252,18 @@ require_once '../templates/header.php';
         }
         
         .vehicle-type-badge {
-            display: none;
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 10;
         }
         
         @media (max-width: 640px) {
@@ -258,6 +280,11 @@ require_once '../templates/header.php';
             .aisle {
                 width: 20px;
                 height: 60px;
+            }
+            
+            .vehicle-type-badge {
+                font-size: 0.9rem;
+                padding: 6px 12px;
             }
         }
     </style>
@@ -308,8 +335,9 @@ require_once '../templates/header.php';
                     <input type="hidden" name="selected_seats" id="selectedSeatsInput" value="">
                     
                     <div class="vehicle-container mx-auto" style="max-width: 450px;">
-                        
-              
+                        <div class="vehicle-type-badge">
+                            <?= $trip_details['capacity'] ?>-Seater <?= ucfirst($layout['type']) ?>
+                        </div>
                         
                         <?php foreach ($layout['rows'] as $rowIndex => $row): ?>
                             <div class="seat-row">

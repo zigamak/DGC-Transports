@@ -113,9 +113,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             transition: background 0.3s ease, transform 0.2s ease;
             width: 100%;
         }
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: linear-gradient(to right, var(--dark-red), var(--primary-red));
             transform: translateY(-2px);
+        }
+        .btn-primary:disabled {
+            background: #d1d5db;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
         }
         .error-message {
             color: #ef4444;
@@ -133,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
         }
         .form-group {
             margin-bottom: 1.5rem;
+            position: relative;
         }
         .form-group label {
             display: block;
@@ -142,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
         }
         .form-group input {
             width: 100%;
-            padding: 12px;
+            padding: 12px 45px 12px 12px;
             border: 1px solid var(--light-gray);
             border-radius: 8px;
             font-size: 1rem;
@@ -153,6 +160,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             outline: none;
             border-color: var(--primary-red);
             box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.2);
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9ca3af;
+            font-size: 1.1rem;
+            margin-top: 12px;
+        }
+        .password-toggle:hover {
+            color: var(--primary-red);
+        }
+        .password-requirements {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+        .requirement {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+        .requirement.valid {
+            color: #10b981;
+        }
+        .requirement.invalid {
+            color: #ef4444;
+        }
+        .js-error {
+            color: #ef4444;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: none;
+            align-items: center;
         }
     </style>
 </head>
@@ -173,21 +216,153 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($errors)) {
             <?php elseif ($success): ?>
                 <p class="success-message text-center"><i class="fas fa-check-circle mr-1"></i><?= $success ?></p>
             <?php else: ?>
-                <form method="POST" class="space-y-6">
+                <form id="passwordForm" method="POST" class="space-y-6">
                     <div class="form-group">
                         <label for="new_password">New Password</label>
                         <input type="password" id="new_password" name="new_password" placeholder="Enter new password" required>
+                        <i class="fas fa-eye password-toggle" id="toggleNewPassword"></i>
+                        <div class="password-requirements">
+                            <div class="requirement" id="lengthReq">
+                                <i class="fas fa-times-circle mr-2"></i>
+                                At least 8 characters
+                            </div>
+                        </div>
+                        <div class="js-error" id="passwordError">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            <span id="passwordErrorText"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="confirm_password">Confirm Password</label>
                         <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
+                        <i class="fas fa-eye password-toggle" id="toggleConfirmPassword"></i>
+                        <div class="js-error" id="confirmError">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            <span id="confirmErrorText"></span>
+                        </div>
                     </div>
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="btn-primary" id="submitBtn">
                         <i class="fas fa-save mr-2"></i>Set Password
                     </button>
                 </form>
             <?php endif; ?>
         </div>
     </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const newPasswordInput = document.getElementById('new_password');
+            const confirmPasswordInput = document.getElementById('confirm_password');
+            const toggleNewPassword = document.getElementById('toggleNewPassword');
+            const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+            const form = document.getElementById('passwordForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const lengthReq = document.getElementById('lengthReq');
+            const passwordError = document.getElementById('passwordError');
+            const passwordErrorText = document.getElementById('passwordErrorText');
+            const confirmError = document.getElementById('confirmError');
+            const confirmErrorText = document.getElementById('confirmErrorText');
+
+            // Toggle password visibility
+            function togglePasswordVisibility(input, toggleIcon) {
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    toggleIcon.classList.remove('fa-eye');
+                    toggleIcon.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    toggleIcon.classList.remove('fa-eye-slash');
+                    toggleIcon.classList.add('fa-eye');
+                }
+            }
+
+            // Event listeners for password toggles
+            toggleNewPassword.addEventListener('click', function() {
+                togglePasswordVisibility(newPasswordInput, toggleNewPassword);
+            });
+
+            toggleConfirmPassword.addEventListener('click', function() {
+                togglePasswordVisibility(confirmPasswordInput, toggleConfirmPassword);
+            });
+
+            // Password validation
+            function validatePassword() {
+                const password = newPasswordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+                let isValid = true;
+
+                // Check password length
+                if (password.length >= 8) {
+                    lengthReq.classList.remove('invalid');
+                    lengthReq.classList.add('valid');
+                    lengthReq.querySelector('i').className = 'fas fa-check-circle mr-2';
+                } else {
+                    lengthReq.classList.remove('valid');
+                    lengthReq.classList.add('invalid');
+                    lengthReq.querySelector('i').className = 'fas fa-times-circle mr-2';
+                }
+
+                // Show password length error
+                if (password.length > 0 && password.length < 8) {
+                    passwordErrorText.textContent = 'Password must be at least 8 characters long';
+                    passwordError.style.display = 'flex';
+                    isValid = false;
+                } else {
+                    passwordError.style.display = 'none';
+                }
+
+                // Check password match
+                if (confirmPassword.length > 0) {
+                    if (password !== confirmPassword) {
+                        confirmErrorText.textContent = 'Passwords do not match';
+                        confirmError.style.display = 'flex';
+                        isValid = false;
+                    } else {
+                        confirmError.style.display = 'none';
+                    }
+                }
+
+                // Enable/disable submit button
+                if (isValid && password.length >= 8 && confirmPassword.length > 0 && password === confirmPassword) {
+                    submitBtn.disabled = false;
+                } else {
+                    submitBtn.disabled = true;
+                }
+
+                return isValid;
+            }
+
+            // Event listeners for validation
+            newPasswordInput.addEventListener('input', validatePassword);
+            confirmPasswordInput.addEventListener('input', validatePassword);
+
+            // Form submission validation
+            form.addEventListener('submit', function(e) {
+                const password = newPasswordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+
+                if (password.length < 8) {
+                    e.preventDefault();
+                    passwordErrorText.textContent = 'Password must be at least 8 characters long';
+                    passwordError.style.display = 'flex';
+                    newPasswordInput.focus();
+                    return false;
+                }
+
+                if (password !== confirmPassword) {
+                    e.preventDefault();
+                    confirmErrorText.textContent = 'Passwords do not match';
+                    confirmError.style.display = 'flex';
+                    confirmPasswordInput.focus();
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Initial validation
+            validatePassword();
+        });
+    </script>
 </body>
 </html>

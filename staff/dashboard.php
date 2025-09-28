@@ -18,13 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_pnr'])) {
         $pnr_error = 'Please enter a PNR.';
     } else {
         $stmt = $conn->prepare("
-            SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status,
-                   c1.name AS pickup_city, c2.name AS dropoff_city, ts.departure_time, b.trip_date
+            SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status, b.created_at,
+                   c1.name AS pickup_city, c2.name AS dropoff_city, b.trip_date
             FROM bookings b
             JOIN trip_templates tt ON b.template_id = tt.id
             JOIN cities c1 ON tt.pickup_city_id = c1.id
             JOIN cities c2 ON tt.dropoff_city_id = c2.id
-            JOIN time_slots ts ON tt.time_slot_id = ts.id
             WHERE b.pnr = ? AND b.trip_date = CURDATE()
         ");
         $stmt->bind_param("s", $pnr);
@@ -35,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_pnr'])) {
         }
         if (empty($searched_bookings)) {
             $pnr_error = 'No bookings found for this PNR on today\'s trips.';
+        } else {
+            $pnr_success = 'Booking(s) found.';
         }
         $stmt->close();
     }
@@ -43,15 +44,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_pnr'])) {
 // Handle check-in action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset($_POST['booking_id'])) {
     $booking_id = (int)$_POST['booking_id'];
-    $new_status = 'checked-in';
+    $new_status = 'boarded';
     $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ?");
     $stmt->bind_param("si", $new_status, $booking_id);
     if ($stmt->execute()) {
-        $pnr_success = 'Booking status updated to Checked-In.';
+        $pnr_success = 'Booking status updated to boarded.';
+        // Refresh the bookings data to reflect the updated status
+        $stmt = $conn->prepare("
+            SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status, b.created_at,
+                   c1.name AS pickup_city, c2.name AS dropoff_city, b.trip_date
+            FROM bookings b
+            JOIN trip_templates tt ON b.template_id = tt.id
+            JOIN cities c1 ON tt.pickup_city_id = c1.id
+            JOIN cities c2 ON tt.dropoff_city_id = c2.id
+            WHERE b.id = ?
+        ");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $searched_bookings = [];
+        while ($row = $result->fetch_assoc()) {
+            $searched_bookings[] = $row;
+        }
+        $stmt->close();
     } else {
         $pnr_error = 'Failed to update booking status.';
     }
-    $stmt->close();
 }
 
 // Fetch trips for today
@@ -76,8 +94,9 @@ $trips_result = $stmt->get_result();
 $trips = [];
 while ($row = $trips_result->fetch_assoc()) {
     $bookings_query = "
-        SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status
+        SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status, b.created_at
         FROM bookings b
+        JOIN trip_templates tt ON b.template_id = tt.id
         WHERE b.template_id = ? AND b.trip_date = ?
     ";
     $bookings_stmt = $conn->prepare($bookings_query);
@@ -262,7 +281,7 @@ $stmt->close();
             color: #dc2626;
         }
 
-        .status-checked-in {
+        .status-boarded {
             background: #e5e7eb;
             color: #1a1a1a;
         }
@@ -390,21 +409,20 @@ $stmt->close();
                                             <span><?= htmlspecialchars($booking['pickup_city']) ?> → <?= htmlspecialchars($booking['dropoff_city']) ?></span>
                                         </div>
                                         <div class="mobile-card-item">
-                                            <span class="mobile-card-label"><i class="fas fa-clock text-primary-red mr-2"></i>Time:</span>
-                                            <span><?= htmlspecialchars($booking['departure_time']) ?> on <?= formatDate($booking['trip_date']) ?></span>
+                                            <span class="mobile-card-label"><i class="fas fa-clock text-primary-red mr-2"></i>Reservation Time:</span>
+                                            <span><?= date('g:iA', strtotime($booking['created_at'])) ?> on <?= formatDate($booking['trip_date']) ?></span>
                                         </div>
                                         <div class="mobile-card-item">
                                             <span class="mobile-card-label"><i class="fas fa-cog text-primary-red mr-2"></i>Action:</span>
                                             <?php if (in_array($booking['status'], ['pending', 'confirmed'])): ?>
                                                 <form method="POST" class="w-full" onsubmit="handleFormSubmit(event, this)">
                                                     <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                                    <button type="submit" name="check_in" class="btn-primary">
+                                                    <input type="hidden" name="check_in" value="1">
+                                                    <button type="submit" class="btn-primary">
                                                         <span><i class="fas fa-check mr-2"></i>Check In</span>
                                                         <div class="spinner"></div>
                                                     </button>
                                                 </form>
-                                            <?php else: ?>
-                                                <span class="text-gray-500">No action</span>
                                             <?php endif; ?>
                                         </div>
                                         <div class="mt-4">
@@ -420,10 +438,10 @@ $stmt->close();
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservation Time</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passenger Name</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PNR</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Departure</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
@@ -431,6 +449,12 @@ $stmt->close();
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php foreach ($searched_bookings as $booking): ?>
                                             <tr class="table-hover">
+                                                <td class="px-6 py-4">
+                                                    <div class="flex items-center">
+                                                        <i class="fas fa-clock text-primary-red mr-2"></i>
+                                                        <span class="text-sm text-gray-900"><?= date('g:iA', strtotime($booking['created_at'])) ?></span>
+                                                    </div>
+                                                </td>
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center">
                                                         <i class="fas fa-user text-primary-red mr-2"></i>
@@ -451,12 +475,6 @@ $stmt->close();
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     <div class="flex items-center">
-                                                        <i class="fas fa-clock text-primary-red mr-2"></i>
-                                                        <span class="text-sm text-gray-900"><?= htmlspecialchars($booking['departure_time']) ?> on <?= formatDate($booking['trip_date']) ?></span>
-                                                    </div>
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <div class="flex items-center">
                                                         <i class="fas fa-check-circle text-primary-red mr-2"></i>
                                                         <span class="status-badge status-<?= str_replace(' ', '-', $booking['status']) ?>"><?= htmlspecialchars(ucfirst($booking['status'])) ?></span>
                                                     </div>
@@ -466,13 +484,12 @@ $stmt->close();
                                                         <?php if (in_array($booking['status'], ['pending', 'confirmed'])): ?>
                                                             <form method="POST" class="inline-flex" onsubmit="handleFormSubmit(event, this)">
                                                                 <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                                                <button type="submit" name="check_in" class="btn-primary text-sm px-4 py-2">
+                                                                <input type="hidden" name="check_in" value="1">
+                                                                <button type="submit" class="btn-primary text-sm px-4 py-2">
                                                                     <span><i class="fas fa-check mr-1"></i>Check In</span>
                                                                     <div class="spinner"></div>
                                                                 </button>
                                                             </form>
-                                                        <?php else: ?>
-                                                            <span class="text-gray-500 text-sm">No action</span>
                                                         <?php endif; ?>
                                                         <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-primary-black hover:text-primary-red text-sm">
                                                             <i class="fas fa-eye"></i>
@@ -539,13 +556,14 @@ $stmt->close();
                                                             <?php foreach ($trip['bookings'] as $booking): ?>
                                                                 <li class="flex flex-col gap-2">
                                                                     <div class="flex items-center">
-                                                                        <span class="text-sm text-gray-900"><?= htmlspecialchars($booking['passenger_name']) ?></span>
+                                                                        <span class="text-sm text-gray-900"><?= date('g:iA', strtotime($booking['created_at'])) ?> - <?= htmlspecialchars($booking['passenger_name']) ?></span>
                                                                         <span class="ml-2 status-badge status-<?= str_replace(' ', '-', $booking['status']) ?>"><?= htmlspecialchars(ucfirst($booking['status'])) ?></span>
                                                                     </div>
                                                                     <?php if (in_array($booking['status'], ['pending', 'confirmed'])): ?>
                                                                         <form method="POST" class="w-full" onsubmit="handleFormSubmit(event, this)">
                                                                             <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                                                            <button type="submit" name="check_in" class="btn-primary">
+                                                                            <input type="hidden" name="check_in" value="1">
+                                                                            <button type="submit" class="btn-primary">
                                                                                 <span><i class="fas fa-check mr-2"></i>Check In</span>
                                                                                 <div class="spinner"></div>
                                                                             </button>
@@ -573,6 +591,7 @@ $stmt->close();
                                         <table class="min-w-full divide-y divide-gray-200">
                                             <thead class="bg-gray-50">
                                                 <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservation Time</th>
                                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Passenger Name</th>
                                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PNR</th>
                                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
@@ -584,11 +603,17 @@ $stmt->close();
                                             <tbody class="bg-white divide-y divide-gray-200">
                                                 <?php if (empty($trip['bookings'])): ?>
                                                     <tr>
-                                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">No bookings for this trip</td>
+                                                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">No bookings for this trip</td>
                                                     </tr>
                                                 <?php else: ?>
                                                     <?php foreach ($trip['bookings'] as $booking): ?>
                                                         <tr class="table-hover">
+                                                            <td class="px-6 py-4">
+                                                                <div class="flex items-center">
+                                                                    <i class="fas fa-clock text-primary-red mr-2"></i>
+                                                                    <span class="text-sm text-gray-900"><?= date('g:iA', strtotime($booking['created_at'])) ?></span>
+                                                                </div>
+                                                            </td>
                                                             <td class="px-6 py-4">
                                                                 <div class="flex items-center">
                                                                     <i class="fas fa-user text-primary-red mr-2"></i>
@@ -624,13 +649,12 @@ $stmt->close();
                                                                     <?php if (in_array($booking['status'], ['pending', 'confirmed'])): ?>
                                                                         <form method="POST" class="inline-flex" onsubmit="handleFormSubmit(event, this)">
                                                                             <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                                                            <button type="submit" name="check_in" class="btn-primary text-sm px-4 py-2">
+                                                                            <input type="hidden" name="check_in" value="1">
+                                                                            <button type="submit" class="btn-primary text-sm px-4 py-2">
                                                                                 <span><i class="fas fa-check mr-1"></i>Check In</span>
                                                                                 <div class="spinner"></div>
                                                                             </button>
                                                                         </form>
-                                                                    <?php else: ?>
-                                                                        <span class="text-gray-500 text-sm">No action</span>
                                                                     <?php endif; ?>
                                                                     <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-primary-black hover:text-primary-red text-sm">
                                                                         <i class="fas fa-eye"></i>
@@ -776,8 +800,12 @@ $stmt->close();
                         <p class="text-gray-900">${booking.pickup_city} → ${booking.dropoff_city}</p>
                     </div>
                     <div>
-                        <p class="text-gray-600 font-medium">Departure</p>
-                        <p class="text-gray-900">${booking.departure_time} on ${new Date(booking.trip_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}</p>
+                        <p class="text-gray-600 font-medium">Reservation Time</p>
+                        <p class="text-gray-900">${new Date(booking.created_at).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true})}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-medium">Trip Date</p>
+                        <p class="text-gray-900">${new Date(booking.trip_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}</p>
                     </div>
                     <div>
                         <p class="text-gray-600 font-medium">Email</p>

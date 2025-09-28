@@ -84,6 +84,9 @@ require_once 'templates/header.php';
                             <i class="fas fa-eye text-gray-400 cursor-pointer" id="togglePassword"></i>
                         </span>
                     </div>
+                    <div class="text-right">
+                        <a href="forgot_password.php" class="text-primary hover:underline text-sm font-semibold">Forgot Password?</a>
+                    </div>
                     <button type="submit"
                             class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 px-6 rounded-xl hover:from-secondary hover:to-primary transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl">
                         <i class="fas fa-sign-in-alt mr-2"></i>
@@ -104,7 +107,7 @@ require_once 'templates/header.php';
             </div>
         </div>
     </div>
-       <?php require_once __DIR__ . '/templates/footer.php'; ?>
+    <?php require_once __DIR__ . '/templates/footer.php'; ?>
 
     <script>
         const togglePassword = document.getElementById('togglePassword');
@@ -119,4 +122,6 @@ require_once 'templates/header.php';
     </script>
 </body>
 </html>
+<?php
+$conn->close();
 ?>

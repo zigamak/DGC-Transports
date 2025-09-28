@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 ? 'Cannot update: This booking is for a past date (' . formatDate($result['trip_date'], 'j M, Y') . ').'
                 : 'Cannot update: This booking is for a future date (' . formatDate($result['trip_date'], 'j M, Y') . ').';
         } else {
-            $stmt = $conn->prepare("UPDATE bookings SET status = 'has boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
+            $stmt = $conn->prepare("UPDATE bookings SET status = 'boarded' WHERE id = ? AND status IN ('confirmed', 'pending')");
             $stmt->bind_param("i", $booking_id);
             if ($stmt->execute() && $stmt->affected_rows > 0) {
                 $success = 'Passenger has been marked as boarded successfully!';
@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $booking_id = (int)$_POST['booking_id'];
     $new_status = trim($_POST['new_status'] ?? '');
     $pnr_to_update = trim($_POST['pnr'] ?? '');
-    $valid_statuses = ['confirmed', 'has boarded', 'arrived', 'cancelled'];
+    $valid_statuses = ['confirmed', 'boarded', 'arrived', 'cancelled'];
     
     // Verify booking date before updating
     $stmt = $conn->prepare("SELECT trip_date FROM bookings WHERE id = ? AND pnr = ?");
@@ -571,7 +571,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 p-4 bg-gray-50 rounded-lg gap-4">
                             <div class="flex items-center gap-2">
                                 <span class="text-gray-600 text-sm">Status:</span>
-                                <span class="status-badge status-<?= $booking['status'] === 'has boarded' ? 'boarded' : ($booking['status'] === 'confirmed' ? 'confirmed' : ($booking['status'] === 'arrived' ? 'arrived' : ($booking['status'] === 'cancelled' ? 'cancelled' : 'pending'))) ?>">
+                                <span class="status-badge status-<?= $booking['status'] === 'boarded' ? 'boarded' : ($booking['status'] === 'confirmed' ? 'confirmed' : ($booking['status'] === 'arrived' ? 'arrived' : ($booking['status'] === 'cancelled' ? 'cancelled' : 'pending'))) ?>">
                                     <?= htmlspecialchars(ucfirst($booking['status'])) ?>
                                 </span>
                             </div>
@@ -585,10 +585,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                         <i class="fas fa-check-circle"></i>Mark as Boarded
                                     </button>
                                 </form>
-                            <?php elseif ($booking['status'] === 'has boarded'): ?>
+                            <?php elseif ($booking['status'] === 'boarded'): ?>
                                 <div class="flex items-center text-green-600 gap-2">
                                     <i class="fas fa-check-circle text-lg"></i>
-                                    <span class="font-medium">Passenger has boarded</span>
+                                    <span class="font-medium">Passenger boarded</span>
                                 </div>
                             <?php elseif ($booking['status'] === 'arrived'): ?>
                                 <div class="flex items-center text-blue-600 gap-2">
@@ -692,7 +692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <select name="new_status" class="input-field flex-1" required>
                                     <option value="">Select new status</option>
                                     <option value="confirmed" <?= $booking['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
-                                    <option value="has boarded" <?= $booking['status'] === 'has boarded' ? 'selected' : '' ?>>Has Boarded</option>
+                                    <option value="boarded" <?= $booking['status'] === 'boarded' ? 'selected' : '' ?>>boarded</option>
                                     <option value="arrived" <?= $booking['status'] === 'arrived' ? 'selected' : '' ?>>Arrived</option>
                                     <option value="cancelled" <?= $booking['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                                 </select>

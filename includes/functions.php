@@ -22,7 +22,11 @@ function generatePNR() {
  * @return array Payment verification result with status and data
  */
 
-
+/**
+ * Verify Paystack payment
+ * @param string $reference Payment reference
+ * @return array Payment verification result with status and data
+ */
 function verifyPaystackPayment($reference) {
     // Check if Paystack secret key is defined
     if (!defined('PAYSTACK_SECRET_KEY') || empty(PAYSTACK_SECRET_KEY)) {
@@ -79,9 +83,23 @@ function verifyPaystackPayment($reference) {
         error_log("Payment not successful for reference {$reference}. Status: {$status}");
         return ['status' => false, 'message' => 'Payment was not successful'];
     }
+
+    // Validate and cap transaction fees
+    $data = $response['data'];
+    $amount = $data['amount'] / 100; // Convert to naira
+    $fees = isset($data['fees']) ? $data['fees'] / 100 : 0; // Convert to naira
+    if ($fees >= $amount) {
+        error_log("Adjusting high fees for reference {$reference}: original fees={$fees}, amount={$amount}");
+        $fees = min($fees, $amount * 0.015); // Cap at 1.5% of amount
+        $data['fees'] = $fees * 100; // Convert back to kobo
+    }
     
-    return ['status' => true, 'data' => $response['data']];
+    // Log the final amount and fees for debugging
+    error_log("Paystack verification for reference {$reference}: amount={$amount}, adjusted fees={$fees}");
+    
+    return ['status' => true, 'data' => $data];
 }
+
 
 /**
  * Get booking by PNR with all related details

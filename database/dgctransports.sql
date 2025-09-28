@@ -127,15 +127,16 @@ CREATE TABLE `payments` (
   FOREIGN KEY (`booking_id`) REFERENCES `bookings`(`id`) ON DELETE CASCADE
 );
 
--- 10. Password resets table
-CREATE TABLE `password_resets` (
+-- Create the new password_resets table
+CREATE TABLE password_resets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
-    token VARCHAR(100) NOT NULL,
+    token VARCHAR(255) NOT NULL,
     expires_at DATETIME NOT NULL,
-    PRIMARY KEY (email),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_email (email),
     INDEX idx_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- 11. Email logs table
 CREATE TABLE `email_logs` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -221,3 +222,5 @@ CREATE TABLE referral_settings (
 
 -- Insert default referral credit value
 INSERT INTO referral_settings (credits) VALUES (2000.00);
+
+ALTER TABLE bookings ADD free_booking_used TINYINT DEFAULT 0;

@@ -46,22 +46,26 @@ ob_start();
             background-color: #ffffff;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        /* --- UPDATED HEADER STYLES --- */
         .header {
-            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-            color: white;
-            padding: 30px 20px;
+            background-color: #ffffff; /* White background */
+            border-bottom: 3px solid #dc2626; /* Red border at the bottom */
+            padding: 20px 20px 10px 20px; /* Reduced top/bottom padding */
             text-align: center;
+            color: #1f2937; /* Dark text for contrast */
         }
         .header h1 {
-            margin: 0;
-            font-size: 28px;
+            margin: 5px 0 0 0; /* Adjusted margin */
+            font-size: 24px; /* Slightly smaller font */
             font-weight: bold;
+            color: #dc2626; /* Making the site name red for emphasis */
         }
         .header p {
-            margin: 8px 0 0 0;
-            font-size: 16px;
-            opacity: 0.9;
+            margin: 0 0 15px 0; /* Adjusted margin */
+            font-size: 14px; /* Smaller text */
+            color: #6b7280;
         }
+        /* --- END UPDATED HEADER STYLES --- */
         .success-badge {
             background: #059669;
             color: white;
@@ -246,27 +250,28 @@ ob_start();
 </head>
 <body>
     <div class="email-container">
-        <!-- Header -->
         <div class="header">
+               <a href="<?= SITE_URL ?>">
+                    <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="Logo" style="height: 40px; width: auto; max-width: 100%;">
+                </a>
             <h1><?= htmlspecialchars(SITE_NAME) ?></h1>
+
             <p>Your Trusted Travel Partner</p>
+            </div>
+        <div style="text-align: center; padding: 10px 20px 0 20px;">
             <div class="success-badge">✓ BOOKING CONFIRMED</div>
         </div>
 
-        <!-- Content -->
         <div class="content">
-            <!-- Greeting -->
             <h2 style="color: #1f2937; margin: 0 0 10px 0;">Hello <?= $passenger_name ?>!</h2>
             <p style="color: #6b7280; margin: 0 0 20px 0;">Thank you for choosing <?= htmlspecialchars(SITE_NAME) ?>. Your booking has been successfully confirmed.</p>
 
-            <!-- PNR Section -->
             <div class="pnr-section">
                 <h3>Your Booking Reference (PNR)</h3>
                 <div class="pnr-code"><?= $pnr ?></div>
                 <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">Keep this reference number for your records</p>
             </div>
 
-            <!-- Trip Details -->
             <div class="trip-details">
                 <div class="trip-header">
                     🚌 Trip Information
@@ -303,7 +308,6 @@ ob_start();
                     <?php endif; ?>
                 </div>
 
-                <!-- Seats -->
                 <div class="seats-section">
                     <h4 style="margin: 0 0 10px 0; color: #1f2937;">🪑 Your Seat</h4>
                     <div class="seats-container">
@@ -312,7 +316,6 @@ ob_start();
                 </div>
             </div>
 
-            <!-- Passenger Information -->
             <div class="passenger-info">
                 <h3 style="color: #1f2937; margin: 0 0 15px 0;">👤 Passenger Information</h3>
                 <div class="details-grid" style="grid-template-columns: 1fr;">
@@ -343,7 +346,6 @@ ob_start();
                 </div>
             </div>
 
-            <!-- Payment Summary -->
             <div class="payment-summary">
                 <h3 style="color: #1f2937; margin: 0 0 10px 0;">💳 Payment Summary</h3>
                 <p style="margin: 5px 0; color: #6b7280;">
@@ -356,7 +358,6 @@ ob_start();
                 </p>
             </div>
 
-            <!-- Important Information -->
             <div class="important-info">
                 <h3>⚠️ Important Travel Information</h3>
                 <ul>
@@ -368,13 +369,11 @@ ob_start();
                 </ul>
             </div>
 
-            <!-- Additional Notes -->
             <div style="background: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0; border-radius: 0 6px 6px 0;">
                 <p style="margin: 0; color: #0c4a6e;"><strong>Note:</strong> Changes or cancellations must be made at least 2 hours before departure. Additional charges may apply.</p>
             </div>
         </div>
 
-        <!-- Footer -->
         <div class="footer">
             <h3>Need Help?</h3>
             <div class="contact-info">
