@@ -201,9 +201,16 @@ try {
     // Commit the transaction
     $conn->commit();
 
-    // Send confirmation email to all passengers
+    // Send confirmation email to all passengers and collect data for admin
     $pnrs = []; // Store PNRs for confirmation page
+    $booking_data_array = []; // Collect booking data for admin email
     foreach ($passenger_details as $index => $passenger) {
+        // Validate passenger data
+        if (!isset($passenger['passenger_name']) || !isset($passenger['seat_number'])) {
+            error_log("Invalid passenger data at index $index: " . json_encode($passenger));
+            throw new Exception("Invalid passenger data for booking ID {$booking_ids[$index]}");
+        }
+
         // Fetch PNR for each booking
         $stmt_pnr = $conn->prepare("SELECT pnr FROM bookings WHERE id = ?");
         if (!$stmt_pnr) {
@@ -222,13 +229,16 @@ try {
         $pnrs[] = $booking['pnr'];
 
         $booking_data = [
-            'email' => $passenger['email'],
-            'passenger_name' => $passenger['passenger_name'], // Updated to match bookings table
+            'email' => isset($passenger['email']) ? $passenger['email'] : '',
+            'passenger_name' => $passenger['passenger_name'],
             'pnr' => $booking['pnr'],
             'seat_number' => $passenger['seat_number'],
             'total_amount' => $total_amount,
             'payment_method' => $payment_method,
             'payment_reference' => $reference,
+            'phone' => isset($passenger['phone']) ? $passenger['phone'] : '',
+            'emergency_contact' => isset($passenger['emergency_contact']) ? $passenger['emergency_contact'] : '',
+            'special_requests' => isset($passenger['special_requests']) ? $passenger['special_requests'] : '',
             'trip' => [
                 'pickup_city' => $_SESSION['selected_trip']['pickup_city'],
                 'dropoff_city' => $_SESSION['selected_trip']['dropoff_city'],
@@ -239,11 +249,22 @@ try {
                 'driver_name' => $_SESSION['selected_trip']['driver_name'] ?? ''
             ]
         ];
-        error_log("Preparing to send email with data: " . json_encode($booking_data));
+        $booking_data_array[] = $booking_data;
+
+        error_log("Preparing to send passenger email with data: " . json_encode($booking_data));
         if (sendBookingConfirmationEmail($booking_data)) {
             error_log("Booking confirmation email sent successfully to: {$booking_data['email']} for PNR {$booking_data['pnr']}");
         } else {
             error_log("Failed to send confirmation email to {$booking_data['email']} for PNR {$booking_data['pnr']}");
+        }
+    }
+
+    // Send admin notification email
+    if (!empty($booking_data_array)) {
+        if (sendAdminBookingNotificationEmail($booking_data_array, $total_amount, $payment_method, $reference)) {
+            error_log("Admin booking notification email sent successfully for PNR {$booking_data_array[0]['pnr']}");
+        } else {
+            error_log("Failed to send admin booking notification email for PNR {$booking_data_array[0]['pnr']}");
         }
     }
 

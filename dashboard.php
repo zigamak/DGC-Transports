@@ -113,7 +113,7 @@ require_once 'templates/header.php';
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <a href="book_trip.php" class="bg-gradient-to-r from-red-600 to-red-800 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
+          <a href="index.php" class="bg-gradient-to-r from-red-600 to-red-800 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">
             <i class="fas fa-bus mr-2"></i>Book a Trip
           </a>
           <a href="profile.php" class="bg-gradient-to-r from-gray-700 to-gray-900 text-white font-bold py-4 px-6 rounded-xl text-center hover:scale-105 transition shadow-lg">

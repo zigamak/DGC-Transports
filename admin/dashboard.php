@@ -1,5 +1,4 @@
 <?php
-//admin/dashboard.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -143,11 +142,12 @@ $total_trips_count = $total_result->fetch_assoc()['total'];
 $total_pages = ceil($total_trips_count / $per_page);
 $stmt->close();
 
-// Fetch recent trip instances
+// Fetch recent trip instances with accurate booked seats
 $recent_trips_query = "
     SELECT ti.id, ti.trip_date, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type, 
-           v.vehicle_number, v.driver_name, ts.departure_time, ti.booked_seats, ti.status,
-           vt.capacity, tt.price, ts.arrival_time, tt.id AS template_id
+           v.vehicle_number, v.driver_name, ts.departure_time, 
+           (SELECT COUNT(*) FROM bookings b WHERE b.trip_id = ti.id AND b.status != 'cancelled') as booked_seats,
+           ti.status, vt.capacity, tt.price, ts.arrival_time, tt.id AS template_id
     FROM trip_instances ti
     JOIN trip_templates tt ON ti.template_id = tt.id
     JOIN cities c1 ON tt.pickup_city_id = c1.id
@@ -642,7 +642,7 @@ $stmt->close();
                                         </div>
                                         <div class="flex items-center text-sm text-gray-600">
                                             <i class="fas fa-chair text-primary-red w-4 mr-2"></i>
-                                            <span><?= $trip['booked_seats'] ?> seats booked</span>
+                                            <span><?= $trip['booked_seats'] ?> of <?= $trip['capacity'] ?> seats booked</span>
                                         </div>
                                     </div>
                                     <div class="mt-4 flex justify-between">
@@ -694,8 +694,7 @@ $stmt->close();
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center">
                                                     <i class="fas fa-chair text-primary-red mr-2"></i>
-                                                    <span class="text-sm font-medium text-gray-900"><?= $trip['booked_seats'] ?></span>
-                                                    <span class="text-sm text-gray-500 ml-1">seats</span>
+                                                    <span class="text-sm font-medium text-gray-900"><?= $trip['booked_seats'] ?> of <?= $trip['capacity'] ?> seats</span>
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4">
@@ -800,7 +799,7 @@ $stmt->close();
                     </div>
                     <div>
                         <p class="text-gray-600 font-medium">Booked Seats</p>
-                        <p class="text-gray-900">${trip.booked_seats} seats</p>
+                        <p class="text-gray-900">${trip.booked_seats} of ${trip.capacity} seats</p>
                     </div>
                     <div>
                         <p class="text-gray-600 font-medium">Status</p>

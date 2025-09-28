@@ -2,9 +2,9 @@
 // includes/templates/email_booking_confirmation.php
 require_once __DIR__ . '/../../includes/config.php';
 
-// Ensure booking_data is set and provide defaults
-$booking_data = isset($booking_data) ? $booking_data : [];
-$passenger_name = isset($booking_data['passenger_name']) ? htmlspecialchars($booking_data['passenger_name'], ENT_QUOTES, 'UTF-8') : 'Passenger';
+// Ensure template_data is set and provide defaults
+$booking_data = isset($template_data) ? $template_data : [];
+$passenger_name = isset($booking_data['passenger_name']) ? htmlspecialchars($booking_data['passenger_name'], ENT_QUOTES, 'UTF-8') : 'N/A';
 $pnr = isset($booking_data['pnr']) ? htmlspecialchars($booking_data['pnr'], ENT_QUOTES, 'UTF-8') : 'N/A';
 $seat_number = isset($booking_data['seat_number']) ? htmlspecialchars($booking_data['seat_number'], ENT_QUOTES, 'UTF-8') : 'N/A';
 $total_amount = isset($booking_data['total_amount']) ? number_format($booking_data['total_amount'], 0) : '0';
@@ -18,10 +18,13 @@ $departure_time = isset($trip['departure_time']) && $trip['departure_time'] ? da
 $vehicle_type = isset($trip['vehicle_type']) ? htmlspecialchars($trip['vehicle_type'], ENT_QUOTES, 'UTF-8') : 'N/A';
 $vehicle_number = isset($trip['vehicle_number']) ? htmlspecialchars($trip['vehicle_number'], ENT_QUOTES, 'UTF-8') : 'N/A';
 $driver_name = isset($trip['driver_name']) && $trip['driver_name'] ? htmlspecialchars($trip['driver_name'], ENT_QUOTES, 'UTF-8') : 'N/A';
-$email = isset($booking_data['email']) ? htmlspecialchars($booking_data['email'], ENT_QUOTES, 'UTF-8') : 'N/A';
-$phone = isset($booking_data['phone']) ? htmlspecialchars($booking_data['phone'], ENT_QUOTES, 'UTF-8') : 'N/A';
-$emergency_contact = isset($booking_data['emergency_contact']) ? htmlspecialchars($booking_data['emergency_contact'], ENT_QUOTES, 'UTF-8') : '';
-$special_requests = isset($booking_data['special_requests']) ? htmlspecialchars($booking_data['special_requests'], ENT_QUOTES, 'UTF-8') : '';
+$email = isset($booking_data['email']) && !empty($booking_data['email']) ? htmlspecialchars($booking_data['email'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$phone = isset($booking_data['phone']) && !empty($booking_data['phone']) ? htmlspecialchars($booking_data['phone'], ENT_QUOTES, 'UTF-8') : 'N/A';
+$emergency_contact = isset($booking_data['emergency_contact']) && !empty($booking_data['emergency_contact']) ? htmlspecialchars($booking_data['emergency_contact'], ENT_QUOTES, 'UTF-8') : '';
+$special_requests = isset($booking_data['special_requests']) && !empty($booking_data['special_requests']) ? htmlspecialchars($booking_data['special_requests'], ENT_QUOTES, 'UTF-8') : '';
+
+// Log template_data for debugging
+error_log("email_booking_confirmation.php received template_data: " . json_encode($booking_data));
 
 ob_start();
 ?>
@@ -46,26 +49,24 @@ ob_start();
             background-color: #ffffff;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        /* --- UPDATED HEADER STYLES --- */
         .header {
-            background-color: #ffffff; /* White background */
-            border-bottom: 3px solid #dc2626; /* Red border at the bottom */
-            padding: 20px 20px 10px 20px; /* Reduced top/bottom padding */
+            background-color: #ffffff;
+            border-bottom: 3px solid #dc2626;
+            padding: 20px;
             text-align: center;
-            color: #1f2937; /* Dark text for contrast */
+            color: #1f2937;
         }
         .header h1 {
-            margin: 5px 0 0 0; /* Adjusted margin */
-            font-size: 24px; /* Slightly smaller font */
+            margin: 5px 0 0 0;
+            font-size: 24px;
             font-weight: bold;
-            color: #dc2626; /* Making the site name red for emphasis */
+            color: #dc2626;
         }
         .header p {
-            margin: 0 0 15px 0; /* Adjusted margin */
-            font-size: 14px; /* Smaller text */
+            margin: 0 0 15px 0;
+            font-size: 14px;
             color: #6b7280;
         }
-        /* --- END UPDATED HEADER STYLES --- */
         .success-badge {
             background: #059669;
             color: white;
@@ -174,7 +175,17 @@ ob_start();
             background: #ecfdf5;
             border-radius: 8px;
             padding: 20px;
-            margin: 25px 0;
+            margin: 25px  Ascending...
+        }
+        .passenger-card {
+            border-bottom: 1px solid #d1d5db;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        .passenger-card:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
         .payment-summary {
             background: #fffbeb;
@@ -225,14 +236,6 @@ ob_start();
         .contact-info {
             margin: 15px 0;
         }
-        .social-links {
-            margin: 20px 0;
-        }
-        .social-links a {
-            color: #dc2626;
-            text-decoration: none;
-            margin: 0 10px;
-        }
         @media (max-width: 600px) {
             .details-grid {
                 grid-template-columns: 1fr;
@@ -251,24 +254,23 @@ ob_start();
 <body>
     <div class="email-container">
         <div class="header">
-               <a href="<?= SITE_URL ?>">
-                    <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="Logo" style="height: 40px; width: auto; max-width: 100%;">
-                </a>
+            <a href="<?= SITE_URL ?>">
+                <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="Logo" style="height: 40px; width: auto; max-width: 100%;">
+            </a>
             <h1><?= htmlspecialchars(SITE_NAME) ?></h1>
-
             <p>Your Trusted Travel Partner</p>
-            </div>
+        </div>
         <div style="text-align: center; padding: 10px 20px 0 20px;">
             <div class="success-badge">✓ BOOKING CONFIRMED</div>
         </div>
 
         <div class="content">
-            <h2 style="color: #1f2937; margin: 0 0 10px 0;">Hello <?= $passenger_name ?>!</h2>
+            <h2 style="color: #1f2937; margin: 0 0 10px 0;">Dear <?= $passenger_name ?>,</h2>
             <p style="color: #6b7280; margin: 0 0 20px 0;">Thank you for choosing <?= htmlspecialchars(SITE_NAME) ?>. Your booking has been successfully confirmed.</p>
 
             <div class="pnr-section">
                 <h3>Your Booking Reference (PNR)</h3>
-                <div class="pnr-code"><?= $pnr ?></div>
+                <div class="pnr-code"><?= $pnr ?> (Seat <?= $seat_number ?>)</div>
                 <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 14px;">Keep this reference number for your records</p>
             </div>
 
@@ -318,31 +320,36 @@ ob_start();
 
             <div class="passenger-info">
                 <h3 style="color: #1f2937; margin: 0 0 15px 0;">👤 Passenger Information</h3>
-                <div class="details-grid" style="grid-template-columns: 1fr;">
-                    <div class="detail-item">
-                        <span class="detail-label">Name</span>
-                        <span class="detail-value"><?= $passenger_name ?></span>
+                <div class="passenger-card">
+                    <h4 style="color: #1f2937; margin: 0 0 10px 0;">Passenger (Seat <?= $seat_number ?>)</h4>
+                    <div class="details-grid" style="grid-template-columns: 1fr;">
+                        <div class="detail-item">
+                            <span class="detail-label">Name</span>
+                            <span class="detail-value"><?= $passenger_name ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Email</span>
+                            <span class="detail-value"><?= $email ?></span>
+                        </div>
+                        <?php if ($phone !== 'N/A'): ?>
+                        <div class="detail-item">
+                            <span class="detail-label">Phone</span>
+                            <span class="detail-value"><?= $phone ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($emergency_contact)): ?>
+                        <div class="detail-item">
+                            <span class="detail-label">Emergency Contact</span>
+                            <span class="detail-value"><?= $emergency_contact ?></span>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($special_requests)): ?>
+                        <div class="detail-item">
+                            <span class="detail-label">Special Requests</span>
+                            <span class="detail-value"><?= $special_requests ?></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Email</span>
-                        <span class="detail-value"><?= $email ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Phone</span>
-                        <span class="detail-value"><?= $phone ?></span>
-                    </div>
-                    <?php if ($emergency_contact): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Emergency Contact</span>
-                        <span class="detail-value"><?= $emergency_contact ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if ($special_requests): ?>
-                    <div class="detail-item">
-                        <span class="detail-label">Special Requests</span>
-                        <span class="detail-value"><?= $special_requests ?></span>
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
 
@@ -363,7 +370,7 @@ ob_start();
                 <ul>
                     <li><strong>Arrive Early:</strong> Please be at the terminal at least 30 minutes before departure time</li>
                     <li><strong>Valid ID Required:</strong> Bring a government-issued photo ID for verification</li>
-                    <li><strong>Keep Your PNR:</strong> Save this email and your PNR (<?= $pnr ?>) for reference</li>
+                    <li><strong>Keep Your PNR:</strong> Save this email and your PNR for reference</li>
                     <li><strong>Luggage Policy:</strong> One carry-on bag and one checked bag are included</li>
                     <li><strong>Contact Support:</strong> Call us immediately if you need to make changes to your booking</li>
                 </ul>
