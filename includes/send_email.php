@@ -10,8 +10,8 @@ use PHPMailer\PHPMailer\Exception;
 
 /**
  * Generic function to send emails
- * @param array $data Email data (to_email, to_name, subject, template_path, template_data)
- * @param string $email_type Type of email for logging (e.g., 'contact_user', 'contact_admin')
+ * @param array $data Email data (to_email, to_name, subject, template_path, template_data, cc, bcc)
+ * @param string $email_type Type of email for logging (e.g., 'contact_user', 'booking_confirmation')
  * @param string $log_message Custom log message
  * @return bool Success or failure
  */
@@ -20,6 +20,16 @@ function sendEmail($data, $email_type, $log_message) {
     $mail = new PHPMailer(true);
 
     try {
+        // Validate required fields
+        if (empty($data['to_email']) || empty($data['subject']) || empty($data['template_path'])) {
+            error_log("Missing required email data: " . json_encode([
+                'to_email' => isset($data['to_email']) ? $data['to_email'] : 'not set',
+                'subject' => isset($data['subject']) ? $data['subject'] : 'not set',
+                'template_path' => isset($data['template_path']) ? $data['template_path'] : 'not set'
+            ]));
+            throw new Exception('Missing required email data');
+        }
+
         $mail->isSMTP();
         $mail->Host = SMTP_HOST;
         $mail->SMTPAuth = true;
@@ -58,10 +68,12 @@ function sendEmail($data, $email_type, $log_message) {
         }
         ob_start();
         $template_data = $data['template_data'] ?? [];
+        error_log("sendEmail: Passing template_data to {$data['template_path']}: " . json_encode($template_data));
         include $data['template_path'];
         $mail->Body = ob_get_clean();
 
         if (empty($mail->Body)) {
+            error_log("Email body is empty for {$data['template_path']} - template rendering failed");
             throw new Exception('Email body is empty - template rendering failed');
         }
 
@@ -72,23 +84,29 @@ function sendEmail($data, $email_type, $log_message) {
             error_log("$log_message to: {$data['to_email']}");
             return true;
         } else {
-            logEmail($data['to_email'], $email_type, 'failed', "Failed to send $email_type email");
-            error_log("Failed to send $email_type email to: {$data['to_email']}");
+            logEmail($data['to_email'], $email_type, 'failed', "Failed to send $email_type email: {$mail->ErrorInfo}");
+            error_log("Failed to send $email_type email to: {$data['to_email']} - Error: {$mail->ErrorInfo}");
             return false;
         }
     } catch (Exception $e) {
-        logEmail($data['to_email'], $email_type, 'error', "PHPMailer Error: {$mail->ErrorInfo}");
-        error_log("PHPMailer Error ($email_type): {$mail->ErrorInfo}");
+        logEmail($data['to_email'], $email_type, 'error', "PHPMailer Error: {$e->getMessage()}");
+        error_log("PHPMailer Error ($email_type): {$e->getMessage()}");
         return false;
     }
 }
 
 /**
- * Send booking confirmation email
+ * Send booking confirmation email to passenger
  */
 function sendBookingConfirmationEmail($booking_data) {
+    // Validate booking_data
+    if (empty($booking_data['pnr']) || empty($booking_data['passenger_name'])) {
+        error_log("Invalid booking_data for sendBookingConfirmationEmail: " . json_encode($booking_data));
+        return false;
+    }
+
     $data = [
-        'to_email' => $booking_data['email'],
+        'to_email' => $booking_data['email'] ?? '',
         'to_name' => $booking_data['passenger_name'],
         'reply_to' => FROM_EMAIL,
         'reply_to_name' => FROM_NAME,
@@ -98,6 +116,66 @@ function sendBookingConfirmationEmail($booking_data) {
         'alt_body' => createPlainTextVersion($booking_data)
     ];
     return sendEmail($data, 'booking_confirmation', "Booking confirmation sent for PNR: {$booking_data['pnr']}");
+}
+
+/**
+ * Send booking confirmation notification to admin
+ */
+function sendAdminBookingNotificationEmail($booking_data_array, $total_amount, $payment_method, $payment_reference) {
+    // Validate booking_data_array
+    if (empty($booking_data_array) || !is_array($booking_data_array) || empty($booking_data_array[0]['pnr'])) {
+        error_log("Invalid booking_data_array for sendAdminBookingNotificationEmail: " . json_encode($booking_data_array));
+        return false;
+    }
+
+    $data = [
+        'to_email' => 'admin@dgctransports.com',
+        'to_name' => 'DGC Transports Admin',
+        'cc' => ['info.revamplabs@gmail.com'],
+        'reply_to' => FROM_EMAIL,
+        'reply_to_name' => FROM_NAME,
+        'subject' => 'New Booking Confirmation - PNR: ' . $booking_data_array[0]['pnr'] . ' - ' . SITE_NAME,
+        'template_path' => __DIR__ . '/templates/email_admin_booking_notification.php',
+        'template_data' => [
+            'bookings' => $booking_data_array,
+            'total_amount' => $total_amount,
+            'payment_method' => $payment_method,
+            'payment_reference' => $payment_reference
+        ],
+        'alt_body' => createPlainTextAdminBookingNotification($booking_data_array, $total_amount, $payment_method, $payment_reference)
+    ];
+    return sendEmail($data, 'admin_booking_notification', "Admin booking notification sent for PNR: {$booking_data_array[0]['pnr']}");
+}
+
+/**
+ * Create plain text version of admin booking notification
+ */
+function createPlainTextAdminBookingNotification($booking_data_array, $total_amount, $payment_method, $payment_reference) {
+    $text = SITE_NAME . " - New Booking Notification\n\n";
+    $text .= "A new booking has been confirmed:\n\n";
+    $text .= "--- Booking Details ---\n";
+    foreach ($booking_data_array as $index => $booking) {
+        $text .= "Passenger " . ($index + 1) . ":\n";
+        $text .= "Name: " . ($booking['passenger_name'] ?? 'N/A') . "\n";
+        $text .= "Email: " . ($booking['email'] ?? 'N/A') . "\n";
+        $text .= "Phone: " . ($booking['phone'] ?? 'N/A') . "\n";
+        $text .= "PNR: " . ($booking['pnr'] ?? 'N/A') . "\n";
+        $text .= "Seat: " . ($booking['seat_number'] ?? 'N/A') . "\n";
+        $text .= "Route: " . ($booking['trip']['pickup_city'] ?? 'N/A') . " to " . ($booking['trip']['dropoff_city'] ?? 'N/A') . "\n";
+        $text .= "Date: " . (isset($booking['trip']['trip_date']) ? date('M j, Y', strtotime($booking['trip']['trip_date'])) : 'N/A') . "\n";
+        $text .= "Departure: " . (isset($booking['trip']['departure_time']) ? date('h:i A', strtotime($booking['trip']['departure_time'])) : 'N/A') . "\n";
+        $text .= "Vehicle: " . ($booking['trip']['vehicle_type'] ?? 'N/A') . " - " . ($booking['trip']['vehicle_number'] ?? 'N/A') . "\n";
+        if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
+            $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
+        }
+        $text .= "\n";
+    }
+    $text .= "Total Amount: ₦" . number_format($total_amount, 0) . "\n";
+    $text .= "Payment Method: " . (ucfirst($payment_method) ?? 'N/A') . "\n";
+    $text .= "Payment Reference: " . ($payment_reference ?? 'N/A') . "\n\n";
+    $text .= "Please review the booking details in the admin panel.";
+    
+    return $text;
 }
 
 /**
@@ -117,8 +195,6 @@ function sendBookingCancellationEmail($booking_data) {
 
 /**
  * Send password email (set password or reset password)
- * @param array $reset_data Data including email, token, expires_at
- * @param string $type Either 'set_password' or 'forgot_password'
  */
 function sendPasswordEmail($reset_data, $type = 'set_password') {
     $script = $type === 'set_password' ? 'set_password.php' : 'reset_password.php';
@@ -138,20 +214,20 @@ function sendPasswordEmail($reset_data, $type = 'set_password') {
  */
 function createPlainTextVersion($booking) {
     $text = SITE_NAME . " - Booking Confirmation\n\n";
-    $text .= "Dear " . $booking['passenger_name'] . ",\n\n";
+    $text .= "Dear " . ($booking['passenger_name'] ?? 'N/A') . ",\n\n";
     $text .= "Your booking has been confirmed!\n\n";
-    $text .= "PNR: " . $booking['pnr'] . "\n";
-    $text .= "Route: " . $booking['trip']['pickup_city'] . " to " . $booking['trip']['dropoff_city'] . "\n";
-    $text .= "Date: " . date('M j, Y', strtotime($booking['trip']['trip_date'])) . "\n";
-    $text .= "Departure: " . date('h:i A', strtotime($booking['trip']['departure_time'] ?? '00:00')) . "\n";
+    $text .= "PNR: " . ($booking['pnr'] ?? 'N/A') . "\n";
+    $text .= "Route: " . ($booking['trip']['pickup_city'] ?? 'N/A') . " to " . ($booking['trip']['dropoff_city'] ?? 'N/A') . "\n";
+    $text .= "Date: " . (isset($booking['trip']['trip_date']) ? date('M j, Y', strtotime($booking['trip']['trip_date'])) : 'N/A') . "\n";
+    $text .= "Departure: " . (isset($booking['trip']['departure_time']) ? date('h:i A', strtotime($booking['trip']['departure_time'])) : 'N/A') . "\n";
     $text .= "Vehicle: " . ($booking['trip']['vehicle_type'] ?? 'N/A') . " - " . ($booking['trip']['vehicle_number'] ?? 'N/A') . "\n";
     
     if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
         $text .= "Driver: " . $booking['trip']['driver_name'] . "\n";
     }
     
-    $text .= "Seat: " . $booking['seat_number'] . "\n";
-    $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n";
+    $text .= "Seat: " . ($booking['seat_number'] ?? 'N/A') . "\n";
+    $text .= "Total Amount: ₦" . number_format($booking['total_amount'] ?? 0, 0) . "\n";
     $text .= "Payment Method: " . (isset($booking['payment_method']) ? ucfirst($booking['payment_method']) : 'N/A') . "\n";
     $text .= "Payment Reference: " . (isset($booking['payment_reference']) ? $booking['payment_reference'] : 'N/A') . "\n\n";
     $text .= "Please arrive at the terminal 30 minutes before departure.\n";
@@ -233,7 +309,7 @@ function testEmailConfiguration() {
 function sendCharterUserConfirmationEmail($charter_data) {
     $data = [
         'to_email' => $charter_data['email'],
-        'to_name' => $charter_data['full_name'], // Changed from 'name' to 'full_name'
+        'to_name' => $charter_data['full_name'],
         'reply_to' => FROM_EMAIL,
         'reply_to_name' => FROM_NAME,
         'subject' => 'Charter Request Received - ' . SITE_NAME,
@@ -248,17 +324,13 @@ function sendCharterUserConfirmationEmail($charter_data) {
  * Send charter request notification email to the admin
  */
 function sendCharterAdminNotificationEmail($charter_data) {
-    // Define the specific admin and staff emails
-    $admin_email = 'admin@dgctransports.com';
-    $staff_cc = ['staff@dgctransports.com'];
-
     $data = [
-        'to_email' => $admin_email,
+        'to_email' => 'admin@dgctransports.com',
         'to_name' => 'DGC Transports Admin',
-        'cc' => $staff_cc,
+        'cc' => ['info.revamplabs@gmail.com'],
         'reply_to' => $charter_data['email'],
-        'reply_to_name' => $charter_data['full_name'], // Changed from 'name' to 'full_name'
-        'subject' => 'NEW Charter Request Submitted by: ' . $charter_data['full_name'], // Changed from 'name' to 'full_name'
+        'reply_to_name' => $charter_data['full_name'],
+        'subject' => 'NEW Charter Request Submitted by: ' . $charter_data['full_name'],
         'template_path' => __DIR__ . '/templates/email_charter_admin_notification.php',
         'template_data' => $charter_data,
         'alt_body' => createPlainTextCharterAdminNotification($charter_data)
@@ -271,17 +343,17 @@ function sendCharterAdminNotificationEmail($charter_data) {
  */
 function createPlainTextCharterConfirmation($charter) {
     $text = SITE_NAME . " - Charter Request Received\n\n";
-    $text .= "Dear " . $charter['full_name'] . ",\n\n"; // Changed from 'name' to 'full_name'
+    $text .= "Dear " . ($charter['full_name'] ?? 'N/A') . ",\n\n";
     $text .= "Thank you for submitting your charter request. We will review the details and get back to you with a quote shortly.\n\n";
     $text .= "--- Your Request Details ---\n";
-    $text .= "Name: " . $charter['full_name'] . "\n"; // Changed from 'name' to 'full_name'
-    $text .= "Email: " . $charter['email'] . "\n";
+    $text .= "Name: " . ($charter['full_name'] ?? 'N/A') . "\n";
+    $text .= "Email: " . ($charter['email'] ?? 'N/A') . "\n";
     $text .= "Phone: " . ($charter['phone'] ?? 'N/A') . "\n";
-    $text .= "Route: " . $charter['pickup_location'] . " to " . $charter['dropoff_location'] . "\n";
-    $text .= "Departure Date: " . date('M j, Y', strtotime($charter['departure_date'])) . "\n";
-    $text .= "Passengers: " . $charter['num_seats'] . "\n"; // Changed from 'passengers' to 'num_seats'
+    $text .= "Route: " . ($charter['pickup_location'] ?? 'N/A') . " to " . ($charter['dropoff_location'] ?? 'N/A') . "\n";
+    $text .= "Departure Date: " . (isset($charter['departure_date']) ? date('M j, Y', strtotime($charter['departure_date'])) : 'N/A') . "\n";
+    $text .= "Passengers: " . ($charter['num_seats'] ?? 'N/A') . "\n";
     $text .= "Preferred Vehicle: " . ($charter['preferred_vehicle'] ?? 'Any') . "\n";
-    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n\n"; // Changed from 'additional_notes' to 'notes'
+    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n\n";
     $text .= "Thank you for choosing " . SITE_NAME . "!";
     
     return $text;
@@ -294,14 +366,14 @@ function createPlainTextCharterAdminNotification($charter) {
     $text = SITE_NAME . " - NEW Charter Request\n\n";
     $text .= "A new charter request has been submitted:\n\n";
     $text .= "--- Charter Request Details ---\n";
-    $text .= "Name: " . $charter['full_name'] . "\n"; // Changed from 'name' to 'full_name'
-    $text .= "Email: " . $charter['email'] . "\n";
+    $text .= "Name: " . ($charter['full_name'] ?? 'N/A') . "\n";
+    $text .= "Email: " . ($charter['email'] ?? 'N/A') . "\n";
     $text .= "Phone: " . ($charter['phone'] ?? 'N/A') . "\n";
-    $text .= "Route: " . $charter['pickup_location'] . " to " . $charter['dropoff_location'] . "\n";
-    $text .= "Departure Date: " . date('M j, Y', strtotime($charter['departure_date'])) . "\n";
-    $text .= "Passengers: " . $charter['num_seats'] . "\n"; // Changed from 'passengers' to 'num_seats'
+    $text .= "Route: " . ($charter['pickup_location'] ?? 'N/A') . " to " . ($charter['dropoff_location'] ?? 'N/A') . "\n";
+    $text .= "Departure Date: " . (isset($charter['departure_date']) ? date('M j, Y', strtotime($charter['departure_date'])) : 'N/A') . "\n";
+    $text .= "Passengers: " . ($charter['num_seats'] ?? 'N/A') . "\n";
     $text .= "Preferred Vehicle: " . ($charter['preferred_vehicle'] ?? 'Any') . "\n";
-    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n"; // Changed from 'additional_notes' to 'notes'
+    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n";
     $text .= "Submitted: " . date('Y-m-d H:i:s') . "\n\n";
     $text .= "Please contact the client to provide a quote.";
     

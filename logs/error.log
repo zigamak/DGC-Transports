@@ -2195,3 +2195,1232 @@ Stack trace:
 [28-Sep-2025 15:52:00 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
 [28-Sep-2025 15:52:00 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
 [28-Sep-2025 15:52:00 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:35:21 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 16:35:21 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Super Admin
+                    [seat_number] => 1
+                    [email] => admin@dgctransports.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 16:35:21 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 1
+        )
+
+)
+
+[28-Sep-2025 16:35:21 Europe/Berlin] Selected trip details: {"virtual_trip_id":"1-2025-09-29","template_id":1,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"07:00:00","arrival_time":"11:00:00"}
+[28-Sep-2025 16:35:21 Europe/Berlin] Created new trip instance with ID: 13 for template_id 1 and trip_date 2025-09-29
+[28-Sep-2025 16:35:21 Europe/Berlin] Created booking ID: 30 with PNR: D04876M for passenger: Super Admin
+[28-Sep-2025 16:35:21 Europe/Berlin] Successfully created 1 bookings: 30
+[28-Sep-2025 16:35:21 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 16:35:21 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 16:35:21 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:35:21 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:35:32 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 16:35:32 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d947a98a1e8_1759070121
+)
+
+[28-Sep-2025 16:35:32 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 1
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => Super Admin
+                    [email] => admin@dgctransports.com
+                    [phone] => +2348055614455
+                    [seat_number] => 1
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D04876M
+                    [booking_id] => 30
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 30
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D04876M
+        )
+
+    [total_amount] => 5000
+    [credits_used] => 0
+    [payment_reference] => DGC_68d947a98a1e8_1759070121
+)
+
+[28-Sep-2025 16:35:32 Europe/Berlin] Updated booking ID 30 to paid and confirmed (ref: DGC_68d947a98a1e8_1759070121)
+[28-Sep-2025 16:35:32 Europe/Berlin] Inserted payment for booking ID 30: method=card, ref=DGC_68d947a98a1e8_1759070121, amount=5000
+[28-Sep-2025 16:35:32 Europe/Berlin] Preparing to send email with data: {"email":"admin@dgctransports.com","passenger_name":"Super Admin","pnr":"D04876M","seat_number":"1","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d947a98a1e8_1759070121","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 16:35:37 Europe/Berlin] Booking confirmation sent for PNR: D04876M to: admin@dgctransports.com
+[28-Sep-2025 16:35:37 Europe/Berlin] Booking confirmation email sent successfully to: admin@dgctransports.com for PNR D04876M
+[28-Sep-2025 16:36:06 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 16:36:06 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Super Admin
+                    [seat_number] => 2
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 16:36:06 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D04876M
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D04876M
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D04876M
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 2
+        )
+
+)
+
+[28-Sep-2025 16:36:06 Europe/Berlin] Selected trip details: {"virtual_trip_id":"1-2025-09-29","template_id":1,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"07:00:00","arrival_time":"11:00:00"}
+[28-Sep-2025 16:36:06 Europe/Berlin] Found existing trip instance with ID: 13 for template_id 1 and trip_date 2025-09-29
+[28-Sep-2025 16:36:06 Europe/Berlin] Created booking ID: 31 with PNR: D03144V for passenger: Super Admin
+[28-Sep-2025 16:36:06 Europe/Berlin] Successfully created 1 bookings: 31
+[28-Sep-2025 16:36:06 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 16:36:06 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 16:36:06 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:36:06 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:36:15 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 16:36:15 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d947d69afa3_1759070166
+)
+
+[28-Sep-2025 16:36:15 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D03144V
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D04876M
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D04876M
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 2
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => Super Admin
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [seat_number] => 2
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D03144V
+                    [booking_id] => 31
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 31
+        )
+
+    [total_amount] => 5000
+    [payment_reference] => DGC_68d947d69afa3_1759070166
+)
+
+[28-Sep-2025 16:36:16 Europe/Berlin] Updated booking ID 31 to paid and confirmed (ref: DGC_68d947d69afa3_1759070166)
+[28-Sep-2025 16:36:16 Europe/Berlin] Inserted payment for booking ID 31: method=card, ref=DGC_68d947d69afa3_1759070166, amount=5000
+[28-Sep-2025 16:36:16 Europe/Berlin] Preparing to send email with data: {"email":"zigamakinde@gmail.com","passenger_name":"Super Admin","pnr":"D03144V","seat_number":"2","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d947d69afa3_1759070166","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 16:36:20 Europe/Berlin] Booking confirmation sent for PNR: D03144V to: zigamakinde@gmail.com
+[28-Sep-2025 16:36:20 Europe/Berlin] Booking confirmation email sent successfully to: zigamakinde@gmail.com for PNR D03144V
+[28-Sep-2025 16:43:17 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 16:43:17 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => Super Admin
+                    [seat_number] => 5
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 16:43:17 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D03144V
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D03144V
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D03144V
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 5
+        )
+
+)
+
+[28-Sep-2025 16:43:17 Europe/Berlin] Selected trip details: {"virtual_trip_id":"1-2025-09-29","template_id":1,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"07:00:00","arrival_time":"11:00:00"}
+[28-Sep-2025 16:43:17 Europe/Berlin] Found existing trip instance with ID: 13 for template_id 1 and trip_date 2025-09-29
+[28-Sep-2025 16:43:17 Europe/Berlin] Created booking ID: 32 with PNR: D04968Z for passenger: Super Admin
+[28-Sep-2025 16:43:17 Europe/Berlin] Successfully created 1 bookings: 32
+[28-Sep-2025 16:43:17 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 16:43:17 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 16:43:17 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:43:17 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 16:43:28 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 16:43:28 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d9498593ea7_1759070597
+)
+
+[28-Sep-2025 16:43:28 Europe/Berlin] Session data: Array
+(
+    [user] => Array
+        (
+            [id] => 3
+            [first_name] => Super
+            [last_name] => Admin
+            [email] => admin@dgctransports.com
+            [phone] => 
+            [password] => $2y$10$3oBSjw83..JpG8/.LIKHe.g5mpHH0gktVfv9k5raH0V.sY6WUnAYC
+            [role] => admin
+            [created_at] => 2025-09-23 10:50:02
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D04968Z
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D03144V
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D03144V
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 5
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => Super Admin
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [seat_number] => 5
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D04968Z
+                    [booking_id] => 32
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 32
+        )
+
+    [total_amount] => 5000
+    [payment_reference] => DGC_68d9498593ea7_1759070597
+)
+
+[28-Sep-2025 16:43:28 Europe/Berlin] Updated booking ID 32 to paid and confirmed (ref: DGC_68d9498593ea7_1759070597)
+[28-Sep-2025 16:43:28 Europe/Berlin] Inserted payment for booking ID 32: method=card, ref=DGC_68d9498593ea7_1759070597, amount=5000
+[28-Sep-2025 16:43:28 Europe/Berlin] Preparing to send email with data: {"email":"zigamakinde@gmail.com","passenger_name":"Super Admin","pnr":"D04968Z","seat_number":"5","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9498593ea7_1759070597","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 16:43:28 Europe/Berlin] PHP Warning:  Undefined array key "email" in C:\xampp\htdocs\dgctransports\includes\templates\email_booking_confirmation.php on line 326
+[28-Sep-2025 16:43:28 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\includes\templates\email_booking_confirmation.php on line 326
+[28-Sep-2025 16:43:28 Europe/Berlin] PHP Warning:  Undefined array key "phone" in C:\xampp\htdocs\dgctransports\includes\templates\email_booking_confirmation.php on line 330
+[28-Sep-2025 16:43:28 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\includes\templates\email_booking_confirmation.php on line 330
+[28-Sep-2025 16:43:32 Europe/Berlin] Booking confirmation sent for PNR: D04968Z to: zigamakinde@gmail.com
+[28-Sep-2025 16:43:32 Europe/Berlin] Booking confirmation email sent successfully to: zigamakinde@gmail.com for PNR D04968Z
+[28-Sep-2025 17:07:52 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function time_elapsed_string() in C:\xampp\htdocs\dgctransports\admin\view_bookings.php:691
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\dgctransports\admin\view_bookings.php on line 691
+[28-Sep-2025 17:08:04 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 17:08:04 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => VICTOR OLUWASEGUN MAKINDE
+                    [seat_number] => 3
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 17:08:04 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+)
+
+[28-Sep-2025 17:08:04 Europe/Berlin] Selected trip details: {"virtual_trip_id":"1-2025-09-29","template_id":1,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"07:00:00","arrival_time":"11:00:00"}
+[28-Sep-2025 17:08:04 Europe/Berlin] Found existing trip instance with ID: 13 for template_id 1 and trip_date 2025-09-29
+[28-Sep-2025 17:08:04 Europe/Berlin] Created booking ID: 33 with PNR: D51426T for passenger: VICTOR OLUWASEGUN MAKINDE
+[28-Sep-2025 17:08:04 Europe/Berlin] Successfully created 1 bookings: 33
+[28-Sep-2025 17:08:04 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 17:08:04 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 17:08:04 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:08:04 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:08:15 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 17:08:15 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d94f5468ef9_1759072084
+)
+
+[28-Sep-2025 17:08:15 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => VICTOR OLUWASEGUN MAKINDE
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [seat_number] => 3
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D51426T
+                    [booking_id] => 33
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 33
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D51426T
+        )
+
+    [total_amount] => 5000
+    [credits_used] => 0
+    [payment_reference] => DGC_68d94f5468ef9_1759072084
+)
+
+[28-Sep-2025 17:08:16 Europe/Berlin] Updated booking ID 33 to paid and confirmed (ref: DGC_68d94f5468ef9_1759072084)
+[28-Sep-2025 17:08:16 Europe/Berlin] Inserted payment for booking ID 33: method=card, ref=DGC_68d94f5468ef9_1759072084, amount=5000
+[28-Sep-2025 17:08:16 Europe/Berlin] Preparing to send email with data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D51426T","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d94f5468ef9_1759072084","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:08:16 Europe/Berlin] email_booking_confirmation.php received booking_data: []
+[28-Sep-2025 17:08:20 Europe/Berlin] Booking confirmation sent for PNR: D51426T to: zigamakinde@gmail.com
+[28-Sep-2025 17:08:20 Europe/Berlin] Booking confirmation email sent successfully to: zigamakinde@gmail.com for PNR D51426T
+[28-Sep-2025 17:13:38 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 17:13:38 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => VICTOR OLUWASEGUN MAKINDE
+                    [seat_number] => 4
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 17:13:38 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D51426T
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D51426T
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D51426T
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 4
+        )
+
+)
+
+[28-Sep-2025 17:13:38 Europe/Berlin] Selected trip details: {"virtual_trip_id":"1-2025-09-29","template_id":1,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"07:00:00","arrival_time":"11:00:00"}
+[28-Sep-2025 17:13:38 Europe/Berlin] Found existing trip instance with ID: 13 for template_id 1 and trip_date 2025-09-29
+[28-Sep-2025 17:13:38 Europe/Berlin] Created booking ID: 34 with PNR: D73665T for passenger: VICTOR OLUWASEGUN MAKINDE
+[28-Sep-2025 17:13:38 Europe/Berlin] Successfully created 1 bookings: 34
+[28-Sep-2025 17:13:38 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 17:13:38 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 17:13:38 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:13:38 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:13:49 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 17:13:49 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d950a2decff_1759072418
+)
+
+[28-Sep-2025 17:13:49 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D73665T
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D51426T
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D51426T
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 4
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => VICTOR OLUWASEGUN MAKINDE
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [seat_number] => 4
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D73665T
+                    [booking_id] => 34
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 34
+        )
+
+    [total_amount] => 5000
+    [payment_reference] => DGC_68d950a2decff_1759072418
+)
+
+[28-Sep-2025 17:13:50 Europe/Berlin] Updated booking ID 34 to paid and confirmed (ref: DGC_68d950a2decff_1759072418)
+[28-Sep-2025 17:13:50 Europe/Berlin] Inserted payment for booking ID 34: method=card, ref=DGC_68d950a2decff_1759072418, amount=5000
+[28-Sep-2025 17:13:50 Europe/Berlin] Preparing to send passenger email with data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D73665T","seat_number":"4","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:13:50 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D73665T","seat_number":"4","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:13:50 Europe/Berlin] email_booking_confirmation.php received booking_data: []
+[28-Sep-2025 17:13:54 Europe/Berlin] Booking confirmation sent for PNR: D73665T to: zigamakinde@gmail.com
+[28-Sep-2025 17:13:54 Europe/Berlin] Booking confirmation email sent successfully to: zigamakinde@gmail.com for PNR D73665T
+[28-Sep-2025 17:13:54 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_admin_booking_notification.php: {"bookings":[{"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D73665T","seat_number":"4","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}],"total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418"}
+[28-Sep-2025 17:13:54 Europe/Berlin] email_admin_booking_notification.php received template_data: {"bookings":[{"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D73665T","seat_number":"4","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}],"total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d950a2decff_1759072418"}
+[28-Sep-2025 17:13:59 Europe/Berlin] Admin booking notification sent for PNR: D73665T to: admin@dgctransports.com
+[28-Sep-2025 17:13:59 Europe/Berlin] Admin booking notification email sent successfully for PNR D73665T
+[28-Sep-2025 17:21:33 Europe/Berlin] process_booking.php accessed - Method: POST
+[28-Sep-2025 17:21:33 Europe/Berlin] POST data received: Array
+(
+    [free_booking] => 0
+    [passengers] => Array
+        (
+            [0] => Array
+                (
+                    [name] => VICTOR OLUWASEGUN MAKINDE
+                    [seat_number] => 3
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [emergency_contact] => 
+                )
+
+        )
+
+    [special_requests] => 
+    [referral_code] => 
+    [terms] => on
+)
+
+[28-Sep-2025 17:21:33 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D73665T
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D73665T
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D73665T
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-29
+            [template_id] => 2
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [user] => Array
+        (
+            [id] => 8
+            [first_name] => 
+            [last_name] => 
+            [email] => zigamakinde@gmail.com
+            [phone] => 
+            [password] => $2y$10$lw3en9OGTtrmEjfgu2juRePPnZgU/4dKHeWo9inRz6EDP55tDT4By
+            [role] => customer
+            [created_at] => 2025-09-28 14:10:50
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+)
+
+[28-Sep-2025 17:21:33 Europe/Berlin] Selected trip details: {"virtual_trip_id":"2-2025-09-29","template_id":2,"trip_date":"2025-09-29","num_seats":1,"price":5000,"pickup_city_id":1,"dropoff_city_id":2,"pickup_city":"Abuja","dropoff_city":"Jos","capacity":5,"vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":null,"departure_time":"09:00:00","arrival_time":"13:00:00"}
+[28-Sep-2025 17:21:33 Europe/Berlin] Created new trip instance with ID: 14 for template_id 2 and trip_date 2025-09-29
+[28-Sep-2025 17:21:33 Europe/Berlin] Created booking ID: 35 with PNR: D61449G for passenger: VICTOR OLUWASEGUN MAKINDE
+[28-Sep-2025 17:21:33 Europe/Berlin] Successfully created 1 bookings: 35
+[28-Sep-2025 17:21:33 Europe/Berlin] Total amount to pay (after credits): ₦5000, Credits used: ₦0
+[28-Sep-2025 17:21:33 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 49
+[28-Sep-2025 17:21:33 Europe/Berlin] PHP Warning:  Undefined array key "name" in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:21:33 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\paystack.php on line 168
+[28-Sep-2025 17:21:44 Europe/Berlin] verify_payment.php accessed - Method: POST
+[28-Sep-2025 17:21:44 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_68d9527d8cb41_1759072893
+)
+
+[28-Sep-2025 17:21:44 Europe/Berlin] Session data: Array
+(
+    [search] => Array
+        (
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [departure_date] => 2025-09-29
+            [vehicle_type_id] => 1
+            [num_seats] => 1
+        )
+
+    [pnrs] => Array
+        (
+            [0] => D61449G
+        )
+
+    [credits_used] => 0
+    [confirmed_pnrs] => Array
+        (
+            [0] => D73665T
+        )
+
+    [confirmed_trip] => Array
+        (
+            [virtual_trip_id] => 1-2025-09-29
+            [template_id] => 1
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 07:00:00
+            [arrival_time] => 11:00:00
+        )
+
+    [confirmed_total_amount] => 5000
+    [first_pnr] => D73665T
+    [selected_trip] => Array
+        (
+            [virtual_trip_id] => 2-2025-09-29
+            [template_id] => 2
+            [trip_date] => 2025-09-29
+            [num_seats] => 1
+            [price] => 5000
+            [pickup_city_id] => 1
+            [dropoff_city_id] => 2
+            [pickup_city] => Abuja
+            [dropoff_city] => Jos
+            [capacity] => 5
+            [vehicle_type] => 5 Seater Car
+            [vehicle_number] => CAR001
+            [driver_name] => 
+            [departure_time] => 09:00:00
+            [arrival_time] => 13:00:00
+        )
+
+    [user] => Array
+        (
+            [id] => 8
+            [first_name] => 
+            [last_name] => 
+            [email] => zigamakinde@gmail.com
+            [phone] => 
+            [password] => $2y$10$lw3en9OGTtrmEjfgu2juRePPnZgU/4dKHeWo9inRz6EDP55tDT4By
+            [role] => customer
+            [created_at] => 2025-09-28 14:10:50
+            [affiliate_id] => 
+            [credits] => 0.00
+        )
+
+    [selected_seats] => Array
+        (
+            [0] => 3
+        )
+
+    [passenger_details] => Array
+        (
+            [0] => Array
+                (
+                    [passenger_name] => VICTOR OLUWASEGUN MAKINDE
+                    [email] => zigamakinde@gmail.com
+                    [phone] => +2348055614455
+                    [seat_number] => 3
+                    [emergency_contact] => 
+                    [special_requests] => 
+                    [pnr] => D61449G
+                    [booking_id] => 35
+                )
+
+        )
+
+    [booking_ids] => Array
+        (
+            [0] => 35
+        )
+
+    [total_amount] => 5000
+    [payment_reference] => DGC_68d9527d8cb41_1759072893
+)
+
+[28-Sep-2025 17:21:45 Europe/Berlin] Updated booking ID 35 to paid and confirmed (ref: DGC_68d9527d8cb41_1759072893)
+[28-Sep-2025 17:21:45 Europe/Berlin] Inserted payment for booking ID 35: method=card, ref=DGC_68d9527d8cb41_1759072893, amount=5000
+[28-Sep-2025 17:21:45 Europe/Berlin] Preparing to send passenger email with data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D61449G","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:21:45 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D61449G","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:21:45 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D61449G","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}
+[28-Sep-2025 17:21:49 Europe/Berlin] Booking confirmation sent for PNR: D61449G to: zigamakinde@gmail.com
+[28-Sep-2025 17:21:49 Europe/Berlin] Booking confirmation email sent successfully to: zigamakinde@gmail.com for PNR D61449G
+[28-Sep-2025 17:21:49 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_admin_booking_notification.php: {"bookings":[{"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D61449G","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}],"total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893"}
+[28-Sep-2025 17:21:49 Europe/Berlin] email_admin_booking_notification.php received template_data: {"bookings":[{"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"D61449G","seat_number":"3","total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893","phone":"+2348055614455","emergency_contact":"","special_requests":"","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2025-09-29","departure_time":"09:00:00","vehicle_type":"5 Seater Car","vehicle_number":"CAR001","driver_name":""}}],"total_amount":5000,"payment_method":"card","payment_reference":"DGC_68d9527d8cb41_1759072893"}
+[28-Sep-2025 17:21:54 Europe/Berlin] Admin booking notification sent for PNR: D61449G to: admin@dgctransports.com
+[28-Sep-2025 17:21:54 Europe/Berlin] Admin booking notification email sent successfully for PNR D61449G
