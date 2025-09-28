@@ -56,8 +56,12 @@ require_once __DIR__ . '/../includes/auth.php';
                 <?php else: ?>
                     <a href="<?= SITE_URL ?>" class="hover:text-primary transition-colors duration-200 font-semibold">Book a Trip</a>
                     <a href="<?= SITE_URL ?>/bookings/manage_booking.php" class="hover:text-primary transition-colors duration-200 font-semibold">Manage Booking</a>
+                    <a href="<?= SITE_URL ?>/about-us.php" class="hover:text-primary transition-colors duration-200 font-semibold">About Us</a>
                     <a href="<?= SITE_URL ?>/contact.php" class="hover:text-primary transition-colors duration-200 font-semibold">Contact Us</a>
+                    <a href="<?= SITE_URL ?>/charter.php" class="hover:text-primary transition-colors duration-200 font-semibold">Charter a Vehicle</a>
                     <a href="<?= SITE_URL ?>/login.php" class="hover:text-primary transition-colors duration-200 font-semibold">Login</a>
+                    <a href="<?= SITE_URL ?>/signup.php" class="hover:text-primary transition-colors duration-200 font-semibold">Sign Up</a>
+
                 <?php endif; ?>
             </nav>
 

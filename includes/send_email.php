@@ -1,4 +1,6 @@
 <?php
+// includes/send_email.php
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
@@ -7,13 +9,16 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 /**
- * Send booking confirmation email
+ * Generic function to send emails
+ * @param array $data Email data (to_email, to_name, subject, template_path, template_data)
+ * @param string $email_type Type of email for logging (e.g., 'contact_user', 'contact_admin')
+ * @param string $log_message Custom log message
+ * @return bool Success or failure
  */
-function sendBookingConfirmationEmail($booking_data) {
+function sendEmail($data, $email_type, $log_message) {
     global $conn;
-    
     $mail = new PHPMailer(true);
-    
+
     try {
         $mail->isSMTP();
         $mail->Host = SMTP_HOST;
@@ -24,204 +29,108 @@ function sendBookingConfirmationEmail($booking_data) {
         $mail->Port = SMTP_PORT;
 
         $mail->setFrom(FROM_EMAIL, FROM_NAME);
-        $mail->addAddress($booking_data['email'], $booking_data['passenger_name']);
-        $mail->addReplyTo(FROM_EMAIL, FROM_NAME);
+        $mail->addAddress($data['to_email'], $data['to_name'] ?? '');
+        if (!empty($data['reply_to'])) {
+            $mail->addReplyTo($data['reply_to'], $data['reply_to_name'] ?? FROM_NAME);
+        }
 
-        $mail->isHTML(true);
-        $mail->Subject = 'Booking Confirmation - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME;
+        // Add CC addresses
+        if (!empty($data['cc']) && is_array($data['cc'])) {
+            foreach ($data['cc'] as $cc_email) {
+                $mail->addCC($cc_email);
+            }
+        }
+
+        // Add BCC addresses
+        if (!empty($data['bcc']) && is_array($data['bcc'])) {
+            foreach ($data['bcc'] as $bcc_email) {
+                $mail->addBCC($bcc_email);
+            }
+        }
         
-        $mail->Body = renderBookingConfirmationTemplate($booking_data);
+        $mail->isHTML(true);
+        $mail->Subject = $data['subject'];
+
+        // Render email body from template
+        if (!file_exists($data['template_path'])) {
+            error_log("Email template not found: {$data['template_path']}");
+            throw new Exception('Email template not found');
+        }
+        ob_start();
+        $template_data = $data['template_data'] ?? [];
+        include $data['template_path'];
+        $mail->Body = ob_get_clean();
+
         if (empty($mail->Body)) {
             throw new Exception('Email body is empty - template rendering failed');
         }
-        
-        $mail->AltBody = createPlainTextVersion($booking_data);
 
-        $result = $mail->send();
-        
-        if ($result) {
-            logEmail($booking_data['email'], 'booking_confirmation', 'sent', 'Booking confirmation sent for PNR: ' . $booking_data['pnr']);
-            error_log("Booking confirmation email sent successfully to: " . $booking_data['email']);
+        $mail->AltBody = $data['alt_body'] ?? 'This is a plain-text version of the email.';
+
+        if ($mail->send()) {
+            logEmail($data['to_email'], $email_type, 'sent', $log_message);
+            error_log("$log_message to: {$data['to_email']}");
             return true;
         } else {
-            logEmail($booking_data['email'], 'booking_confirmation', 'failed', 'Failed to send booking confirmation');
-            error_log("Failed to send booking confirmation email to: " . $booking_data['email']);
+            logEmail($data['to_email'], $email_type, 'failed', "Failed to send $email_type email");
+            error_log("Failed to send $email_type email to: {$data['to_email']}");
             return false;
         }
-        
     } catch (Exception $e) {
-        logEmail($booking_data['email'], 'booking_confirmation', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+        logEmail($data['to_email'], $email_type, 'error', "PHPMailer Error: {$mail->ErrorInfo}");
+        error_log("PHPMailer Error ($email_type): {$mail->ErrorInfo}");
         return false;
     }
+}
+
+/**
+ * Send booking confirmation email
+ */
+function sendBookingConfirmationEmail($booking_data) {
+    $data = [
+        'to_email' => $booking_data['email'],
+        'to_name' => $booking_data['passenger_name'],
+        'reply_to' => FROM_EMAIL,
+        'reply_to_name' => FROM_NAME,
+        'subject' => 'Booking Confirmation - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME,
+        'template_path' => __DIR__ . '/templates/email_booking_confirmation.php',
+        'template_data' => $booking_data,
+        'alt_body' => createPlainTextVersion($booking_data)
+    ];
+    return sendEmail($data, 'booking_confirmation', "Booking confirmation sent for PNR: {$booking_data['pnr']}");
 }
 
 /**
  * Send booking cancellation email
  */
 function sendBookingCancellationEmail($booking_data) {
-    global $conn;
-    
-    $mail = new PHPMailer(true);
-    
-    try {
-        $mail->isSMTP();
-        $mail->Host = SMTP_HOST;
-        $mail->SMTPAuth = true;
-        $mail->Username = SMTP_USERNAME;
-        $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = SMTP_SECURE;
-        $mail->Port = SMTP_PORT;
-
-        $mail->setFrom(FROM_EMAIL, FROM_NAME);
-        $mail->addAddress($booking_data['email'], $booking_data['passenger_name']);
-
-        $mail->isHTML(true);
-        $mail->Subject = 'Booking Cancelled - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME;
-        
-        $mail->Body = renderCancellationTemplate($booking_data);
-        if (empty($mail->Body)) {
-            throw new Exception('Cancellation email body is empty - template rendering failed');
-        }
-        
-        $mail->AltBody = 'Your booking with PNR ' . $booking_data['pnr'] . ' has been cancelled.';
-
-        $result = $mail->send();
-        
-        if ($result) {
-            logEmail($booking_data['email'], 'booking_cancellation', 'sent', 'Booking cancellation sent for PNR: ' . $booking_data['pnr']);
-            return true;
-        } else {
-            logEmail($booking_data['email'], 'booking_cancellation', 'failed', 'Failed to send booking cancellation');
-            return false;
-        }
-        
-    } catch (Exception $e) {
-        logEmail($booking_data['email'], 'booking_cancellation', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
-        return false;
-    }
+    $data = [
+        'to_email' => $booking_data['email'],
+        'to_name' => $booking_data['passenger_name'],
+        'subject' => 'Booking Cancelled - PNR: ' . $booking_data['pnr'] . ' - ' . SITE_NAME,
+        'template_path' => __DIR__ . '/templates/email_booking_cancellation.php',
+        'template_data' => $booking_data,
+        'alt_body' => 'Your booking with PNR ' . $booking_data['pnr'] . ' has been cancelled.'
+    ];
+    return sendEmail($data, 'booking_cancellation', "Booking cancellation sent for PNR: {$booking_data['pnr']}");
 }
 
 /**
- * Send set password email
+ * Send password email (set password or reset password)
+ * @param array $reset_data Data including email, token, expires_at
+ * @param string $type Either 'set_password' or 'forgot_password'
  */
-function sendPasswordResetEmail($reset_data) {
-    global $conn;
-    
-    $mail = new PHPMailer(true);
-    
-    try {
-        $mail->isSMTP();
-        $mail->Host = SMTP_HOST;
-        $mail->SMTPAuth = true;
-        $mail->Username = SMTP_USERNAME;
-        $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = SMTP_SECURE;
-        $mail->Port = SMTP_PORT;
-
-        $mail->setFrom(FROM_EMAIL, FROM_NAME);
-        $mail->addAddress($reset_data['email']);
-
-        $mail->isHTML(true);
-        $mail->Subject = 'Set Up Your Password - ' . SITE_NAME;
-        
-        $mail->Body = renderPasswordResetTemplate($reset_data);
-        if (empty($mail->Body)) {
-            throw new Exception('Set password email body is empty - template rendering failed');
-        }
-        
-        $mail->AltBody = "Your account has been created.\n\nClick the following link to set up your password: " . SITE_URL . "/set_password.php?token={$reset_data['token']}\n\nThis link expires at {$reset_data['expires_at']}.";
-
-        $result = $mail->send();
-        
-        if ($result) {
-            logEmail($reset_data['email'], 'set_password', 'sent', 'Set password link sent to: ' . $reset_data['email']);
-            error_log("Set password email sent successfully to: " . $reset_data['email']);
-            return true;
-        } else {
-            logEmail($reset_data['email'], 'set_password', 'failed', 'Failed to send set password link');
-            error_log("Failed to send set password email to: " . $reset_data['email']);
-            return false;
-        }
-        
-    } catch (Exception $e) {
-        logEmail($reset_data['email'], 'set_password', 'error', 'PHPMailer Error: ' . $mail->ErrorInfo);
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
-        return false;
-    }
-}
-
-/**
- * Render booking confirmation email template
- */
-function renderBookingConfirmationTemplate($booking) {
-    $template_path = __DIR__ . '/templates/email_booking_confirmation.php';
-    if (!file_exists($template_path)) {
-        error_log("Email template not found: $template_path");
-        return '';
-    }
-    
-    ob_start();
-    try {
-        include $template_path;
-        $content = ob_get_clean();
-        if (empty($content)) {
-            error_log("Email template rendered empty content: $template_path");
-        }
-        return $content;
-    } catch (Exception $e) {
-        error_log("Error rendering email template ($template_path): " . $e->getMessage());
-        ob_end_clean();
-        return '';
-    }
-}
-
-/**
- * Render booking cancellation email template
- */
-function renderCancellationTemplate($booking) {
-    $html = '
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa;">
-        <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px;">' . SITE_NAME . '</h1>
-            <p style="margin: 5px 0 0 0;">Booking Cancellation</p>
-        </div>
-        <div style="padding: 30px; background: white;">
-            <h2 style="color: #dc2626; margin-bottom: 20px;">Booking Cancelled</h2>
-            <p>Dear ' . htmlspecialchars($booking['passenger_name']) . ',</p>
-            <p>Your booking with PNR <strong>' . htmlspecialchars($booking['pnr']) . '</strong> has been cancelled.</p>
-            <p>If you have any questions, please contact our support team.</p>
-            <p>Thank you for choosing ' . SITE_NAME . '.</p>
-        </div>
-    </div>';
-    
-    return $html;
-}
-
-/**
- * Render set password email template
- */
-function renderPasswordResetTemplate($reset_data) {
-    $template_path = __DIR__ . '/templates/email_set_password.php';
-    if (!file_exists($template_path)) {
-        error_log("Email template not found: $template_path");
-        return '';
-    }
-    
-    ob_start();
-    try {
-        include $template_path;
-        $content = ob_get_clean();
-        if (empty($content)) {
-            error_log("Email template rendered empty content: $template_path");
-        }
-        return $content;
-    } catch (Exception $e) {
-        error_log("Error rendering email template ($template_path): " . $e->getMessage());
-        ob_end_clean();
-        return '';
-    }
+function sendPasswordEmail($reset_data, $type = 'set_password') {
+    $script = $type === 'set_password' ? 'set_password.php' : 'reset_password.php';
+    $action = $type === 'set_password' ? 'set up your password' : 'reset your password';
+    $data = [
+        'to_email' => $reset_data['email'],
+        'subject' => $type === 'set_password' ? 'Set Up Your Password - ' . SITE_NAME : 'Password Reset Request - ' . SITE_NAME,
+        'template_path' => __DIR__ . '/templates/email_' . $type . '.php',
+        'template_data' => $reset_data,
+        'alt_body' => ($type === 'set_password' ? 'Your account has been created' : 'You requested a password reset') . ".\n\nClick the following link to $action: " . SITE_URL . "/$script?token={$reset_data['token']}\n\nThis link expires at {$reset_data['expires_at']}.\n\nIf you did not request this, please ignore this email."
+    ];
+    return sendEmail($data, $type, ucfirst(str_replace('_', ' ', $type)) . " link sent to: {$reset_data['email']}");
 }
 
 /**
@@ -234,7 +143,7 @@ function createPlainTextVersion($booking) {
     $text .= "PNR: " . $booking['pnr'] . "\n";
     $text .= "Route: " . $booking['trip']['pickup_city'] . " to " . $booking['trip']['dropoff_city'] . "\n";
     $text .= "Date: " . date('M j, Y', strtotime($booking['trip']['trip_date'])) . "\n";
-    $text .= "Departure: " . date('h:i A', strtotime($booking['trip']['departure_time'] ?? '00:00')) . "\n"; // FIXED: Use 12-hour format
+    $text .= "Departure: " . date('h:i A', strtotime($booking['trip']['departure_time'] ?? '00:00')) . "\n";
     $text .= "Vehicle: " . ($booking['trip']['vehicle_type'] ?? 'N/A') . " - " . ($booking['trip']['vehicle_number'] ?? 'N/A') . "\n";
     
     if (isset($booking['trip']['driver_name']) && !empty($booking['trip']['driver_name'])) {
@@ -243,8 +152,8 @@ function createPlainTextVersion($booking) {
     
     $text .= "Seat: " . $booking['seat_number'] . "\n";
     $text .= "Total Amount: ₦" . number_format($booking['total_amount'], 0) . "\n";
-    $text .= "Payment Method: " . (isset($booking['payment_method']) ? ucfirst($booking['payment_method']) : 'N/A') . "\n"; // NEW: Include payment_method
-    $text .= "Payment Reference: " . (isset($booking['payment_reference']) ? $booking['payment_reference'] : 'N/A') . "\n\n"; // NEW: Include payment_reference
+    $text .= "Payment Method: " . (isset($booking['payment_method']) ? ucfirst($booking['payment_method']) : 'N/A') . "\n";
+    $text .= "Payment Reference: " . (isset($booking['payment_reference']) ? $booking['payment_reference'] : 'N/A') . "\n\n";
     $text .= "Please arrive at the terminal 30 minutes before departure.\n";
     $text .= "Bring a valid ID for verification.\n\n";
     $text .= "Thank you for choosing " . SITE_NAME . "!";
@@ -316,5 +225,86 @@ function testEmailConfiguration() {
     } catch (Exception $e) {
         return ['success' => false, 'message' => 'SMTP Error: ' . $e->getMessage()];
     }
+}
+
+/**
+ * Send charter request submission email to the user
+ */
+function sendCharterUserConfirmationEmail($charter_data) {
+    $data = [
+        'to_email' => $charter_data['email'],
+        'to_name' => $charter_data['full_name'], // Changed from 'name' to 'full_name'
+        'reply_to' => FROM_EMAIL,
+        'reply_to_name' => FROM_NAME,
+        'subject' => 'Charter Request Received - ' . SITE_NAME,
+        'template_path' => __DIR__ . '/templates/email_charter_user_confirmation.php',
+        'template_data' => $charter_data,
+        'alt_body' => createPlainTextCharterConfirmation($charter_data)
+    ];
+    return sendEmail($data, 'charter_user_confirmation', "Charter request confirmation sent to: {$charter_data['email']}");
+}
+
+/**
+ * Send charter request notification email to the admin
+ */
+function sendCharterAdminNotificationEmail($charter_data) {
+    // Define the specific admin and staff emails
+    $admin_email = 'admin@dgctransports.com';
+    $staff_cc = ['staff@dgctransports.com'];
+
+    $data = [
+        'to_email' => $admin_email,
+        'to_name' => 'DGC Transports Admin',
+        'cc' => $staff_cc,
+        'reply_to' => $charter_data['email'],
+        'reply_to_name' => $charter_data['full_name'], // Changed from 'name' to 'full_name'
+        'subject' => 'NEW Charter Request Submitted by: ' . $charter_data['full_name'], // Changed from 'name' to 'full_name'
+        'template_path' => __DIR__ . '/templates/email_charter_admin_notification.php',
+        'template_data' => $charter_data,
+        'alt_body' => createPlainTextCharterAdminNotification($charter_data)
+    ];
+    return sendEmail($data, 'charter_admin_notification', "New charter request notification sent to admin/staff.");
+}
+
+/**
+ * Create plain text version of the user charter confirmation
+ */
+function createPlainTextCharterConfirmation($charter) {
+    $text = SITE_NAME . " - Charter Request Received\n\n";
+    $text .= "Dear " . $charter['full_name'] . ",\n\n"; // Changed from 'name' to 'full_name'
+    $text .= "Thank you for submitting your charter request. We will review the details and get back to you with a quote shortly.\n\n";
+    $text .= "--- Your Request Details ---\n";
+    $text .= "Name: " . $charter['full_name'] . "\n"; // Changed from 'name' to 'full_name'
+    $text .= "Email: " . $charter['email'] . "\n";
+    $text .= "Phone: " . ($charter['phone'] ?? 'N/A') . "\n";
+    $text .= "Route: " . $charter['pickup_location'] . " to " . $charter['dropoff_location'] . "\n";
+    $text .= "Departure Date: " . date('M j, Y', strtotime($charter['departure_date'])) . "\n";
+    $text .= "Passengers: " . $charter['num_seats'] . "\n"; // Changed from 'passengers' to 'num_seats'
+    $text .= "Preferred Vehicle: " . ($charter['preferred_vehicle'] ?? 'Any') . "\n";
+    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n\n"; // Changed from 'additional_notes' to 'notes'
+    $text .= "Thank you for choosing " . SITE_NAME . "!";
+    
+    return $text;
+}
+
+/**
+ * Create plain text version of the admin charter notification
+ */
+function createPlainTextCharterAdminNotification($charter) {
+    $text = SITE_NAME . " - NEW Charter Request\n\n";
+    $text .= "A new charter request has been submitted:\n\n";
+    $text .= "--- Charter Request Details ---\n";
+    $text .= "Name: " . $charter['full_name'] . "\n"; // Changed from 'name' to 'full_name'
+    $text .= "Email: " . $charter['email'] . "\n";
+    $text .= "Phone: " . ($charter['phone'] ?? 'N/A') . "\n";
+    $text .= "Route: " . $charter['pickup_location'] . " to " . $charter['dropoff_location'] . "\n";
+    $text .= "Departure Date: " . date('M j, Y', strtotime($charter['departure_date'])) . "\n";
+    $text .= "Passengers: " . $charter['num_seats'] . "\n"; // Changed from 'passengers' to 'num_seats'
+    $text .= "Preferred Vehicle: " . ($charter['preferred_vehicle'] ?? 'Any') . "\n";
+    $text .= "Additional Notes: " . ($charter['notes'] ?? 'None') . "\n"; // Changed from 'additional_notes' to 'notes'
+    $text .= "Submitted: " . date('Y-m-d H:i:s') . "\n\n";
+    $text .= "Please contact the client to provide a quote.";
+    
+    return $text;
 }
 ?>

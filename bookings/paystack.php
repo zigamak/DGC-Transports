@@ -1,5 +1,5 @@
 <?php
-// bookings/paystack.php - Corrected version for your database schema
+// bookings/paystack.php - Updated version with subaccount and payment splitting
 ob_start(); // Start output buffering
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -9,6 +9,7 @@ ini_set('error_log', __DIR__ . '/../logs/error.log');
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
+require_once '../includes/auth.php';
 require_once '../templates/header.php';
 
 // Check if all required data is available
@@ -46,6 +47,19 @@ $amount_in_kobo = $total_amount * 100;
 $primary_passenger = reset($passenger_details);
 $email = $primary_passenger['email'];
 $passenger_name = $primary_passenger['name'];
+
+// Load subaccount and split payment configuration
+$subaccount_code = defined('PAYSTACK_SUBACCOUNT_CODE') ? PAYSTACK_SUBACCOUNT_CODE : 'ACCT_3k06e4jqesf2v3u';
+$split_percentage = defined('PAYSTACK_SPLIT_PERCENTAGE') ? (int)PAYSTACK_SPLIT_PERCENTAGE : 100;
+
+// Validate split percentage
+if ($split_percentage < 0 || $split_percentage > 100) {
+    error_log("Invalid PAYSTACK_SPLIT_PERCENTAGE: $split_percentage. Using default 100.");
+    $split_percentage = 100;
+}
+
+// Calculate transaction charge for subaccount (in kobo)
+$transaction_charge = ($split_percentage / 100) * $amount_in_kobo;
 
 ob_end_flush(); // End output buffering
 ?>
@@ -327,6 +341,8 @@ ob_end_flush(); // End output buffering
                 amount: <?php echo json_encode($amount_in_kobo); ?>,
                 currency: 'NGN',
                 ref: <?php echo json_encode($reference); ?>,
+                subaccount: <?php echo json_encode($subaccount_code); ?>,
+                transaction_charge: <?php echo json_encode((int)$transaction_charge); ?>,
                 metadata: {
                     custom_fields: [
                         {

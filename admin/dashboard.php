@@ -90,7 +90,7 @@ if ($template_id) {
 }
 
 // Build the WHERE clause for filtering recent trips
-$where_conditions = ["ti.status = 'active'"];
+$where_conditions = ["ti.status = 'active'", "ti.trip_date >= CURRENT_DATE"];
 $params = [];
 $param_types = "";
 if ($template_id) {
@@ -578,7 +578,7 @@ $stmt->close();
                         <div>
                             <h2 class="text-lg md:text-xl font-bold text-gray-900">
                                 <i class="fas fa-route text-primary-red mr-2"></i>
-                                Recent Trips
+                                Upcoming Trips
                             </h2>
                             <p class="text-sm text-gray-600 mt-1">
                                 Showing <?= count($recent_trips) ?> of <?= $total_trips_count ?> upcoming scheduled trips

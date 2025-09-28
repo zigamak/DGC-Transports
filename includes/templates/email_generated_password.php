@@ -1,5 +1,8 @@
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa;">
     <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 20px; text-align: center;">
+        <a href="<?= SITE_URL ?>/index.php" style="display: inline-block; margin-bottom: 10px;">
+            <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="DGC Transports Logo" style="max-height: 50px;" onerror="this.src='https://via.placeholder.com/120x32?text=DGC';">
+        </a>
         <h1 style="margin: 0; font-size: 24px;"><?php echo SITE_NAME; ?></h1>
         <p style="margin: 5px 0 0 0;">Welcome to Your Account</p>
     </div>
