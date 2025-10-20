@@ -223,21 +223,42 @@ if (isset($_SESSION['referral_message'])) {
                                 </h3>
                                 
                                 <div class="space-y-4">
-                                    <div>
-                                        <label for="passenger_name_<?= $i ?>" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-user text-primary mr-2"></i>Full Name *
-                                        </label>
-                                        <input type="text" 
-                                               class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent" 
-                                               id="passenger_name_<?= $i ?>" 
-                                               name="passengers[<?= $i ?>][name]" 
-                                               required
-                                               placeholder="Enter full name as it appears on ID"
-                                               <?php if ($i === 0 && $is_logged_in): ?>
-                                                   value="<?= htmlspecialchars($_SESSION['user']['first_name'] . ' ' . $_SESSION['user']['last_name']) ?>"
-                                               <?php endif; ?>>
-                                        <input type="hidden" name="passengers[<?= $i ?>][seat_number]" value="<?= $selected_seats[$i] ?>">
+                                    <!-- First Name and Last Name Fields -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="passenger_first_name_<?= $i ?>" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                <i class="fas fa-user text-primary mr-2"></i>First Name *
+                                            </label>
+                                            <input type="text" 
+                                                   class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent" 
+                                                   id="passenger_first_name_<?= $i ?>" 
+                                                   name="passengers[<?= $i ?>][first_name]" 
+                                                   required
+                                                   placeholder="Enter first name"
+                                                   <?php if ($i === 0 && $is_logged_in): ?>
+                                                       value="<?= htmlspecialchars($_SESSION['user']['first_name']) ?>"
+                                                   <?php endif; ?>>
+                                        </div>
+                                        
+                                        <div>
+                                            <label for="passenger_last_name_<?= $i ?>" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                <i class="fas fa-user text-primary mr-2"></i>Last Name *
+                                            </label>
+                                            <input type="text" 
+                                                   class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent" 
+                                                   id="passenger_last_name_<?= $i ?>" 
+                                                   name="passengers[<?= $i ?>][last_name]" 
+                                                   required
+                                                   placeholder="Enter last name"
+                                                   <?php if ($i === 0 && $is_logged_in): ?>
+                                                       value="<?= htmlspecialchars($_SESSION['user']['last_name']) ?>"
+                                                   <?php endif; ?>>
+                                        </div>
                                     </div>
+                                    
+                                    <!-- Hidden field to combine first and last name for backward compatibility -->
+                                    <input type="hidden" id="passenger_name_<?= $i ?>" name="passengers[<?= $i ?>][name]" value="">
+                                    <input type="hidden" name="passengers[<?= $i ?>][seat_number]" value="<?= $selected_seats[$i] ?>">
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -273,13 +294,14 @@ if (isset($_SESSION['referral_message'])) {
 
                                     <div>
                                         <label for="emergency_contact_<?= $i ?>" class="block text-sm font-semibold text-gray-700 mb-2">
-                                            <i class="fas fa-user-friends text-primary mr-2"></i>Emergency Contact (Optional)
+                                            <i class="fas fa-user-friends text-primary mr-2"></i>Emergency Contact (Next of Kin) *
                                         </label>
                                         <input type="text" 
                                                class="form-input w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent" 
                                                id="emergency_contact_<?= $i ?>" 
                                                name="passengers[<?= $i ?>][emergency_contact]"
-                                               placeholder="Emergency contact name and phone">
+                                               required
+                                               placeholder="Next of Kin name and phone number">
                                     </div>
 
                                     <?php if ($i === 0): ?>
@@ -448,6 +470,100 @@ if (isset($_SESSION['referral_message'])) {
             }
         }
 
+        // Combine first and last name before form submission
+        document.getElementById('passengerForm').addEventListener('submit', function(e) {
+            const passengers = <?= $num_seats ?>;
+            
+            // Combine first and last names into the hidden name field
+            for (let i = 0; i < passengers; i++) {
+                const firstName = document.getElementById(`passenger_first_name_${i}`).value.trim();
+                const lastName = document.getElementById(`passenger_last_name_${i}`).value.trim();
+                document.getElementById(`passenger_name_${i}`).value = `${firstName} ${lastName}`;
+            }
+            
+            // Continue with validation
+            let isValid = true;
+            let firstInvalidField = null;
+
+            // Validate each passenger
+            for (let i = 0; i < passengers; i++) {
+                const firstName = document.getElementById(`passenger_first_name_${i}`).value.trim();
+                const lastName = document.getElementById(`passenger_last_name_${i}`).value.trim();
+                const email = document.getElementById(`email_${i}`).value.trim();
+                const phone = document.getElementById(`phone_${i}`).value.trim();
+                const emergencyContact = document.getElementById(`emergency_contact_${i}`).value.trim();
+
+                if (!firstName) {
+                    isValid = false;
+                    alert(`Please fill in the first name for Passenger ${i + 1}.`);
+                    firstInvalidField = document.getElementById(`passenger_first_name_${i}`);
+                    break;
+                }
+                
+                if (!lastName) {
+                    isValid = false;
+                    alert(`Please fill in the last name for Passenger ${i + 1}.`);
+                    firstInvalidField = document.getElementById(`passenger_last_name_${i}`);
+                    break;
+                }
+
+                // Email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!email || !emailRegex.test(email)) {
+                    isValid = false;
+                    alert(`Please enter a valid email address for Passenger ${i + 1}.`);
+                    firstInvalidField = document.getElementById(`email_${i}`);
+                    break;
+                }
+
+                // Phone validation
+                const phoneRegex = /^\+?[0-9\s\-\(\)]{10,}$/;
+                if (!phone || !phoneRegex.test(phone)) {
+                    isValid = false;
+                    alert(`Please enter a valid phone number (at least 10 digits) for Passenger ${i + 1}.`);
+                    firstInvalidField = document.getElementById(`phone_${i}`);
+                    break;
+                }
+                
+                // Emergency contact validation (now required)
+                if (!emergencyContact) {
+                    isValid = false;
+                    alert(`Please fill in the emergency contact (Next of Kin) for Passenger ${i + 1}.`);
+                    firstInvalidField = document.getElementById(`emergency_contact_${i}`);
+                    break;
+                }
+            }
+
+            // Check terms and conditions
+            const terms = document.getElementById('terms').checked;
+            if (!terms) {
+                isValid = false;
+                alert('Please accept the Terms and Conditions to proceed.');
+                firstInvalidField = document.getElementById('terms');
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                if (firstInvalidField) {
+                    firstInvalidField.focus();
+                }
+                // Re-enable submit button
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                if (submitBtn && !submitBtn.name) {
+                    submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i><?= $free_booking ? "Confirm Free Booking" : "Proceed to Payment - ₦" . number_format($total_amount, 0) ?>';
+                    submitBtn.disabled = false;
+                }
+                return false;
+            }
+
+            // Show loading state for main submit
+            const submitBtn = e.target.querySelector('button[type="submit"]:not([name="apply_referral"])');
+            if (submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing Booking...';
+                submitBtn.disabled = true;
+            }
+        });
+
         // Toggle Login/Signup Forms
         const showLoginBtn = document.getElementById('showLogin');
         const showSignupBtn = document.getElementById('showSignup');
@@ -581,79 +697,6 @@ if (isset($_SESSION['referral_message'])) {
                 applyBtn.innerHTML = 'Apply';
                 messageDiv.innerHTML = '<p class="text-red-500 text-sm">Error checking referral code. Please try again.</p>';
             });
-        });
-
-        // No need to update total amount since no discount is applied
-        function updateTotalAmount() {
-            // No action needed
-        }
-
-        // Passenger Form Validation
-        document.getElementById('passengerForm').addEventListener('submit', function(e) {
-            let isValid = true;
-            const passengers = <?= $num_seats ?>;
-            let firstInvalidField = null;
-
-            // Validate each passenger
-            for (let i = 0; i < passengers; i++) {
-                const name = document.getElementById(`passenger_name_${i}`).value.trim();
-                const email = document.getElementById(`email_${i}`).value.trim();
-                const phone = document.getElementById(`phone_${i}`).value.trim();
-
-                if (!name) {
-                    isValid = false;
-                    alert(`Please fill in the name for Passenger ${i + 1}.`);
-                    firstInvalidField = document.getElementById(`passenger_name_${i}`);
-                    break;
-                }
-
-                // Email validation
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!email || !emailRegex.test(email)) {
-                    isValid = false;
-                    alert(`Please enter a valid email address for Passenger ${i + 1}.`);
-                    firstInvalidField = document.getElementById(`email_${i}`);
-                    break;
-                }
-
-                // Phone validation
-                const phoneRegex = /^\+?[0-9\s\-\(\)]{10,}$/;
-                if (!phone || !phoneRegex.test(phone)) {
-                    isValid = false;
-                    alert(`Please enter a valid phone number (at least 10 digits) for Passenger ${i + 1}.`);
-                    firstInvalidField = document.getElementById(`phone_${i}`);
-                    break;
-                }
-            }
-
-            // Check terms and conditions
-            const terms = document.getElementById('terms').checked;
-            if (!terms) {
-                isValid = false;
-                alert('Please accept the Terms and Conditions to proceed.');
-                firstInvalidField = document.getElementById('terms');
-            }
-
-            if (!isValid) {
-                e.preventDefault();
-                if (firstInvalidField) {
-                    firstInvalidField.focus();
-                }
-                // Re-enable submit button
-                const submitBtn = e.target.querySelector('button[type="submit"]');
-                if (submitBtn && !submitBtn.name) {
-                    submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i><?= $free_booking ? "Confirm Free Booking" : "Proceed to Payment - ₦" . number_format($total_amount, 0) ?>';
-                    submitBtn.disabled = false;
-                }
-                return false;
-            }
-
-            // Show loading state for main submit
-            const submitBtn = e.target.querySelector('button[type="submit"]:not([name="apply_referral"])');
-            if (submitBtn) {
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing Booking...';
-                submitBtn.disabled = true;
-            }
         });
 
         // Auto-fill email and phone for subsequent passengers

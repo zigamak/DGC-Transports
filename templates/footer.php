@@ -23,6 +23,9 @@
                         <i class="fab fa-whatsapp text-lg"></i>
                     </a>
                 </div>
+                  <span class="block mt-2 md:mt-0 md:ml-3 text-gray-400">
+                    Abuja Address: Beside Kwalika Park, Area 1, after Pedestrian Bridge.
+                </span>
             </div>
 
             <div class="space-y-6">
@@ -57,12 +60,9 @@
                 <ul class="space-y-3">
                     <li><a href="<?= SITE_URL ?>/" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Book a Trip</a></li>
                     <li><a href="<?= SITE_URL ?>/bookings/manage_booking.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Manage Booking</a></li>
-
                     <li><a href="<?= SITE_URL ?>/about-us.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">About Us</a></li>
                     <li><a href="<?= SITE_URL ?>/contact.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Contact Us</a></li>
                     <li><a href="<?= SITE_URL ?>/Charter.php" class="text-gray-300 hover:text-blue-500 transition-colors duration-300">Charter a Vehicle</a></li>
-
-
                 </ul>
             </div>
 
@@ -77,9 +77,14 @@
         </div>
 
         <div class="mt-12 text-center text-sm border-t border-gray-700 pt-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p class="flex items-center justify-center text-gray-500">
-                Copyright © 2025 DGC Transport Services.
-                <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="DGC Logo" class="h-8 ml-3 mr-1 transition-transform duration-300 hover:scale-105">
+            <p class="flex flex-col md:flex-row items-center justify-center text-gray-500 text-center md:text-left">
+                <span>
+                    Copyright © 2025 DGC Transport Services.
+                </span>
+                <span class="flex items-center mt-2 md:mt-0 md:ml-3">
+                    <img src="<?= SITE_URL ?>/assets/images/logo.png" alt="DGC Logo" class="h-8 ml-0 md:ml-3 mr-1 transition-transform duration-300 hover:scale-105">
+                </span>
+              
             </p>
             <div class="flex space-x-6 text-gray-500">
                 <a href="<?= SITE_URL ?>/privacy-policy.php" class="hover:text-blue-500 transition-colors duration-300">Privacy Policy</a>

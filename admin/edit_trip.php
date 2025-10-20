@@ -17,8 +17,8 @@ $trip = null;
 if ($trip_id > 0) {
     $stmt = $conn->prepare("
         SELECT pickup_city_id, dropoff_city_id, vehicle_type_id, vehicle_id, 
-               time_slot_id, price, recurrence_type, recurrence_days, start_date, end_date
-        FROM trip_templates WHERE id = ? AND status = 'active'
+               time_slot_id, price, recurrence_type, recurrence_days, start_date, end_date, status
+        FROM trip_templates WHERE id = ?
     ");
     $stmt->bind_param("i", $trip_id);
     $stmt->execute();
@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $time_slot_id = (int)$_POST['time_slot_id'];
     $price = (float)$_POST['price'];
     $recurrence_type = sanitizeInput($_POST['recurrence_type']);
+    $status = sanitizeInput($_POST['status']);
     $start_date = $_POST['start_date'];
     $recurrence_days = isset($_POST['recurrence_days']) ? implode(',', $_POST['recurrence_days']) : '';
     
@@ -63,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_date = $end_date_obj->format('Y-m-d');
 
     // Validate inputs
-    if ($pickup_city_id && $dropoff_city_id && $vehicle_type_id && $vehicle_id && $time_slot_id && $price > 0 && $start_date) {
+    if ($pickup_city_id && $dropoff_city_id && $vehicle_type_id && $vehicle_id && $time_slot_id && $price > 0 && $start_date && in_array($status, ['active', 'inactive', 'cancelled'])) {
         if ($pickup_city_id === $dropoff_city_id) {
             $error = 'Pickup and dropoff cities cannot be the same.';
         } else {
@@ -72,23 +73,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 UPDATE trip_templates SET
                     pickup_city_id = ?, dropoff_city_id = ?, vehicle_type_id = ?, vehicle_id = ?, 
                     time_slot_id = ?, price = ?, recurrence_type = ?, recurrence_days = ?, 
-                    start_date = ?, end_date = ?
+                    start_date = ?, end_date = ?, status = ?
                 WHERE id = ?
             ");
-           $stmt->bind_param(
-    "iiiiidsssi", // 5 integers, 1 double, 4 strings
-    $pickup_city_id,
-    $dropoff_city_id,
-    $vehicle_type_id,
-    $vehicle_id,
-    $time_slot_id,
-    $price,
-    $recurrence_type,
-    $recurrence_days,
-    $start_date,
-    $end_date,
-    $trip_id // Missing type: 'i'
-);
+            $stmt->bind_param(
+                "iiiiidssssi", 
+                $pickup_city_id,
+                $dropoff_city_id,
+                $vehicle_type_id,
+                $vehicle_id,
+                $time_slot_id,
+                $price,
+                $recurrence_type,
+                $recurrence_days,
+                $start_date,
+                $end_date,
+                $status,
+                $trip_id
+            );
             if ($stmt->execute()) {
                 $stmt->close();
                 header('Location: ' . SITE_URL . '/admin/trips.php?success=1');
@@ -334,6 +336,16 @@ $recurrence_days_array = $trip['recurrence_days'] ? explode(',', $trip['recurren
                             <label for="start_date" class="form-label block">Start Date</label>
                             <input type="date" id="start_date" name="start_date" class="form-input" 
                                    min="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($trip['start_date']) ?>" required>
+                        </div>
+
+                        <!-- Status -->
+                        <div>
+                            <label for="status" class="form-label block">Status</label>
+                            <select id="status" name="status" class="form-input" required>
+                                <option value="active" <?= $trip['status'] == 'active' ? 'selected' : '' ?>>Active</option>
+                                <option value="inactive" <?= $trip['status'] == 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                                <option value="cancelled" <?= $trip['status'] == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                            </select>
                         </div>
 
                         <!-- Recurrence Type -->

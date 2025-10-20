@@ -69,7 +69,7 @@ if (!$dropoff_city_query) {
     $dropoff_city_query->close();
 }
 
-// Query to fetch valid trip templates and instances, including arrival time
+// Query to fetch valid trip templates and instances
 $trips_query = "
     SELECT 
         CONCAT(tt.id, '-', ?) AS virtual_trip_id,
@@ -82,7 +82,6 @@ $trips_query = "
         vt.capacity,
         tt.price,
         ts.departure_time,
-        ts.arrival_time,
         ? AS trip_date,
         COALESCE(COUNT(b.id), 0) AS booked_seats_count,
         (vt.capacity - COALESCE(COUNT(b.id), 0)) AS available_seats
@@ -104,7 +103,6 @@ $trips_query = "
             OR (tt.recurrence_type = 'year' AND DATE_FORMAT(?, '%m-%d') = DATE_FORMAT(tt.start_date, '%m-%d'))
         )
     GROUP BY tt.id, v.id, vt.id, ts.id, ti.id
-    HAVING available_seats >= ?
     ORDER BY ts.departure_time
 ";
 
@@ -114,7 +112,7 @@ if (!$stmt) {
     $error = "An error occurred while fetching trips. Please try again.";
 } else {
     $stmt->bind_param(
-        "ssssiiissssi",
+        "ssssiiissss",
         $search['departure_date'],
         $search['departure_date'],
         $search['departure_date'],
@@ -125,8 +123,7 @@ if (!$stmt) {
         $search['departure_date'],
         $search['departure_date'],
         $search['departure_date'],
-        $search['departure_date'],
-        $search['num_seats']
+        $search['departure_date']
     );
     if (!$stmt->execute()) {
         error_log("Trips query execute failed: " . $stmt->error);
@@ -154,7 +151,6 @@ if (empty($trips)) {
             vt.capacity,
             tt.price,
             ts.departure_time,
-            ts.arrival_time,
             ti.trip_date,
             COALESCE(COUNT(b.id), 0) AS booked_seats_count,
             (vt.capacity - COALESCE(COUNT(b.id), 0)) AS available_seats
@@ -169,7 +165,6 @@ if (empty($trips)) {
             AND tt.status = 'active'
             AND ti.trip_date BETWEEN ? AND ?
         GROUP BY tt.id, v.id, vt.id, ts.id, ti.id, ti.trip_date
-        HAVING available_seats >= ?
         ORDER BY ti.trip_date, ts.departure_time
         LIMIT 5
     ";
@@ -178,7 +173,7 @@ if (empty($trips)) {
         error_log("Similar trips query prepare failed: " . $conn->error);
     } else {
         $stmt->bind_param(
-            "ssiissi",
+            "ssiissii",
             $date_range_start,
             $date_range_end,
             $date_range_start,
@@ -186,8 +181,7 @@ if (empty($trips)) {
             $search['pickup_city_id'],
             $search['dropoff_city_id'],
             $date_range_start,
-            $date_range_end,
-            $search['num_seats']
+            $date_range_end
         );
         if (!$stmt->execute()) {
             error_log("Similar trips query execute failed: " . $stmt->error);
@@ -300,6 +294,10 @@ if (empty($trips)) {
             background-color: #fee2e2;
             color: #991b1b;
         }
+        .seat-badge.fully-booked {
+            background-color: #e5e7eb;
+            color: #4b5563;
+        }
         .info-panel {
             background-color: var(--white);
             border: 1px solid #e5e7eb;
@@ -356,22 +354,13 @@ if (empty($trips)) {
                         <h3 class="text-2xl font-bold text-slate-800 mb-4 border-l-4 border-primary-red pl-4">Similar Trips Available</h3>
                         <div class="space-y-6">
                             <?php foreach ($similar_trips as $trip): ?>
-                                <div class="card p-4 md:p-6" onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')">
+                                <div class="card p-4 md:p-6" <?php if ($trip['available_seats'] >= $search['num_seats']): ?>onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')"<?php endif; ?>>
                                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                                         <div class="md:col-span-2">
                                             <div class="flex items-center space-x-4 mb-2">
                                                 <div>
-                                                    <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['departure_time'])) ?></div>
+                                                    <div class="text-2xl font-bold text-slate-800"><?= date('gA', strtotime($trip['departure_time'])) ?></div>
                                                     <div class="text-sm text-gray-500">Departure</div>
-                                                </div>
-                                                <div class="flex-1 flex items-center relative">
-                                                    <div class="w-3 h-3 bg-primary-red rounded-full"></div>
-                                                    <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
-                                                    <div class="w-3 h-3 bg-primary-red rounded-full"></div>
-                                                </div>
-                                                <div>
-                                                    <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['arrival_time'])) ?></div>
-                                                    <div class="text-sm text-gray-500">Arrival</div>
                                                 </div>
                                             </div>
                                             <div class="text-sm text-gray-600 mt-2">
@@ -385,14 +374,17 @@ if (empty($trips)) {
                                         </div>
                                         <div class="text-center">
                                             <?php
-                                                $seats_class = 'low';
+                                                $seats_class = $trip['available_seats'] == 0 ? 'fully-booked' : 'low';
                                                 if ($trip['available_seats'] > 5) {
                                                     $seats_class = 'high';
                                                 } elseif ($trip['available_seats'] > 2) {
                                                     $seats_class = 'medium';
                                                 }
                                             ?>
-                                            <span class="seat-badge <?= $seats_class ?>"><i class="fas fa-chair mr-2"></i><?= $trip['available_seats'] ?> seats left</span>
+                                            <span class="seat-badge <?= $seats_class ?>">
+                                                <i class="fas fa-chair mr-2"></i>
+                                                <?= $trip['available_seats'] == 0 ? 'Fully Booked' : $trip['available_seats'] . ' seats left' ?>
+                                            </span>
                                         </div>
                                         <div class="text-center">
                                             <div class="text-3xl font-bold text-primary-red mb-1">
@@ -401,9 +393,11 @@ if (empty($trips)) {
                                             <div class="text-sm text-gray-500">
                                                 ₦<?= number_format($trip['price'], 0) ?> per seat
                                             </div>
-                                            <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
-                                                <i class="fas fa-ticket-alt mr-2"></i>Book Now
-                                            </button>
+                                            <?php if ($trip['available_seats'] >= $search['num_seats']): ?>
+                                                <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
+                                                    <i class="fas fa-ticket-alt mr-2"></i>Book Now
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -414,22 +408,13 @@ if (empty($trips)) {
             <?php else: ?>
                 <div class="space-y-6">
                     <?php foreach ($trips as $trip): ?>
-                        <div class="card p-4 md:p-6" onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')">
+                        <div class="card p-4 md:p-6" <?php if ($trip['available_seats'] >= $search['num_seats']): ?>onclick="selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')"<?php endif; ?>>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                                 <div class="md:col-span-2">
                                     <div class="flex items-center space-x-4 mb-2">
                                         <div>
-                                            <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['departure_time'])) ?></div>
+                                            <div class="text-2xl font-bold text-slate-800"><?= date('gA', strtotime($trip['departure_time'])) ?></div>
                                             <div class="text-sm text-gray-500">Departure</div>
-                                        </div>
-                                        <div class="flex-1 flex items-center relative">
-                                            <div class="w-3 h-3 bg-primary-red rounded-full"></div>
-                                            <div class="flex-1 h-1 bg-gray-300 mx-2"></div>
-                                            <div class="w-3 h-3 bg-primary-red rounded-full"></div>
-                                        </div>
-                                        <div>
-                                            <div class="text-2xl font-bold text-slate-800"><?= date('H:i', strtotime($trip['arrival_time'])) ?></div>
-                                            <div class="text-sm text-gray-500">Arrival</div>
                                         </div>
                                     </div>
                                     <div class="text-sm text-gray-600 mt-2">
@@ -439,14 +424,17 @@ if (empty($trips)) {
                                 </div>
                                 <div class="text-center">
                                     <?php
-                                        $seats_class = 'low';
+                                        $seats_class = $trip['available_seats'] == 0 ? 'fully-booked' : 'low';
                                         if ($trip['available_seats'] > 5) {
                                             $seats_class = 'high';
                                         } elseif ($trip['available_seats'] > 2) {
                                             $seats_class = 'medium';
                                         }
                                     ?>
-                                    <span class="seat-badge <?= $seats_class ?>"><i class="fas fa-chair mr-2"></i><?= $trip['available_seats'] ?> seats left</span>
+                                    <span class="seat-badge <?= $seats_class ?>">
+                                        <i class="fas fa-chair mr-2"></i>
+                                        <?= $trip['available_seats'] == 0 ? 'Fully Booked' : $trip['available_seats'] . ' seats left' ?>
+                                    </span>
                                 </div>
                                 <div class="text-center">
                                     <div class="text-3xl font-bold text-primary-red mb-1">
@@ -455,9 +443,11 @@ if (empty($trips)) {
                                     <div class="text-sm text-gray-500">
                                         ₦<?= number_format($trip['price'], 0) ?> per seat
                                     </div>
-                                    <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
-                                        <i class="fas fa-ticket-alt mr-2"></i>Book Now
-                                    </button>
+                                    <?php if ($trip['available_seats'] >= $search['num_seats']): ?>
+                                        <button onclick="event.stopPropagation(); selectTrip('<?= $trip['virtual_trip_id'] ?>', <?= $search['num_seats'] ?>, <?= $trip['price'] ?>, <?= $trip['template_id'] ?>, '<?= $trip['trip_date'] ?>')" class="btn-primary w-full mt-3">
+                                            <i class="fas fa-ticket-alt mr-2"></i>Book Now
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

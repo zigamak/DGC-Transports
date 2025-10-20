@@ -54,7 +54,7 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
 
     $table_check = $conn->query("SHOW TABLES LIKE 'vehicle_types'");
     if ($table_check && $table_check->num_rows > 0) {
-        $vehicle_types_result = $conn->query("SELECT id, type, capacity FROM vehicle_types ORDER BY type");
+       $vehicle_types_result = $conn->query("SELECT id, type, capacity FROM vehicle_types WHERE status = 'active' ORDER BY type");
         if ($vehicle_types_result) {
             while ($vehicle = $vehicle_types_result->fetch_assoc()) {
                 $vehicle_types[$vehicle['id']] = $vehicle;
@@ -292,7 +292,8 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="container w-full">
             <div class="card overflow-hidden fade-in">
-                <div class="grid lg:grid-cols-2 gap-0">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-0">
+                    
                     <div class="p-8 lg:p-12">
                         <div class="max-w-md mx-auto">
                             <div class="flex border-b mb-8">
@@ -360,14 +361,14 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                                             <i class="fas fa-bus text-primary-red mr-2"></i>
                                             Vehicle
                                         </label>
-                                        <select class="input-field" id="vehicle_type_id" name="vehicle_type_id" required aria-label="Vehicle type" onchange="updateMaxSeats()">
-                                            <option value="">Choose vehicle</option>
-                                            <?php foreach ($vehicle_types as $vehicle): ?>
-                                                <option value="<?= $vehicle['id'] ?>" data-capacity="<?= $vehicle['capacity'] ?>">
-                                                    <?= htmlspecialchars($vehicle['type']) ?> (<?= $vehicle['capacity'] ?> seats)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                      <select class="input-field" id="vehicle_type_id" name="vehicle_type_id" required aria-label="Vehicle type" onchange="updateMaxSeats()">
+    <option value="">Choose vehicle</option>
+    <?php foreach ($vehicle_types as $vehicle): ?>
+        <option value="<?= $vehicle['id'] ?>" data-capacity="<?= $vehicle['capacity'] ?>">
+            <?= htmlspecialchars($vehicle['type']) ?> (<?= $vehicle['capacity'] ?> seats)
+        </option>
+    <?php endforeach; ?>
+</select>
                                     </div>
                                     <div class="form-group">
                                         <label for="num_seats" class="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
@@ -396,7 +397,8 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                             </form>
                         </div>
                     </div>
-                    <div id="heroImageSlider" class="hero-image-slider relative hidden lg:flex items-center justify-center min-h-[450px]">
+                    
+                    <div id="heroImageSlider" class="hero-image-slider relative flex items-center justify-center min-h-[300px] lg:min-h-[450px]">
                         <?php 
                         // PHP to output all slides
                         foreach (IMAGE_SLIDES as $index => $image_path) {
@@ -407,40 +409,41 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                         ?>
                         <div class="slide-overlay"></div>
                         <div class="relative z-10 p-8 text-center text-white">
-                            <i class="fas fa-bus text-8xl text-primary-red mb-6"></i>
-                            <h2 class="text-4xl font-bold mb-4">Premium Travel Experience</h2>
-                            <p class="text-xl text-gray-200 mb-6">Safe, comfortable, and reliable transportation between cities</p>
-                            <div class="grid grid-cols-1 gap-6 max-w-sm mx-auto">
-                                <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-primary-red rounded-full flex items-center justify-center mr-4">
-                                        <i class="fas fa-shield-alt text-xl"></i>
+                            <i class="fas fa-bus text-6xl sm:text-8xl text-primary-red mb-6"></i>
+                            <h2 class="text-3xl sm:text-4xl font-bold mb-4">Premium Travel Experience</h2>
+                            <p class="text-md sm:text-xl text-gray-200 mb-6">Safe, comfortable, and reliable transportation between cities</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+                                <div class="flex items-center justify-center sm:block sm:text-left">
+                                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-primary-red rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-shield-alt text-lg sm:text-xl"></i>
                                     </div>
-                                    <div class="text-left">
-                                        <h3 class="font-semibold">Safe & Secure</h3>
-                                        <p class="text-gray-300 text-sm">Professional drivers</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-primary-red rounded-full flex items-center justify-center mr-4">
-                                        <i class="fas fa-clock text-xl"></i>
-                                    </div>
-                                    <div class="text-left">
-                                        <h3 class="font-semibold">On-Time Service</h3>
-                                        <p class="text-gray-300 text-sm">Punctual departures</p>
+                                    <div class="mt-2 sm:mt-0">
+                                        <h3 class="font-semibold text-sm">Safe & Secure</h3>
+                                        <p class="text-gray-300 text-xs">Professional drivers</p>
                                     </div>
                                 </div>
-                                <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-primary-red rounded-full flex items-center justify-center mr-4">
-                                        <i class="fas fa-star text-xl"></i>
+                                <div class="flex items-center justify-center sm:block sm:text-left">
+                                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-primary-red rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-clock text-lg sm:text-xl"></i>
                                     </div>
-                                    <div class="text-left">
-                                        <h3 class="font-semibold">Premium Comfort</h3>
-                                        <p class="text-gray-300 text-sm">Luxury vehicles</p>
+                                    <div class="mt-2 sm:mt-0">
+                                        <h3 class="font-semibold text-sm">On-Time Service</h3>
+                                        <p class="text-gray-300 text-xs">Punctual departures</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-center sm:block sm:text-left">
+                                    <div class="w-10 h-10 sm:w-12 sm:h-12 bg-primary-red rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-star text-lg sm:text-xl"></i>
+                                    </div>
+                                    <div class="mt-2 sm:mt-0">
+                                        <h3 class="font-semibold text-sm">Premium Comfort</h3>
+                                        <p class="text-gray-300 text-xs">Luxury vehicles</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </div>
@@ -478,7 +481,7 @@ if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
                     const option = new Option(city.text, city.value);
                     dropoffSelect.add(option);
                     if (city.value === currentDropoffValue) {
-                         newDropoffValue = currentDropoffValue;
+                        newDropoffValue = currentDropoffValue;
                     }
                 }
             });
