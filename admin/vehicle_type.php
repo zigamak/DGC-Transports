@@ -8,12 +8,17 @@ require_once '../includes/functions.php';
 // Enforce admin-only access
 requireRole('admin', '/login.php');
 
-// Handle form submission for adding vehicle type
+// Initialize variables
 $errors = [];
 $success = '';
+$edit_mode = false;
+$edit_vehicle_type = null;
+
+// Handle form submission for adding vehicle type
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_vehicle_type'])) {
     $type = trim($_POST['type'] ?? '');
     $capacity = (int)($_POST['capacity'] ?? 0);
+    $status = $_POST['status'] ?? 'active';
 
     // Validate inputs
     if (empty($type)) {
@@ -31,15 +36,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_vehicle_type'])) 
     if ($capacity <= 0) {
         $errors[] = 'Capacity must be a positive number.';
     }
+    if (!in_array($status, ['active', 'inactive'])) {
+        $errors[] = 'Invalid status selected.';
+    }
 
     // Insert vehicle type if no errors
     if (empty($errors)) {
-        $stmt = $conn->prepare("INSERT INTO vehicle_types (type, capacity) VALUES (?, ?)");
-        $stmt->bind_param("si", $type, $capacity);
+        $stmt = $conn->prepare("INSERT INTO vehicle_types (type, capacity, status) VALUES (?, ?, ?)");
+        $stmt->bind_param("sis", $type, $capacity, $status);
         if ($stmt->execute()) {
             $success = 'Vehicle type added successfully.';
         } else {
             $errors[] = 'Failed to add vehicle type. Please try again.';
+        }
+        $stmt->close();
+    }
+}
+
+// Handle edit request (populate form with existing data)
+if (isset($_GET['edit_id'])) {
+    $edit_id = (int)$_GET['edit_id'];
+    $stmt = $conn->prepare("SELECT id, type, capacity, status FROM vehicle_types WHERE id = ?");
+    $stmt->bind_param("i", $edit_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $edit_vehicle_type = $result->fetch_assoc();
+        $edit_mode = true;
+    } else {
+        $errors[] = 'Vehicle type not found.';
+    }
+    $stmt->close();
+}
+
+// Handle form submission for editing vehicle type
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_vehicle_type'])) {
+    $id = (int)($_POST['id'] ?? 0);
+    $type = trim($_POST['type'] ?? '');
+    $capacity = (int)($_POST['capacity'] ?? 0);
+    $status = $_POST['status'] ?? 'active';
+
+    // Validate inputs
+    if (empty($type)) {
+        $errors[] = 'Vehicle type is required.';
+    } else {
+        // Check if type is unique (excluding current record)
+        $stmt = $conn->prepare("SELECT id FROM vehicle_types WHERE type = ? AND id != ?");
+        $stmt->bind_param("si", $type, $id);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) {
+            $errors[] = 'Vehicle type already exists.';
+        }
+        $stmt->close();
+    }
+    if ($capacity <= 0) {
+        $errors[] = 'Capacity must be a positive number.';
+    }
+    if (!in_array($status, ['active', 'inactive'])) {
+        $errors[] = 'Invalid status selected.';
+    }
+
+    // Update vehicle type if no errors
+    if (empty($errors)) {
+        $stmt = $conn->prepare("UPDATE vehicle_types SET type = ?, capacity = ?, status = ? WHERE id = ?");
+        $stmt->bind_param("sisi", $type, $capacity, $status, $id);
+        if ($stmt->execute()) {
+            $success = 'Vehicle type updated successfully.';
+            $edit_mode = false;
+            $edit_vehicle_type = null;
+        } else {
+            $errors[] = 'Failed to update vehicle type. Please try again.';
         }
         $stmt->close();
     }
@@ -59,7 +125,7 @@ if (isset($_GET['delete_id'])) {
 }
 
 // Fetch vehicle types
-$vehicle_types_query = "SELECT id, type, capacity FROM vehicle_types ORDER BY type";
+$vehicle_types_query = "SELECT id, type, capacity, status FROM vehicle_types ORDER BY type";
 $vehicle_types_result = $conn->query($vehicle_types_query);
 $vehicle_types = [];
 while ($row = $vehicle_types_result->fetch_assoc()) {
@@ -99,7 +165,7 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         
-        .form-input {
+        .form-input, .form-select {
             border: 1px solid #d1d5db;
             border-radius: 6px;
             padding: 8px 12px;
@@ -108,7 +174,7 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
             transition: all 0.2s ease;
         }
         
-        .form-input:focus {
+        .form-input:focus, .form-select:focus {
             outline: none;
             border-color: #e30613;
             box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
@@ -132,6 +198,20 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
         
         .btn-primary:hover {
             background: #c70410;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
             transform: translateY(-1px);
         }
         
@@ -191,12 +271,12 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
                     </div>
                 </div>
 
-                <!-- Add Vehicle Type Form -->
+                <!-- Add/Edit Vehicle Type Form -->
                 <div class="bg-white rounded-xl card-shadow mb-8">
                     <div class="p-4 md:p-6 border-b border-gray-200">
                         <h2 class="text-lg md:text-xl font-bold text-gray-900">
                             <i class="fas fa-plus text-primary-red mr-2"></i>
-                            Add New Vehicle Type
+                            <?= $edit_mode ? 'Edit Vehicle Type' : 'Add New Vehicle Type' ?>
                         </h2>
                     </div>
                     <div class="p-4 md:p-6">
@@ -218,19 +298,35 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
                                 </div>
                             </div>
                         <?php endif; ?>
-                        <form method="POST" class="form-grid grid gap-6">
+                        <form method="POST" class="form-grid grid gap-6 grid-cols-1 md:grid-cols-3">
+                            <?php if ($edit_mode): ?>
+                                <input type="hidden" name="id" value="<?= htmlspecialchars($edit_vehicle_type['id']) ?>">
+                            <?php endif; ?>
                             <div>
                                 <label for="type" class="form-label block">Vehicle Type</label>
-                                <input type="text" id="type" name="type" placeholder="e.g., Bus, Van" class="form-input" required>
+                                <input type="text" id="type" name="type" placeholder="e.g., Bus, Van" class="form-input" value="<?= $edit_mode ? htmlspecialchars($edit_vehicle_type['type']) : '' ?>" required>
                             </div>
                             <div>
                                 <label for="capacity" class="form-label block">Capacity (Seats)</label>
-                                <input type="number" id="capacity" name="capacity" min="1" class="form-input" required>
+                                <input type="number" id="capacity" name="capacity" min="1" class="form-input" value="<?= $edit_mode ? htmlspecialchars($edit_vehicle_type['capacity']) : '' ?>" required>
                             </div>
-                            <div class="col-span-1 md:col-span-2">
-                                <button type="submit" name="add_vehicle_type" class="btn-primary w-full md:w-auto">
-                                    <i class="fas fa-save mr-2"></i>Add Vehicle Type
+                            <div>
+                                <label for="status" class="form-label block">Status</label>
+                                <select id="status" name="status" class="form-select" required>
+                                    <option value="active" <?= $edit_mode && $edit_vehicle_type['status'] === 'active' ? 'selected' : '' ?>>Active</option>
+                                    <option value="inactive" <?= $edit_mode && $edit_vehicle_type['status'] === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                                </select>
+                            </div>
+                            <div class="col-span-1 md:col-span-3">
+                                <button type="submit" name="<?= $edit_mode ? 'edit_vehicle_type' : 'add_vehicle_type' ?>" class="btn-primary w-full md:w-auto">
+                                    <i class="fas fa-save mr-2"></i>
+                                    <?= $edit_mode ? 'Update Vehicle Type' : 'Add Vehicle Type' ?>
                                 </button>
+                                <?php if ($edit_mode): ?>
+                                    <a href="vehicle_types.php" class="btn-secondary w-full md:w-auto ml-0 md:ml-2 mt-2 md:mt-0">
+                                        <i class="fas fa-times mr-2"></i>Cancel
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </form>
                     </div>
@@ -260,6 +356,7 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -268,7 +365,15 @@ while ($row = $vehicle_types_result->fetch_assoc()) {
                                             <tr class="table-hover">
                                                 <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($type['type']) ?></td>
                                                 <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($type['capacity']) ?> seats</td>
+                                                <td class="px-6 py-4 text-sm">
+                                                    <span class="<?= $type['status'] === 'active' ? 'text-green-600' : 'text-gray-600' ?>">
+                                                        <?= htmlspecialchars(ucfirst($type['status'])) ?>
+                                                    </span>
+                                                </td>
                                                 <td class="px-6 py-4">
+                                                    <a href="?edit_id=<?= $type['id'] ?>" class="text-blue-600 hover:text-blue-800 mr-4">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
                                                     <a href="?delete_id=<?= $type['id'] ?>" onclick="return confirm('Are you sure you want to delete this vehicle type?');" class="text-red-600 hover:text-red-800">
                                                         <i class="fas fa-trash"></i>
                                                     </a>

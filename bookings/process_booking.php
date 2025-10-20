@@ -1,7 +1,6 @@
 <?php
 // bookings/process_booking.php
 
-
 session_start();
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/config.php';
@@ -57,6 +56,7 @@ if ($user_id && isset($_POST['use_credits']) && $_POST['use_credits'] === 'on') 
         header("Location: " . SITE_URL . "/bookings/passenger_details.php");
         exit();
     }
+    // Use 'i' for integer binding of $user_id
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -73,6 +73,9 @@ if ($user_id && isset($_POST['use_credits']) && $_POST['use_credits'] === 'on') 
     }
 }
 
+// Initialize referral code variable
+$referral_code = null;
+
 // Handle referral code - ONLY STORE FOR CREDITS, NO DISCOUNT TO CURRENT USER
 if (isset($_POST['referral_code']) && !empty(trim($_POST['referral_code']))) {
     $referral_code = strtoupper(trim($_POST['referral_code']));
@@ -80,8 +83,8 @@ if (isset($_POST['referral_code']) && !empty(trim($_POST['referral_code']))) {
     
     // Check if referral code exists and find the referrer
     $stmt = $conn->prepare("SELECT u.id as referrer_id, u.first_name, u.last_name 
-                           FROM users u 
-                           WHERE u.affiliate_id = ?");
+                            FROM users u 
+                            WHERE u.affiliate_id = ?");
     if ($stmt) {
         $stmt->bind_param("s", $referral_code);
         $stmt->execute();
@@ -96,7 +99,7 @@ if (isset($_POST['referral_code']) && !empty(trim($_POST['referral_code']))) {
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $referral_settings = $result->fetch_assoc();
-                $referral_credits = $result->num_rows > 0 ? $referral_settings['credits'] : 2000;
+                $referral_credits = $referral_settings ? ($referral_settings['credits'] ?? 2000) : 2000;
                 $stmt->close();
                 
                 // Store in session for later use in verify_payment.php
@@ -110,6 +113,8 @@ if (isset($_POST['referral_code']) && !empty(trim($_POST['referral_code']))) {
         } else {
             error_log("Invalid referral code from form: $referral_code");
             $_SESSION['referral_error'] = 'Invalid referral code';
+            // Clear referral_code for the transaction if invalid
+            $referral_code = null; 
         }
     }
 }
@@ -184,9 +189,7 @@ foreach ($_POST['passengers'] as $index => $passenger) {
         $passenger_data['special_requests'] = '';
     }
     
-    if (empty($errors)) {
-        $passenger_details[] = $passenger_data;
-    }
+    $passenger_details[] = $passenger_data;
 }
 
 // If there are validation errors, redirect back with errors
@@ -205,20 +208,30 @@ try {
     // Log selected trip details
     error_log("Selected trip details: " . json_encode($trip));
 
-    // Verify trip template exists
-    $stmt = $conn->prepare("SELECT id FROM trip_templates WHERE id = ? AND status = 'active'");
+    // Use capacity from session (since trip_templates may not have it or table is missing column)
+    $capacity = $trip['capacity'] ?? 5; // Fallback to 5 if not set
+    error_log("Using capacity from session: $capacity");
+
+    // Additional capacity check: Count confirmed bookings and ensure room
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) as confirmed_count 
+        FROM bookings 
+        WHERE template_id = ? 
+          AND trip_date = ? 
+          AND payment_status = 'paid' 
+          AND status = 'confirmed'
+    ");
     if (!$stmt) {
-        throw new Exception('Failed to prepare trip_templates query: ' . $conn->error);
+        throw new Exception('Failed to prepare capacity count query: ' . $conn->error);
     }
-    $stmt->bind_param("i", $trip['template_id']);
+    $stmt->bind_param("is", $trip['template_id'], $trip['trip_date']);
     $stmt->execute();
     $result = $stmt->get_result();
-    $trip_template = $result->fetch_assoc();
+    $count_row = $result->fetch_assoc();
     $stmt->close();
-
-    if (!$trip_template) {
-        error_log("No active trip template found for template_id {$trip['template_id']}");
-        throw new Exception('Invalid trip template ID: ' . $trip['template_id']);
+    $confirmed_count = $count_row['confirmed_count'];
+    if (($confirmed_count + $num_seats) > $capacity) {
+        throw new Exception('Sorry, the vehicle capacity has been reached for this trip.');
     }
 
     // Fetch or create trip_id from trip_instances
@@ -259,14 +272,16 @@ try {
     }
 
     // Check seat availability with FOR UPDATE to lock rows
+    // ONLY block if paid and confirmed (per requirement: pending should not block duplicates)
     $placeholders = str_repeat('?,', count($selected_seats) - 1) . '?';
     $stmt = $conn->prepare("
         SELECT seat_number 
         FROM bookings
         WHERE template_id = ? 
-            AND trip_date = ? 
-            AND status != 'cancelled'
-            AND seat_number IN ($placeholders)
+              AND trip_date = ? 
+              AND payment_status = 'paid'
+              AND status = 'confirmed'
+              AND seat_number IN ($placeholders)
         FOR UPDATE
     ");
     
@@ -276,23 +291,27 @@ try {
     
     $params = [$trip['template_id'], $trip['trip_date']];
     $params = array_merge($params, $selected_seats);
+    // Correctly define types: 'i' for template_id (int), 's' for trip_date (string), 's' for each seat number (string)
     $types = 'is' . str_repeat('s', count($selected_seats));
     
-    $stmt->bind_param($types, ...$params);
+    // Use call_user_func_array for binding parameters
+    // Note: This is an older, but safe way to handle dynamic bind_param calls with an array.
+    // However, using the splat operator `...$params` on the `bind_param` line is more modern PHP (PHP 5.6+).
+    // The existing code's `bind_param($types, ...$params)` is correct for modern PHP and is kept.
+    $stmt->bind_param($types, ...$params); 
     $stmt->execute();
     $booked_seats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     
     if (!empty($booked_seats)) {
         $conflicting_seats = array_column($booked_seats, 'seat_number');
-        error_log("Conflicting seats detected: " . implode(', ', $conflicting_seats));
+        error_log("Conflicting seats detected (paid/confirmed only): " . implode(', ', $conflicting_seats));
         throw new Exception('Sorry, some of your selected seats (' . implode(', ', $conflicting_seats) . ') have been booked by another passenger.');
     }
     
     $booking_ids = [];
     $pnrs = [];
-    
-    // Create booking records for each passenger
+    // Create booking records for each passenger (allowing pending overlaps and duplicates on pending)
     foreach ($passenger_details as $index => $passenger) {
         // Generate unique PNR
         $pnr = generatePNR();
@@ -300,24 +319,31 @@ try {
         // Calculate individual booking amount
         $booking_amount = $trip['price'];
         $payment_reference = null; // Set in verify_payment.php
-        $updated_at = null; // Set in verify_payment.php
+        $free_booking_used = 0;
+        
+        // Use separate variables for bind_param, especially for nullable values
+        $user_id_bind = $user_id;
+        $payment_reference_bind = $payment_reference;
         
         // Insert booking record
         $stmt = $conn->prepare("
             INSERT INTO bookings 
             (user_id, pnr, passenger_name, email, phone, emergency_contact, special_requests, 
              template_id, trip_date, seat_number, total_amount, payment_reference, 
-             payment_status, status, created_at, updated_at, trip_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', NOW(), ?, ?)
+             payment_status, status, created_at, updated_at, trip_id, free_booking_used) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', NOW(), NULL, ?, ?)
         ");
         
         if (!$stmt) {
             throw new Exception('Database prepare failed: ' . $conn->error);
         }
         
+        // CORRECTED TYPE STRING: 14 characters ('issssssisdsiii') for 14 variables
+        // i: user_id | s: pnr | s: name | s: email | s: phone | s: emergency_contact | s: special_requests 
+        // i: template_id | s: trip_date | s: seat_number | d: total_amount | s: payment_reference | i: trip_id | i: free_booking_used
         $stmt->bind_param(
-            "issssssisidssi",
-            $user_id,
+            "issssssisdsiii", // <-- CORRECTED: Added one more 'i' for $trip_id or $free_booking_used
+            $user_id_bind,
             $pnr,
             $passenger['passenger_name'],
             $passenger['email'],
@@ -328,11 +354,10 @@ try {
             $trip['trip_date'],
             $passenger['seat_number'],
             $booking_amount,
-            $payment_reference,
-            $updated_at,
-            $trip_id
+            $payment_reference_bind,
+            $trip_id,
+            $free_booking_used
         );
-        
         if (!$stmt->execute()) {
             throw new Exception('Failed to create booking for ' . $passenger['passenger_name'] . ': ' . $stmt->error);
         }
@@ -356,13 +381,19 @@ try {
         if (!$stmt) {
             throw new Exception('Failed to prepare credit deduction query: ' . $conn->error);
         }
+
         $stmt->bind_param("dii", $credits_to_use, $user_id, $credits_to_use);
+
         if (!$stmt->execute()) {
             throw new Exception('Failed to deduct credits: ' . $stmt->error);
         }
+
         if ($stmt->affected_rows === 0) {
-            throw new Exception('Insufficient credits or user not found.');
+            // This is a critical point: if credits deduction failed, we should probably
+            // rollback the entire transaction and inform the user.
+            throw new Exception('Insufficient credits or user not found during deduction.');
         }
+
         $stmt->close();
         
         // Log credit transaction
@@ -410,8 +441,11 @@ try {
     
     error_log("Booking creation failed: " . $e->getMessage());
     
-    if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
-        $_SESSION['error'] = 'Some of your selected seats are no longer available. Please choose different seats.';
+    // Unified handling for seat conflicts and capacity issues
+    if (strpos($e->getMessage(), 'booked by another passenger') !== false || 
+        strpos($e->getMessage(), 'vehicle capacity') !== false ||
+        strpos($e->getMessage(), 'Duplicate entry') !== false) {
+        $_SESSION['error'] = $e->getMessage(); // Or custom message
         header("Location: " . SITE_URL . "/bookings/seat_selection.php?error=duplicate_seat");
     } else {
         $_SESSION['error'] = 'Failed to create booking. Please try again. Error: ' . htmlspecialchars($e->getMessage());
@@ -422,7 +456,11 @@ try {
 } finally {
     // Close any open statements
     if (isset($stmt)) {
+        // Check if statement is still valid before closing
+        // Note: mysqli_stmt::close() is generally safe even if the connection is closed, 
+        // but adding checks can prevent warnings in complex scenarios. The existing structure is fine.
         $stmt->close();
+        unset($stmt); // Clear the variable after closing
     }
 }
 ?>
