@@ -24,8 +24,15 @@ if (isset($_POST['update_booking']) && isset($_POST['booking_id']) && isset($_PO
     
     $allowed_statuses = ['pending', 'confirmed', 'boarded', 'cancelled'];
     if (in_array($status, $allowed_statuses)) {
-        $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ? AND trip_id = ? AND trip_date = ?");
-        $stmt->bind_param("siss", $status, $booking_id, $trip_id, $trip_date);
+        // If status is 'confirmed', also set payment_status to 'paid'
+        if ($status === 'confirmed') {
+            $payment_status = 'paid';
+            $stmt = $conn->prepare("UPDATE bookings SET status = ?, payment_status = ? WHERE id = ? AND trip_id = ? AND trip_date = ?");
+            $stmt->bind_param("ssiss", $status, $payment_status, $booking_id, $trip_id, $trip_date);
+        } else {
+            $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ? AND trip_id = ? AND trip_date = ?");
+            $stmt->bind_param("siss", $status, $booking_id, $trip_id, $trip_date);
+        }
         if ($stmt->execute()) {
             $success = 'Booking status updated successfully.';
             // Maintain filters in URL

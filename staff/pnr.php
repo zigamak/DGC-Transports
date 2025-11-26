@@ -1,5 +1,5 @@
 <?php
-//staff/pnr.php
+// staff/pnr.php
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -10,7 +10,8 @@ require_once '../includes/functions.php';
 requireRole('staff', '/login.php');
 
 // Initialize variables
-$pnr = '';
+$search_query = '';
+$search_type = 'pnr';
 $booking = null;
 $error = '';
 $success = '';
@@ -19,12 +20,13 @@ $qr_code_path = '';
 // Get current date for comparison
 $current_date = date('Y-m-d');
 
-// Handle PNR search (manual)
+// Handle search (PNR, Name, or Email)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'search') {
-    $pnr = sanitizeInput($_POST['pnr']);
-    if (!empty($pnr)) {
-        // Query to get booking details with all related information
-        $stmt = $conn->prepare("
+    $search_query = sanitizeInput($_POST['search_query']);
+    $search_type = sanitizeInput($_POST['search_type']);
+    
+    if (!empty($search_query)) {
+        $query = "
             SELECT
                 b.*,
                 vt.type as vehicle_type,
@@ -42,27 +44,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             JOIN time_slots ts ON tt.time_slot_id = ts.id
             JOIN vehicles v ON tt.vehicle_id = v.id
             JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
-            WHERE b.pnr = ?
-        ");
-        $stmt->bind_param("s", $pnr);
+            WHERE ";
+
+        if ($search_type === 'pnr') {
+            $query .= "b.pnr = ?";
+        } elseif ($search_type === 'name') {
+            $query .= "b.passenger_name LIKE ?";
+            $search_query = "%$search_query%";
+        } elseif ($search_type === 'email') {
+            $query .= "b.email LIKE ?";
+            $search_query = "%$search_query%";
+        }
+
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("s", $search_query);
         $stmt->execute();
         $booking = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         if (!$booking) {
-            $error = 'No booking found with the provided PNR.';
-        } else {
-            // Validate booking date against current date
-            $booking_date = date('Y-m-d', strtotime($booking['trip_date']));
-            if ($booking_date !== $current_date) {
-                $error = $booking_date < $current_date 
-                    ? 'This booking is for a past date (' . formatDate($booking['trip_date'], 'j M, Y') . ').'
-                    : 'This booking is for a future date (' . formatDate($booking['trip_date'], 'j M, Y') . ').';
-                $booking = null; // Clear booking to prevent further processing
-            }
+            $error = 'No booking found with the provided ' . htmlspecialchars($search_type) . '.';
         }
     } else {
-        $error = 'Please enter a valid PNR.';
+        $error = 'Please enter a valid search query.';
     }
 }
 
@@ -115,7 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt2->execute();
                 $booking = $stmt2->get_result()->fetch_assoc();
                 $stmt2->close();
-                $pnr = $pnr_to_update;
+                $search_query = $pnr_to_update;
+                $search_type = 'pnr';
             } else {
                 $error = 'Failed to update boarding status. Passenger may already be boarded or booking not found.';
             }
@@ -180,7 +185,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $stmt2->execute();
                     $booking = $stmt2->get_result()->fetch_assoc();
                     $stmt2->close();
-                    $pnr = $pnr_to_update;
+                    $search_query = $pnr_to_update;
+                    $search_type = 'pnr';
                 } else {
                     $error = 'Failed to update booking status.';
                 }
@@ -264,6 +270,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .btn-success:hover {
             background: linear-gradient(to right, #059669, #047857);
+            transform: translateY(-1px);
+        }
+
+        .btn-print {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            color: var(--white);
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-print:hover {
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
             transform: translateY(-1px);
         }
 
@@ -476,6 +498,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 font-size: 0.875rem;
             }
         }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #ticket-section, #ticket-section * {
+                visibility: visible;
+            }
+            #ticket-section {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                box-shadow: none;
+            }
+            .btn-print, .btn-success, .status-update-form {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -487,15 +530,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <div class="max-w-7xl mx-auto">
             <!-- Header -->
             <div class="mb-6">
-                <p class="text-gray-600 text-sm sm:text-base">Manage passenger bookings by searching PNR or scanning QR codes</p>
+                <p class="text-gray-600 text-sm sm:text-base">Manage passenger bookings by searching PNR, name, or email, or scanning QR codes</p>
             </div>
 
             <!-- Search and Scanner Section -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <!-- Manual PNR Search -->
+                <!-- Manual Search -->
                 <div class="card p-5 sm:p-6">
                     <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-search text-red-600 mr-2"></i> Search by PNR
+                        <i class="fas fa-search text-red-600 mr-2"></i> Search Booking
                     </h2>
                     
                     <?php if ($error): ?>
@@ -508,7 +551,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <form method="POST" class="mb-4">
                         <input type="hidden" name="action" value="search">
                         <div class="flex flex-col sm:flex-row gap-3">
-                            <input type="text" name="pnr" value="<?= htmlspecialchars($pnr) ?>" class="input-field flex-1" placeholder="Enter PNR (e.g., DGC123456)" required>
+                            <select name="search_type" class="input-field w-full sm:w-40" required>
+                                <option value="pnr" <?= $search_type === 'pnr' ? 'selected' : '' ?>>PNR</option>
+                                <option value="name" <?= $search_type === 'name' ? 'selected' : '' ?>>Name</option>
+                                <option value="email" <?= $search_type === 'email' ? 'selected' : '' ?>>Email</option>
+                            </select>
+                            <input type="text" name="search_query" value="<?= htmlspecialchars($search_query) ?>" class="input-field flex-1" placeholder="Enter PNR, Name, or Email" required>
                             <button type="submit" class="btn-primary flex items-center justify-center gap-2">
                                 <i class="fas fa-search"></i>Search
                             </button>
@@ -550,7 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <!-- Booking Details -->
             <?php if ($booking): ?>
-                <div class="card mb-8">
+                <div class="card mb-8" id="ticket-section">
                     <!-- Header -->
                     <div class="gradient-bg text-white p-5 rounded-t-xl">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -576,26 +624,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 </span>
                             </div>
                             
-                            <?php if ($booking['status'] === 'confirmed' || $booking['status'] === 'pending'): ?>
-                                <form method="POST" class="inline">
-                                    <input type="hidden" name="action" value="mark_boarded">
-                                    <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                    <input type="hidden" name="pnr" value="<?= htmlspecialchars($booking['pnr']) ?>">
-                                    <button type="submit" class="btn-success flex items-center gap-2">
-                                        <i class="fas fa-check-circle"></i>Mark as Boarded
-                                    </button>
-                                </form>
-                            <?php elseif ($booking['status'] === 'boarded'): ?>
-                                <div class="flex items-center text-green-600 gap-2">
-                                    <i class="fas fa-check-circle text-lg"></i>
-                                    <span class="font-medium">Passenger boarded</span>
-                                </div>
-                            <?php elseif ($booking['status'] === 'arrived'): ?>
-                                <div class="flex items-center text-blue-600 gap-2">
-                                    <i class="fas fa-flag-checkered text-lg"></i>
-                                    <span class="font-medium">Journey completed</span>
-                                </div>
-                            <?php endif; ?>
+                            <div class="flex gap-3">
+                                <?php if ($booking['status'] === 'confirmed' || $booking['status'] === 'pending'): ?>
+                                    <form method="POST" class="inline">
+                                        <input type="hidden" name="action" value="mark_boarded">
+                                        <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
+                                        <input type="hidden" name="pnr" value="<?= htmlspecialchars($booking['pnr']) ?>">
+                                        <button type="submit" class="btn-success flex items-center gap-2">
+                                            <i class="fas fa-check-circle"></i>Mark as Boarded
+                                        </button>
+                                    </form>
+                                <?php elseif ($booking['status'] === 'boarded'): ?>
+                                    <div class="flex items-center text-green-600 gap-2">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                        <span class="font-medium">Passenger boarded</span>
+                                    </div>
+                                <?php elseif ($booking['status'] === 'arrived'): ?>
+                                    <div class="flex items-center text-blue-600 gap-2">
+                                        <i class="fas fa-flag-checkered text-lg"></i>
+                                        <span class="font-medium">Journey completed</span>
+                                    </div>
+                                <?php endif; ?>
+                              <button id="print-ticket-btn" class="btn-print flex items-center gap-2">
+    <i class="fas fa-print"></i>Print Ticket
+</button>
+                            </div>
                         </div>
 
                         <!-- Details Grid -->
@@ -683,7 +736,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         </div>
 
                         <!-- Advanced Status Management -->
-                        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="mt-6 p-4 bg-gray-50 rounded-lg status-update-form">
                             <h4 class="text-base font-semibold mb-3">Update Booking Status</h4>
                             <form method="POST" class="flex flex-col sm:flex-row gap-3">
                                 <input type="hidden" name="action" value="update_status">
@@ -692,7 +745,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <select name="new_status" class="input-field flex-1" required>
                                     <option value="">Select new status</option>
                                     <option value="confirmed" <?= $booking['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
-                                    <option value="boarded" <?= $booking['status'] === 'boarded' ? 'selected' : '' ?>>boarded</option>
+                                    <option value="boarded" <?= $booking['status'] === 'boarded' ? 'selected' : '' ?>>Boarded</option>
                                     <option value="arrived" <?= $booking['status'] === 'arrived' ? 'selected' : '' ?>>Arrived</option>
                                     <option value="cancelled" <?= $booking['status'] === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                                 </select>
@@ -706,286 +759,324 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <?php endif; ?>
         </div>
     </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const elements = {
+            video: document.getElementById('video'),
+            canvas: document.getElementById('canvas'),
+            output: document.getElementById('output'),
+            context: document.getElementById('canvas').getContext('2d', { willReadFrequently: true }),
+            modal: document.getElementById('scan-modal'),
+            modalStatus: document.getElementById('modal-status'),
+            modalPassengerName: document.getElementById('modal-passenger-name'),
+            modalRouteDetails: document.getElementById('modal-route-details'),
+            modalVehicleDetails: document.getElementById('modal-vehicle-details'),
+            modalSeatNumber: document.getElementById('modal-seat-number'),
+            modalClose: document.getElementById('modal-close'),
+            startCameraButton: document.getElementById('start-camera-button'),
+            stopCameraButton: document.getElementById('stop-camera-button'),
+            scanOverlay: document.getElementById('scan-overlay'),
+            startButtonContainer: document.getElementById('start-button-container')
+        };
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const elements = {
-                video: document.getElementById('video'),
-                canvas: document.getElementById('canvas'),
-                output: document.getElementById('output'),
-                context: document.getElementById('canvas').getContext('2d', { willReadFrequently: true }),
-                modal: document.getElementById('scan-modal'),
-                modalStatus: document.getElementById('modal-status'),
-                modalPassengerName: document.getElementById('modal-passenger-name'),
-                modalRouteDetails: document.getElementById('modal-route-details'),
-                modalVehicleDetails: document.getElementById('modal-vehicle-details'),
-                modalSeatNumber: document.getElementById('modal-seat-number'),
-                modalClose: document.getElementById('modal-close'),
-                startCameraButton: document.getElementById('start-camera-button'),
-                stopCameraButton: document.getElementById('stop-camera-button'),
-                scanOverlay: document.getElementById('scan-overlay'),
-                startButtonContainer: document.getElementById('start-button-container')
-            };
+        let canScan = true;
+        let audioContext;
+        let stream = null;
+        let lastScanTime = 0;
+        const minScanInterval = 2000;
 
-            let canScan = true;
-            let audioContext;
-            let stream = null;
-            let lastScanTime = 0;
-            const minScanInterval = 2000;
+        if (elements.startCameraButton) {
+            elements.startCameraButton.addEventListener('click', initCamera);
+        }
+        
+        if (elements.stopCameraButton) {
+            elements.stopCameraButton.addEventListener('click', stopCamera);
+        }
+        
+        if (elements.modalClose) {
+            elements.modalClose.addEventListener('click', hideModal);
+        }
 
-            if (elements.startCameraButton) {
-                elements.startCameraButton.addEventListener('click', initCamera);
+        // Print button event listener
+        const printBtn = document.getElementById('print-ticket-btn');
+        if (printBtn) {
+            printBtn.addEventListener('click', function() {
+                window.print();
+            });
+        }
+
+        document.addEventListener('click', () => {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
+        }, { once: true });
+
+        function beep(frequency = 800, duration = 100, type = 'success') {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
             
-            if (elements.stopCameraButton) {
-                elements.stopCameraButton.addEventListener('click', stopCamera);
-            }
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
             
-            if (elements.modalClose) {
-                elements.modalClose.addEventListener('click', hideModal);
+            oscillator.frequency.setValueAtTime(
+                type === 'success' ? frequency : frequency * 0.8,
+                audioContext.currentTime
+            );
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration / 1000);
+        }
+
+        function playFeedback(success) {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(success ? [100] : [100, 50, 100]);
+            }
+            if (success) {
+                beep(1000, 150, 'success');
+            } else {
+                beep(800, 100, 'error');
+            }
+        }
+
+        function showModal(status, passengerName, routeDetails, vehicleDetails, seatNumber) {
+            elements.modalStatus.textContent = status;
+            elements.modalStatus.className = 'status ' + (
+                status === 'Boarded Successfully' ? 'success' :
+                status === 'Passenger Already Boarded' ? 'warning' : 'failed'
+            );
+            elements.modalPassengerName.textContent = passengerName ? `Passenger: ${passengerName}` : '';
+            elements.modalRouteDetails.textContent = routeDetails ? `Route: ${routeDetails}` : '';
+            elements.modalVehicleDetails.textContent = vehicleDetails ? `Vehicle: ${vehicleDetails}` : '';
+            elements.modalSeatNumber.textContent = seatNumber ? `Seat: ${seatNumber}` : '';
+            elements.modal.style.display = 'flex';
+            canScan = false;
+        }
+
+        function hideModal() {
+            elements.modal.style.display = 'none';
+            elements.output.innerHTML = 'Position QR code within the rectangle...';
+            canScan = true;
+            lastScanTime = Date.now();
+        }
+
+        async function recordScan(qrCodeData) {
+            if (!canScan) return;
+            const currentTime = Date.now();
+            if (currentTime - lastScanTime < minScanInterval) {
+                return;
             }
 
-            document.addEventListener('click', () => {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-            }, { once: true });
+            canScan = false;
+            lastScanTime = currentTime;
 
-            function beep(frequency = 800, duration = 100, type = 'success') {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
+            elements.output.innerHTML = 'Processing QR code...';
+
+            try {
+                const formData = new FormData();
+                formData.append('action', 'scanQR');
+                formData.append('qrCode', qrCodeData);
                 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(
-                    type === 'success' ? frequency : frequency * 0.8,
-                    audioContext.currentTime
-                );
-                
-                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + duration / 1000);
-            }
-
-            function playFeedback(success) {
-                if ('vibrate' in navigator) {
-                    navigator.vibrate(success ? [100] : [100, 50, 100]);
-                }
-                if (success) {
-                    beep(1000, 150, 'success');
-                } else {
-                    beep(800, 100, 'error');
-                }
-            }
-
-            function showModal(status, passengerName, routeDetails, vehicleDetails, seatNumber) {
-                elements.modalStatus.textContent = status;
-                elements.modalStatus.className = 'status ' + (
-                    status === 'Boarded Successfully' ? 'success' :
-                    status === 'Passenger Already Boarded' ? 'warning' : 'failed'
-                );
-                elements.modalPassengerName.textContent = passengerName ? `Passenger: ${passengerName}` : '';
-                elements.modalRouteDetails.textContent = routeDetails ? `Route: ${routeDetails}` : '';
-                elements.modalVehicleDetails.textContent = vehicleDetails ? `Vehicle: ${vehicleDetails}` : '';
-                elements.modalSeatNumber.textContent = seatNumber ? `Seat: ${seatNumber}` : '';
-                elements.modal.style.display = 'flex';
-                canScan = false;
-            }
-
-            function hideModal() {
-                elements.modal.style.display = 'none';
-                elements.output.innerHTML = 'Position QR code within the rectangle...';
-                canScan = true;
-                lastScanTime = Date.now();
-            }
-
-            async function recordScan(qrCodeData) {
-                if (!canScan) return;
-                const currentTime = Date.now();
-                if (currentTime - lastScanTime < minScanInterval) {
-                    return;
-                }
-
-                canScan = false;
-                lastScanTime = currentTime;
-
-                elements.output.innerHTML = 'Processing QR code...';
-
-                try {
-                    const formData = new FormData();
-                    formData.append('action', 'scanQR');
-                    formData.append('qrCode', qrCodeData);
-                    
-                    const response = await fetch('qr_processor.php', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const result = await response.json();
-                    
-                    if (result.status === 'success') {
-                        playFeedback(true);
-                        elements.output.innerHTML = `<span class="text-green-600">Boarded Successfully</span><br>Boarding Time: ${result.boarding_time || new Date().toLocaleString()}`;
-                        showModal(
-                            'Boarded Successfully',
-                            result.passenger_name,
-                            `${result.pickup_city} → ${result.dropoff_city}`,
-                            `${result.vehicle_type} (${result.vehicle_number})`,
-                            result.seat_number
-                        );
-                    } else if (result.status === 'warning') {
-                        playFeedback(false);
-                        elements.output.innerHTML = `<span class="text-yellow-600">Passenger Already Boarded</span><br>Boarding Time: ${result.boarding_time}`;
-                        showModal(
-                            'Passenger Already Boarded',
-                            result.passenger_name,
-                            `${result.pickup_city} → ${result.dropoff_city}`,
-                            `${result.vehicle_type} (${result.vehicle_number})`,
-                            result.seat_number
-                        );
-                    } else if (result.status === 'date_error') {
-                        playFeedback(false);
-                        elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
-                        showModal(result.message, null, null, null, null);
-                    } else {
-                        playFeedback(false);
-                        elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
-                        showModal(result.message, null, null, null, null);
-                    }
-                    
-                } catch (error) {
-                    console.error('Error during fetch or processing:', error);
-                    playFeedback(false);
-                    elements.output.innerHTML = `<span class="text-red-600">Scanner Error: ${error.message}</span>`;
-                    showModal('Scanner Error: ' + error.message, null, null, null, null);
-                }
-            }
-
-            function processFrame() {
-                if (!elements.video.srcObject || elements.video.readyState !== elements.video.HAVE_ENOUGH_DATA) {
-                    requestAnimationFrame(processFrame);
-                    return;
-                }
-
-                if (!canScan || elements.modal.style.display === 'flex') {
-                    requestAnimationFrame(processFrame);
-                    return;
-                }
-
-                const videoWidth = elements.video.videoWidth;
-                const videoHeight = elements.video.videoHeight;
-                
-                const roiX = videoWidth * 0.15;
-                const roiY = videoHeight * 0.15;
-                const roiWidth = videoWidth * 0.7;
-                const roiHeight = videoHeight * 0.7;
-
-                elements.canvas.width = roiWidth;
-                elements.canvas.height = roiHeight;
-                
-                elements.context.drawImage(
-                    elements.video,
-                    roiX, roiY, roiWidth, roiHeight,
-                    0, 0, roiWidth, roiHeight
-                );
-
-                const imageData = elements.context.getImageData(0, 0, roiWidth, roiHeight);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "attemptBoth"
+                const response = await fetch('qr_processor.php', {
+                    method: 'POST',
+                    body: formData
                 });
-
-                if (code) {
-                    console.log("Scanned QR Code:", code.data);
-                    recordScan(code.data);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    playFeedback(true);
+                    elements.output.innerHTML = `<span class="text-green-600">Boarded Successfully</span><br>Boarding Time: ${result.boarding_time || new Date().toLocaleString()}`;
+                    showModal(
+                        'Boarded Successfully',
+                        result.passenger_name,
+                        `${result.pickup_city} → ${result.dropoff_city}`,
+                        `${result.vehicle_type} (${result.vehicle_number})`,
+                        result.seat_number
+                    );
+                } else if (result.status === 'warning') {
+                    playFeedback(false);
+                    elements.output.innerHTML = `<span class="text-yellow-600">Passenger Already Boarded</span><br>Boarding Time: ${result.boarding_time}`;
+                    showModal(
+                        'Passenger Already Boarded',
+                        result.passenger_name,
+                        `${result.pickup_city} → ${result.dropoff_city}`,
+                        `${result.vehicle_type} (${result.vehicle_number})`,
+                        result.seat_number
+                    );
+                } else if (result.status === 'date_error') {
+                    playFeedback(false);
+                    elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
+                    showModal(result.message, null, null, null, null);
                 } else {
-                    requestAnimationFrame(processFrame);
+                    playFeedback(false);
+                    elements.output.innerHTML = `<span class="text-red-600">${result.message}</span>`;
+                    showModal(result.message, null, null, null, null);
                 }
+                
+            } catch (error) {
+                console.error('Error during fetch or processing:', error);
+                playFeedback(false);
+                elements.output.innerHTML = `<span class="text-red-600">Scanner Error: ${error.message}</span>`;
+                showModal('Scanner Error: ' + error.message, null, null, null, null);
+            }
+        }
+
+        function processFrame() {
+            if (!elements.video.srcObject || elements.video.readyState !== elements.video.HAVE_ENOUGH_DATA) {
+                requestAnimationFrame(processFrame);
+                return;
             }
 
-            async function initCamera() {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
-                        }
-                    });
-                    elements.video.srcObject = stream;
-                    await elements.video.play();
-                    
-                    elements.video.style.display = 'block';
-                    elements.scanOverlay.style.display = 'block';
-                    elements.startCameraButton.style.display = 'none';
-                    elements.startButtonContainer.style.display = 'none';
-                    elements.stopCameraButton.style.display = 'block';
-                    
-                    elements.output.textContent = 'Camera initialized. Position QR code...';
-                    requestAnimationFrame(processFrame);
+            if (!canScan || elements.modal.style.display === 'flex') {
+                requestAnimationFrame(processFrame);
+                return;
+            }
 
-                } catch (error) {
-                    console.error('Detailed camera access error:', error.name, error.message);
-                    let errorMessage = 'Error accessing camera. Please ensure permissions are granted and try refreshing the page.';
-                    if (error.name === 'NotAllowedError') {
-                        errorMessage = 'Camera access denied. Please allow camera access in your browser settings.';
-                    } else if (error.name === 'NotFoundError') {
-                        errorMessage = 'No camera found. Please ensure a camera is connected and available.';
-                    } else if (error.name === 'NotReadableError') {
-                        errorMessage = 'Camera is in use by another application. Please close other apps using the camera.';
+            const videoWidth = elements.video.videoWidth;
+            const videoHeight = elements.video.videoHeight;
+            
+            const roiX = videoWidth * 0.15;
+            const roiY = videoHeight * 0.15;
+            const roiWidth = videoWidth * 0.7;
+            const roiHeight = videoHeight * 0.7;
+
+            elements.canvas.width = roiWidth;
+            elements.canvas.height = roiHeight;
+            
+            elements.context.drawImage(
+                elements.video,
+                roiX, roiY, roiWidth, roiHeight,
+                0, 0, roiWidth, roiHeight
+            );
+
+            const imageData = elements.context.getImageData(0, 0, roiWidth, roiHeight);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "attemptBoth"
+            });
+
+            if (code) {
+                console.log("Scanned QR Code:", code.data);
+                recordScan(code.data);
+            } else {
+                requestAnimationFrame(processFrame);
+            }
+        }
+
+        async function initCamera() {
+            try {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const videoConstraints = {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: isMobile ? { exact: "environment" } : "user"
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints
+                });
+                elements.video.srcObject = stream;
+                await elements.video.play();
+                
+                elements.video.style.display = 'block';
+                elements.scanOverlay.style.display = 'block';
+                elements.startCameraButton.style.display = 'none';
+                elements.startButtonContainer.style.display = 'none';
+                elements.stopCameraButton.style.display = 'block';
+                
+                elements.output.textContent = 'Camera initialized. Position QR code...';
+                requestAnimationFrame(processFrame);
+
+            } catch (error) {
+                console.error('Detailed camera access error:', error.name, error.message);
+                let errorMessage = 'Error accessing camera. Please ensure permissions are granted and try refreshing the page.';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Camera access denied. Please allow camera access in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'No camera found. Please ensure a camera is connected and available.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMessage = 'Camera is in use by another application. Please close other apps using the camera.';
+                } else if (error.name === 'OverconstrainedError') {
+                    errorMessage = 'Requested camera not available. Trying default camera...';
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+                        });
+                        elements.video.srcObject = stream;
+                        await elements.video.play();
+                        
+                        elements.video.style.display = 'block';
+                        elements.scanOverlay.style.display = 'block';
+                        elements.startCameraButton.style.display = 'none';
+                        elements.startButtonContainer.style.display = 'none';
+                        elements.stopCameraButton.style.display = 'block';
+                        
+                        elements.output.textContent = 'Camera initialized. Position QR code...';
+                        requestAnimationFrame(processFrame);
+                        return;
+                    } catch (fallbackError) {
+                        errorMessage = 'Fallback camera failed: ' + fallbackError.message;
                     }
-                    elements.output.textContent = errorMessage;
-                    showModal(errorMessage, null, null, null, null);
                 }
+                elements.output.textContent = errorMessage;
+                showModal(errorMessage, null, null, null, null);
             }
+        }
 
-            function stopCamera() {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-                elements.video.srcObject = null;
-                elements.video.style.display = 'none';
-                elements.scanOverlay.style.display = 'none';
-                elements.stopCameraButton.style.display = 'none';
-                elements.startCameraButton.style.display = 'block';
-                elements.startButtonContainer.style.display = 'block';
-                elements.output.innerHTML = "Press 'Start Scanning' to begin...";
-                canScan = true;
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
             }
+            elements.video.srcObject = null;
+            elements.video.style.display = 'none';
+            elements.scanOverlay.style.display = 'none';
+            elements.stopCameraButton.style.display = 'none';
+            elements.startCameraButton.style.display = 'block';
+            elements.startButtonContainer.style.display = 'block';
+            elements.output.innerHTML = "Press 'Start Scanning' to begin...";
+            canScan = true;
+        }
 
-            window.addEventListener('unload', () => {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
-            });
-
-            const pnrInput = document.querySelector('input[name="pnr"]');
-            if (pnrInput && !pnrInput.value) {
-                pnrInput.focus();
+        window.addEventListener('unload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
             }
-
-            document.addEventListener('keydown', function(e) {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
-                    e.preventDefault();
-                    elements.startCameraButton.click();
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                    e.preventDefault();
-                    elements.stopCameraButton.click();
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                    e.preventDefault();
-                    document.querySelector('input[name="pnr"]').focus();
-                }
-            });
         });
-    </script>
+
+        const searchInput = document.querySelector('input[name="search_query"]');
+        if (searchInput && !searchInput.value) {
+            searchInput.focus();
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'q') {
+                e.preventDefault();
+                elements.startCameraButton.click();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                elements.stopCameraButton.click();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                document.querySelector('input[name="search_query"]').focus();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                if (printBtn) {
+                    printBtn.click();
+                }
+            }
+        });
+    });
+</script>
 </body>
 </html>

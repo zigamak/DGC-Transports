@@ -12,13 +12,13 @@ requireRole('staff', '/login.php');
 $pnr_error = '';
 $pnr_success = '';
 $searched_bookings = [];
-$filter_date = isset($_POST['filter_date']) ? $_POST['filter_date'] : date('Y-m-d');
+$filter_date = isset($_POST['filter_date']) ? $_POST['filter_date'] : '';
 $filter_status = isset($_POST['filter_status']) ? $_POST['filter_status'] : 'all';
 $filter_pnr = isset($_POST['pnr']) ? trim($_POST['pnr']) : '';
 
-// Build the query for pending bookings
+// Build the query for bookings
 $query = "
-    SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status, b.created_at,
+    SELECT b.id, b.pnr, b.passenger_name, b.email, b.phone, b.status, b.payment_status, b.created_at,
            c1.name AS pickup_city, c2.name AS dropoff_city, b.trip_date
     FROM bookings b
     JOIN trip_templates tt ON b.template_id = tt.id
@@ -45,8 +45,6 @@ if ($filter_status !== 'all') {
     $query .= " AND b.status = ?";
     $params[] = $filter_status;
     $param_types .= 's';
-} else {
-    $query .= " AND b.status IN ('pending', 'pending payment')";
 }
 
 $query .= " ORDER BY b.created_at DESC";
@@ -67,6 +65,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($searched_bookings)) {
     $pnr_error = 'No bookings found matching the criteria.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($searched_bookings)) {
     $pnr_success = 'Booking(s) found.';
+}
+
+// Handle confirm action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm']) && isset($_POST['booking_id'])) {
+    $booking_id = (int)$_POST['booking_id'];
+    $new_status = 'confirmed';
+    $new_payment_status = 'paid';
+    $stmt = $conn->prepare("UPDATE bookings SET status = ?, payment_status = ? WHERE id = ?");
+    $stmt->bind_param("ssi", $new_status, $new_payment_status, $booking_id);
+    if ($stmt->execute()) {
+        $pnr_success = 'Booking confirmed and payment marked as paid.';
+        // Refresh the bookings data
+        $stmt = $conn->prepare($query);
+        if (!empty($params)) {
+            $stmt->bind_param($param_types, ...$params);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $searched_bookings = [];
+        while ($row = $result->fetch_assoc()) {
+            $searched_bookings[] = $row;
+        }
+        $stmt->close();
+    } else {
+        $pnr_error = 'Failed to confirm booking.';
+    }
 }
 
 // Handle check-in action
@@ -100,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pending Bookings - DGC Transports</title>
+    <title>Bookings Management - DGC Transports</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -263,9 +287,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
             color: #dc2626;
         }
 
+        .status-confirmed {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
         .status-boarded {
             background: #e5e7eb;
             color: #1a1a1a;
+        }
+
+        .status-paid {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .status-unpaid {
+            background: #fef2f2;
+            color: #dc2626;
         }
 
         @keyframes spin {
@@ -325,9 +364,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                         <div>
                             <h1 class="text-2xl md:text-3xl font-bold text-gray-900">
                                 <i class="fas fa-ticket-alt text-primary-red mr-3"></i>
-                                Pending Bookings
+                                Bookings Management
                             </h1>
-                            <p class="text-sm text-gray-600 mt-1">Manage pending and pending payment bookings</p>
+                            <p class="text-sm text-gray-600 mt-1">Manage all bookings including pending and confirmed</p>
                         </div>
                         <div class="header-actions w-full md:w-auto">
                             <form method="POST" class="search-form" id="pnr-search-form">
@@ -335,9 +374,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                                     <input type="text" id="pnr" name="pnr" placeholder="Enter PNR" class="form-input" aria-label="Search by PNR">
                                     <input type="date" id="filter_date" name="filter_date" value="<?= htmlspecialchars($filter_date) ?>" class="form-input" aria-label="Filter by Date">
                                     <select id="filter_status" name="filter_status" class="form-select" aria-label="Filter by Status">
-                                        <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Pending</option>
+                                        <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All</option>
                                         <option value="pending" <?= $filter_status === 'pending' ? 'selected' : '' ?>>Pending</option>
                                         <option value="pending payment" <?= $filter_status === 'pending payment' ? 'selected' : '' ?>>Pending Payment</option>
+                                        <option value="confirmed" <?= $filter_status === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                                        <option value="boarded" <?= $filter_status === 'boarded' ? 'selected' : '' ?>>Boarded</option>
                                     </select>
                                     <button type="submit" class="btn-primary" id="pnr-search-btn">
                                         <span><i class="fas fa-search mr-2"></i>Filter</span>
@@ -371,7 +412,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                         <?php endif; ?>
                         <?php if (!empty($searched_bookings)): ?>
                             <h2 class="text-xl font-bold text-gray-900 mb-4">
-                                <i class="fas fa-ticket-alt text-primary-red mr-2"></i>Pending Bookings
+                                <i class="fas fa-ticket-alt text-primary-red mr-2"></i>Bookings List
                             </h2>
                             <!-- Mobile View -->
                             <div class="space-y-4 md:hidden">
@@ -401,17 +442,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                                             <span><?= date('g:iA', strtotime($booking['created_at'])) ?> on <?= formatDate($booking['trip_date']) ?></span>
                                         </div>
                                         <div class="mobile-card-item">
+                                            <span class="mobile-card-label"><i class="fas fa-money-bill-wave text-primary-red mr-2"></i>Payment:</span>
+                                            <span class="status-badge status-<?= str_replace(' ', '-', $booking['payment_status']) ?>"><?= htmlspecialchars(ucfirst($booking['payment_status'])) ?></span>
+                                        </div>
+                                        <div class="mobile-card-item">
                                             <span class="mobile-card-label"><i class="fas fa-cog text-primary-red mr-2"></i>Action:</span>
-                                            <?php if (in_array($booking['status'], ['pending', 'pending payment'])): ?>
-                                                <form method="POST" class="w-full" onsubmit="handleFormSubmit(event, this)">
-                                                    <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
-                                                    <input type="hidden" name="check_in" value="1">
-                                                    <button type="submit" class="btn-primary">
-                                                        <span><i class="fas fa-check mr-2"></i>Check In</span>
-                                                        <div class="spinner"></div>
-                                                    </button>
-                                                </form>
-                                            <?php endif; ?>
+                                            <div class="w-full flex flex-col gap-2">
+                                                <?php if (in_array($booking['status'], ['pending', 'pending payment'])): ?>
+                                                    <form method="POST" class="w-full" onsubmit="handleFormSubmit(event, this)">
+                                                        <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
+                                                        <input type="hidden" name="confirm" value="1">
+                                                        <button type="submit" class="btn-primary">
+                                                            <span><i class="fas fa-check mr-2"></i>Confirm</span>
+                                                            <div class="spinner"></div>
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+                                                <?php if ($booking['status'] === 'confirmed'): ?>
+                                                    <form method="POST" class="w-full" onsubmit="handleFormSubmit(event, this)">
+                                                        <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
+                                                        <input type="hidden" name="check_in" value="1">
+                                                        <button type="submit" class="btn-primary">
+                                                            <span><i class="fas fa-check mr-2"></i>Check In</span>
+                                                            <div class="spinner"></div>
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
                                         <div class="mt-4">
                                             <button onclick="showBookingDetails(<?= htmlspecialchars(json_encode($booking), ENT_QUOTES) ?>)" class="text-primary-black hover:text-primary-red text-sm font-medium">
@@ -431,6 +488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PNR</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
@@ -468,8 +526,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                                                     </div>
                                                 </td>
                                                 <td class="px-6 py-4">
+                                                    <div class="flex items-center">
+                                                        <i class="fas fa-money-bill-wave text-primary-red mr-2"></i>
+                                                        <span class="status-badge status-<?= str_replace(' ', '-', $booking['payment_status']) ?>"><?= htmlspecialchars(ucfirst($booking['payment_status'])) ?></span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4">
                                                     <div class="flex items-center gap-3">
                                                         <?php if (in_array($booking['status'], ['pending', 'pending payment'])): ?>
+                                                            <form method="POST" class="inline-flex" onsubmit="handleFormSubmit(event, this)">
+                                                                <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
+                                                                <input type="hidden" name="confirm" value="1">
+                                                                <button type="submit" class="btn-primary text-sm px-4 py-2">
+                                                                    <span><i class="fas fa-check mr-1"></i>Confirm</span>
+                                                                    <div class="spinner"></div>
+                                                                </button>
+                                                            </form>
+                                                        <?php endif; ?>
+                                                        <?php if ($booking['status'] === 'confirmed'): ?>
                                                             <form method="POST" class="inline-flex" onsubmit="handleFormSubmit(event, this)">
                                                                 <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
                                                                 <input type="hidden" name="check_in" value="1">
@@ -494,8 +568,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                                 <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                     <i class="fas fa-ticket-alt text-3xl text-gray-400"></i>
                                 </div>
-                                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Pending Bookings</h3>
-                                <p class="text-gray-600 mb-4">No pending bookings found for the selected criteria.</p>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Bookings</h3>
+                                <p class="text-gray-600 mb-4">No bookings found for the selected criteria.</p>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -633,6 +707,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_in']) && isset(
                     <div>
                         <p class="text-gray-600 font-medium">Status</p>
                         <span class="status-badge status-${booking.status.replace(' ', '-')}">${booking.status.toUpperCase()}</span>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-medium">Payment Status</p>
+                        <span class="status-badge status-${booking.payment_status.replace(' ', '-')}">${booking.payment_status.toUpperCase()}</span>
                     </div>
                 </div>
             `;
