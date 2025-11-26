@@ -4,6 +4,7 @@ require_once '../includes/db.php';
 require_once '../includes/config.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
+require_once '../includes/send_email.php';
 
 // Enforce admin-only access
 requireRole('admin', '/login.php');
@@ -13,6 +14,25 @@ if (isset($_GET['cancel']) && is_numeric($_GET['cancel'])) {
     $booking_id = (int)$_GET['cancel'];
     $conn->begin_transaction();
     try {
+        // Fetch booking details for cancellation email
+        $stmt = $conn->prepare("
+            SELECT b.*, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type,
+                   v.vehicle_number, v.driver_name, ts.departure_time, ts.arrival_time
+            FROM bookings b
+            JOIN trip_instances ti ON b.trip_id = ti.id
+            JOIN trip_templates tt ON ti.template_id = tt.id
+            JOIN cities c1 ON tt.pickup_city_id = c1.id
+            JOIN cities c2 ON tt.dropoff_city_id = c2.id
+            JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+            JOIN vehicles v ON tt.vehicle_id = v.id
+            JOIN time_slots ts ON tt.time_slot_id = ts.id
+            WHERE b.id = ?
+        ");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $booking_data = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
         // Update booking status
         $stmt = $conn->prepare("UPDATE bookings SET status = 'cancelled', payment_status = 'cancelled' WHERE id = ?");
         $stmt->bind_param("i", $booking_id);
@@ -26,10 +46,166 @@ if (isset($_GET['cancel']) && is_numeric($_GET['cancel'])) {
         $stmt->close();
 
         $conn->commit();
+
+        // Send cancellation email
+        if ($booking_data) {
+            $email_data = [
+                'email' => $booking_data['email'],
+                'passenger_name' => $booking_data['passenger_name'],
+                'pnr' => $booking_data['pnr'],
+                'trip' => [
+                    'pickup_city' => $booking_data['pickup_city'],
+                    'dropoff_city' => $booking_data['dropoff_city'],
+                    'trip_date' => $booking_data['trip_date'],
+                    'departure_time' => $booking_data['departure_time'],
+                    'vehicle_type' => $booking_data['vehicle_type'],
+                    'vehicle_number' => $booking_data['vehicle_number'],
+                    'driver_name' => $booking_data['driver_name']
+                ],
+                'seat_number' => $booking_data['seat_number'],
+                'total_amount' => $booking_data['total_amount'],
+                'payment_status' => 'cancelled'
+            ];
+            sendBookingCancellationEmail($email_data);
+        }
+
         $success = 'Booking cancelled successfully.';
     } catch (Exception $e) {
         $conn->rollback();
         $error = 'Failed to cancel booking: ' . $e->getMessage();
+    }
+}
+
+// Handle confirm request
+if (isset($_GET['confirm']) && is_numeric($_GET['confirm'])) {
+    $booking_id = (int)$_GET['confirm'];
+    $conn->begin_transaction();
+    try {
+        // Fetch booking details for confirmation email
+        $stmt = $conn->prepare("
+            SELECT b.*, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type,
+                   v.vehicle_number, v.driver_name, ts.departure_time, ts.arrival_time,
+                   p.payment_method, p.transaction_reference
+            FROM bookings b
+            JOIN trip_instances ti ON b.trip_id = ti.id
+            JOIN trip_templates tt ON ti.template_id = tt.id
+            JOIN cities c1 ON tt.pickup_city_id = c1.id
+            JOIN cities c2 ON tt.dropoff_city_id = c2.id
+            JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+            JOIN vehicles v ON tt.vehicle_id = v.id
+            JOIN time_slots ts ON tt.time_slot_id = ts.id
+            LEFT JOIN payments p ON b.id = p.booking_id
+            WHERE b.id = ?
+        ");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $booking_data = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        // Update booking status
+        $stmt = $conn->prepare("UPDATE bookings SET status = 'confirmed', payment_status = 'paid' WHERE id = ?");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $stmt->close();
+
+        // Update payment status
+        $stmt = $conn->prepare("UPDATE payments SET status = 'paid' WHERE booking_id = ?");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $stmt->close();
+
+        $conn->commit();
+
+        // Send confirmation email to passenger
+        if ($booking_data) {
+            $email_data = [
+                'email' => $booking_data['email'],
+                'passenger_name' => $booking_data['passenger_name'],
+                'pnr' => $booking_data['pnr'],
+                'trip' => [
+                    'pickup_city' => $booking_data['pickup_city'],
+                    'dropoff_city' => $booking_data['dropoff_city'],
+                    'trip_date' => $booking_data['trip_date'],
+                    'departure_time' => $booking_data['departure_time'],
+                    'vehicle_type' => $booking_data['vehicle_type'],
+                    'vehicle_number' => $booking_data['vehicle_number'],
+                    'driver_name' => $booking_data['driver_name']
+                ],
+                'seat_number' => $booking_data['seat_number'],
+                'total_amount' => $booking_data['total_amount'],
+                'payment_method' => $booking_data['payment_method'] ?? 'N/A',
+                'payment_reference' => $booking_data['transaction_reference'] ?? 'N/A',
+                'payment_status' => 'paid'
+            ];
+            sendBookingConfirmationEmail($email_data);
+
+            // Send admin notification
+            sendAdminBookingNotificationEmail([$email_data], $booking_data['total_amount'], $booking_data['payment_method'] ?? 'Manual', $booking_data['transaction_reference'] ?? 'MANUAL-' . $booking_id);
+        }
+
+        $success = 'Booking confirmed successfully and email sent.';
+    } catch (Exception $e) {
+        $conn->rollback();
+        $error = 'Failed to confirm booking: ' . $e->getMessage();
+    }
+}
+
+// Handle send ticket request
+if (isset($_GET['send_ticket']) && is_numeric($_GET['send_ticket'])) {
+    $booking_id = (int)$_GET['send_ticket'];
+    try {
+        // Fetch booking details for sending ticket
+        $stmt = $conn->prepare("
+            SELECT b.*, c1.name AS pickup_city, c2.name AS dropoff_city, vt.type AS vehicle_type,
+                   v.vehicle_number, v.driver_name, ts.departure_time, ts.arrival_time,
+                   p.payment_method, p.transaction_reference
+            FROM bookings b
+            JOIN trip_instances ti ON b.trip_id = ti.id
+            JOIN trip_templates tt ON ti.template_id = tt.id
+            JOIN cities c1 ON tt.pickup_city_id = c1.id
+            JOIN cities c2 ON tt.dropoff_city_id = c2.id
+            JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+            JOIN vehicles v ON tt.vehicle_id = v.id
+            JOIN time_slots ts ON tt.time_slot_id = ts.id
+            LEFT JOIN payments p ON b.id = p.booking_id
+            WHERE b.id = ?
+        ");
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $booking_data = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        // Send confirmation email to passenger
+        if ($booking_data) {
+            $email_data = [
+                'email' => $booking_data['email'],
+                'passenger_name' => $booking_data['passenger_name'],
+                'pnr' => $booking_data['pnr'],
+                'trip' => [
+                    'pickup_city' => $booking_data['pickup_city'],
+                    'dropoff_city' => $booking_data['dropoff_city'],
+                    'trip_date' => $booking_data['trip_date'],
+                    'departure_time' => $booking_data['departure_time'],
+                    'vehicle_type' => $booking_data['vehicle_type'],
+                    'vehicle_number' => $booking_data['vehicle_number'],
+                    'driver_name' => $booking_data['driver_name']
+                ],
+                'seat_number' => $booking_data['seat_number'],
+                'total_amount' => $booking_data['total_amount'],
+                'payment_method' => $booking_data['payment_method'] ?? 'N/A',
+                'payment_reference' => $booking_data['transaction_reference'] ?? 'N/A',
+                'payment_status' => $booking_data['payment_status']
+            ];
+            if (sendBookingConfirmationEmail($email_data)) {
+                $success = 'Ticket sent successfully to ' . htmlspecialchars($booking_data['email']) . '.';
+            } else {
+                $error = 'Failed to send ticket email.';
+            }
+        } else {
+            $error = 'Booking not found.';
+        }
+    } catch (Exception $e) {
+        $error = 'Failed to send ticket: ' . $e->getMessage();
     }
 }
 
@@ -42,7 +218,7 @@ $per_page = 20;
 $offset = ($page - 1) * $per_page;
 
 // Build the WHERE clause for filtering bookings
-$where_conditions = ["b.status = 'confirmed'", "b.payment_status = 'paid'"];
+$where_conditions = [];
 $params = [];
 $param_types = "";
 if (!empty($search)) {
@@ -61,7 +237,7 @@ if (!empty($date_to)) {
     $params[] = $date_to;
     $param_types .= "s";
 }
-$where_clause = implode(" AND ", $where_conditions);
+$where_clause = empty($where_conditions) ? "1" : implode(" AND ", $where_conditions);
 
 // Get total count for pagination
 $count_query = "
@@ -179,6 +355,30 @@ $stmt->close();
             background: linear-gradient(to right, var(--dark-red), var(--primary-red));
             transform: translateY(-2px);
         }
+        .btn-confirm {
+            background: linear-gradient(to right, #10b981, #059669);
+            color: var(--white);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        .btn-confirm:hover {
+            background: linear-gradient(to right, #059669, #047857);
+            transform: translateY(-2px);
+        }
+        .btn-send-ticket {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            color: var(--white);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        .btn-send-ticket:hover {
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
+            transform: translateY(-2px);
+        }
         .error-message {
             color: #ef4444;
             font-size: 0.9rem;
@@ -231,6 +431,18 @@ $stmt->close();
         .status-cancelled {
             background-color: #fee2e2;
             color: #ef4444;
+        }
+        .status-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-boarded {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .status-arrived {
+            background-color: #e0e7ff;
+            color: #3730a3;
         }
         .pagination a, .pagination span {
             padding: 8px 12px;
@@ -288,31 +500,12 @@ $stmt->close();
                             <i class="fas fa-ticket-alt text-3xl text-gray-400"></i>
                         </div>
                         <h3 class="text-lg font-semibold text-gray-900 mb-2">No Bookings Found</h3>
-                        <p class="text-gray-600 mb-6 max-w-sm mx-auto">No confirmed and paid bookings match your search criteria.</p>
+                        <p class="text-gray-600 mb-6 max-w-sm mx-auto">No bookings match your search criteria.</p>
                     </div>
                 <?php else: ?>
                     <div class="space-y-4 mobile-view">
                         <?php foreach ($bookings as $booking): ?>
-                            <div class="mobile-card-row bg-white shadow-md rounded-xl relative p-4">
-                                <div class="absolute top-4 right-4">
-                                    <div class="relative inline-block text-left">
-                                        <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $booking['id'] ?>">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
-                                        <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $booking['id'] ?>">
-                                            <div class="py-1">
-                                                <button onclick="showDetailsModal(<?= $booking['id'] ?>)" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
-                                                    <i class="fas fa-info-circle mr-2"></i>Details
-                                                </button>
-                                                <?php if ($booking['status'] !== 'cancelled'): ?>
-                                                    <button onclick="showCancelModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
-                                                        <i class="fas fa-times mr-2"></i>Cancel
-                                                    </button>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="mobile-card-row bg-white shadow-md rounded-xl p-4">
                                 <div class="mobile-card-item">
                                     <span class="mobile-card-label"><i class="fas fa-ticket-alt text-primary-red mr-2"></i>PNR:</span>
                                     <span class="mobile-card-content"><?= htmlspecialchars($booking['pnr']) ?></span>
@@ -337,13 +530,32 @@ $stmt->close();
                                     <span class="mobile-card-label"><i class="fas fa-info-circle text-primary-red mr-2"></i>Status:</span>
                                     <span class="mobile-card-content status-badge status-<?= $booking['status'] ?>"><?= ucfirst($booking['status']) ?></span>
                                 </div>
-                                <div class="mobile-card-item">
+                                <div class="mobile-card-item border-b-0">
                                     <span class="mobile-card-label"><i class="fas fa-calendar-check text-primary-red mr-2"></i>Reservation Date:</span>
                                     <span class="mobile-card-content"><?= date('M j, Y H:i', strtotime($booking['created_at'])) ?></span>
+                                </div>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <button onclick="showDetailsModal(<?= $booking['id'] ?>)" class="flex-1 min-w-[45%] bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition">
+                                        <i class="fas fa-info-circle mr-1"></i>Details
+                                    </button>
+                                    <?php if ($booking['status'] !== 'confirmed' && $booking['status'] !== 'boarded' && $booking['status'] !== 'arrived'): ?>
+                                        <button onclick="showConfirmModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="flex-1 min-w-[45%] bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition">
+                                            <i class="fas fa-check mr-1"></i>Confirm
+                                        </button>
+                                    <?php endif; ?>
+                                    <?php if ($booking['status'] !== 'cancelled'): ?>
+                                        <button onclick="showCancelModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="flex-1 min-w-[45%] bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition">
+                                            <i class="fas fa-times mr-1"></i>Cancel
+                                        </button>
+                                    <?php endif; ?>
+                                    <button onclick="showSendTicketModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="flex-1 min-w-[45%] bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-600 transition">
+                                        <i class="fas fa-envelope mr-1"></i>Send Ticket
+                                    </button>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
+
                     <div class="hidden md:block overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
@@ -408,16 +620,24 @@ $stmt->close();
                                                 <button type="button" class="inline-flex justify-center items-center w-8 h-8 text-gray-400 hover:text-gray-600 focus:outline-none menu-toggle" data-id="<?= $booking['id'] ?>">
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
-                                                <div class="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $booking['id'] ?>">
+                                                <div class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden menu-content" data-id="<?= $booking['id'] ?>">
                                                     <div class="py-1">
                                                         <button onclick="showDetailsModal(<?= $booking['id'] ?>)" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100">
                                                             <i class="fas fa-info-circle mr-2"></i>Details
                                                         </button>
+                                                        <?php if ($booking['status'] !== 'confirmed' && $booking['status'] !== 'boarded' && $booking['status'] !== 'arrived'): ?>
+                                                            <button onclick="showConfirmModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
+                                                                <i class="fas fa-check mr-2"></i>Confirm
+                                                            </button>
+                                                        <?php endif; ?>
                                                         <?php if ($booking['status'] !== 'cancelled'): ?>
                                                             <button onclick="showCancelModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
                                                                 <i class="fas fa-times mr-2"></i>Cancel
                                                             </button>
                                                         <?php endif; ?>
+                                                        <button onclick="showSendTicketModal(<?= $booking['id'] ?>, '<?= htmlspecialchars($booking['pnr']) ?>')" class="text-gray-700 w-full text-left block px-4 py-2 text-sm hover:bg-gray-100">
+                                                            <i class="fas fa-envelope mr-2"></i>Send Ticket
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -470,6 +690,30 @@ $stmt->close();
         </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center modal-overlay">
+        <div class="modal-content bg-white rounded-lg p-6 max-w-sm mx-auto shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-center">Confirm Booking</h3>
+            <p id="confirmMessage" class="text-gray-700 mb-6 text-center"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancelConfirmButton" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">Cancel</button>
+                <a id="confirmConfirmLink" href="#" class="btn-confirm">Confirm</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Send Ticket Modal -->
+    <div id="sendTicketModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center modal-overlay">
+        <div class="modal-content bg-white rounded-lg p-6 max-w-sm mx-auto shadow-xl">
+            <h3 class="text-xl font-bold mb-4 text-center">Send Ticket</h3>
+            <p id="sendTicketMessage" class="text-gray-700 mb-6 text-center"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancelSendTicketButton" class="btn-primary bg-gray-300 text-gray-800 hover:bg-gray-400 transform-none">Cancel</button>
+                <a id="confirmSendTicketLink" href="#" class="btn-send-ticket">Send</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Details Modal -->
     <div id="detailsModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 hidden flex items-center justify-center modal-overlay">
         <div class="modal-content bg-white rounded-lg p-6 max-w-lg mx-auto shadow-xl details-content">
@@ -499,6 +743,44 @@ $stmt->close();
             window.addEventListener('click', (event) => {
                 if (event.target === cancelModal) {
                     cancelModal.classList.add('hidden');
+                }
+            });
+
+            // Confirm Modal
+            const confirmModal = document.getElementById('confirmModal');
+            const confirmMessage = document.getElementById('confirmMessage');
+            const confirmConfirmLink = document.getElementById('confirmConfirmLink');
+            const cancelConfirmButton = document.getElementById('cancelConfirmButton');
+            window.showConfirmModal = (id, pnr) => {
+                confirmMessage.textContent = `Confirm booking with PNR ${pnr}? This will mark it as confirmed and paid, and send a confirmation email.`;
+                confirmConfirmLink.href = `bookings.php?confirm=${id}`;
+                confirmModal.classList.remove('hidden');
+            };
+            cancelConfirmButton.addEventListener('click', () => {
+                confirmModal.classList.add('hidden');
+            });
+            window.addEventListener('click', (event) => {
+                if (event.target === confirmModal) {
+                    confirmModal.classList.add('hidden');
+                }
+            });
+
+            // Send Ticket Modal
+            const sendTicketModal = document.getElementById('sendTicketModal');
+            const sendTicketMessage = document.getElementById('sendTicketMessage');
+            const confirmSendTicketLink = document.getElementById('confirmSendTicketLink');
+            const cancelSendTicketButton = document.getElementById('cancelSendTicketButton');
+            window.showSendTicketModal = (id, pnr) => {
+                sendTicketMessage.textContent = `Send ticket email for booking with PNR ${pnr}?`;
+                confirmSendTicketLink.href = `bookings.php?send_ticket=${id}`;
+                sendTicketModal.classList.remove('hidden');
+            };
+            cancelSendTicketButton.addEventListener('click', () => {
+                sendTicketModal.classList.add('hidden');
+            });
+            window.addEventListener('click', (event) => {
+                if (event.target === sendTicketModal) {
+                    sendTicketModal.classList.add('hidden');
                 }
             });
 

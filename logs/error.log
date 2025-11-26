@@ -22,3 +22,27 @@ Stack trace:
 #0 C:\xampp\htdocs\dgctransports\admin\view_bookings.php(175): mysqli_stmt->bind_param('isiiii', 13, '2025-10-22', 20, 0, 20, 0)
 #1 {main}
   thrown in C:\xampp\htdocs\dgctransports\admin\view_bookings.php on line 175
+[20-Oct-2025 17:04:21 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'dgctransports.trips' doesn't exist in C:\xampp\htdocs\dgctransports\staff\bookings.php:55
+Stack trace:
+#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(55): mysqli->prepare('\r\n    SELECT b....')
+#1 {main}
+  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 55
+[20-Oct-2025 17:09:20 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'tt.departure_time' in 'field list' in C:\xampp\htdocs\dgctransports\staff\bookings.php:54
+Stack trace:
+#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(54): mysqli->prepare('\r\n    SELECT b....')
+#1 {main}
+  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 54
+[20-Oct-2025 17:09:22 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'tt.departure_time' in 'field list' in C:\xampp\htdocs\dgctransports\staff\bookings.php:54
+Stack trace:
+#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(54): mysqli->prepare('\r\n    SELECT b....')
+#1 {main}
+  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 54
+[20-Oct-2025 17:22:43 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[20-Oct-2025 17:22:43 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[20-Oct-2025 17:23:04 Europe/Berlin] PHPMailer Error (booking_confirmation): SMTP Error: Could not connect to SMTP host. Failed to connect to server
+[20-Oct-2025 17:24:01 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[20-Oct-2025 17:24:01 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[20-Oct-2025 17:24:22 Europe/Berlin] PHPMailer Error (booking_confirmation): SMTP Error: Could not connect to SMTP host. Failed to connect to server
+[23-Oct-2025 12:06:53 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[23-Oct-2025 12:06:53 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
+[23-Oct-2025 12:06:58 Europe/Berlin] Booking confirmation sent for PNR: DGC9945CD4 to: zigamakinde@gmail.com

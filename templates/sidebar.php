@@ -141,11 +141,11 @@ if (function_exists('isLoggedIn') && isLoggedIn()): ?>
                     </div>
                     <span>Check PNR</span>
                 </a>
-                 <a href="<?= SITE_URL ?>/staff/pending_bookings.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                 <a href="<?= SITE_URL ?>/staff/bookings.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-ticket-alt text-sm"></i>
                     </div>
-                    <span>Pending Bookings</span>
+                    <span>Bookings</span>
                 </a>
                 
                 <a href="<?= SITE_URL ?>/staff/profile.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
