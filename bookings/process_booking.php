@@ -473,37 +473,46 @@ try {
         $stmt->execute();
         $stmt->close();
     }
-    
     // Commit the transaction
     $conn->commit();
+    
     // Store booking data in session
-$_SESSION['passenger_details'] = $passenger_details;
-$_SESSION['booking_ids'] = $booking_ids;
-$_SESSION['pnrs'] = $pnrs;
-$_SESSION['total_amount'] = $total_amount;
-$_SESSION['credits_used'] = $credits_to_use;
+    $_SESSION['passenger_details'] = $passenger_details;
+    $_SESSION['booking_ids'] = $booking_ids;
+    $_SESSION['pnrs'] = $pnrs;
+    $_SESSION['total_amount'] = $total_amount;
+    $_SESSION['credits_used'] = $credits_to_use;
 
-// Clear error messages
-unset($_SESSION['error']);
-unset($_SESSION['errors']);
-unset($_SESSION['form_data']);
-unset($_SESSION['referral_error']);
+    // Clear error messages
+    unset($_SESSION['error']);
+    unset($_SESSION['errors']);
+    unset($_SESSION['form_data']);
+    unset($_SESSION['referral_error']);
 
-// DON'T clear trip data yet - payment page might need it
-// Only clear seat selection data to prevent re-booking
-if ($is_roundtrip) {
-    // Keep roundtrip data but clear seat selections
-    unset($_SESSION['roundtrip_seats']);
-} else {
-    // Keep selected_trip but clear seat selections
-    unset($_SESSION['selected_seats']);
-}
+    // IMPORTANT: Preserve trip data for paystack.php display
+    if ($is_roundtrip) {
+        // Keep all roundtrip data including seats for payment page display
+        // DON'T clear anything - paystack.php needs this data
+        // $_SESSION['roundtrip'] - KEEP
+        // $_SESSION['roundtrip_seats'] - KEEP
+        // $_SESSION['is_roundtrip'] - KEEP
+    } else {
+        // For one-way: Keep trip and seats data for payment page
+        // $_SESSION['selected_trip'] - KEEP
+        // $_SESSION['selected_seats'] - KEEP
+        
+        // Ensure passenger details include seat numbers for paystack.php
+        foreach ($passenger_details as $idx => $passenger) {
+            $_SESSION['passenger_details'][$idx]['seat_number'] = $passenger['seat_number'];
+        }
+    }
 
-error_log("Successfully created " . count($booking_ids) . " bookings");
+    error_log("Successfully created " . count($booking_ids) . " bookings");
 
-// Redirect to payment page
-header("Location: " . SITE_URL . "/bookings/paystack.php");
-exit();
+    // Redirect to payment page
+    header("Location: " . SITE_URL . "/bookings/paystack.php");
+    exit();
+    
 } catch (Exception $e) {
     $conn->rollback();
     error_log("Booking creation failed: " . $e->getMessage());
@@ -512,7 +521,11 @@ exit();
         strpos($e->getMessage(), 'vehicle capacity') !== false ||
         strpos($e->getMessage(), 'Duplicate entry') !== false) {
         $_SESSION['error'] = $e->getMessage();
-        header("Location: " . SITE_URL . "/bookings/seat_selection.php?error=duplicate_seat");
+        if ($is_roundtrip) {
+            header("Location: " . SITE_URL . "/bookings/roundtrip_seat_selection.php?error=duplicate_seat");
+        } else {
+            header("Location: " . SITE_URL . "/bookings/seat_selection.php?error=duplicate_seat");
+        }
     } else {
         $_SESSION['error'] = 'Failed to create booking. Please try again. Error: ' . htmlspecialchars($e->getMessage());
         header("Location: " . SITE_URL . "/bookings/passenger_details.php");
