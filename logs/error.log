@@ -1,48 +1,59 @@
-[20-Oct-2025 12:23:12 Europe/Berlin] PHP Fatal error:  Uncaught ArgumentCountError: The number of elements in the type definition string must match the number of bind variables in C:\xampp\htdocs\dgctransports\api\get_trips.php:64
-Stack trace:
-#0 C:\xampp\htdocs\dgctransports\api\get_trips.php(64): mysqli_stmt->bind_param('ssiissss', '2025-10-22', '2025-10-22', 1, 2, 1, '2025-10-22', '2025-10-22', '2025-10-22', '2025-10-22')
-#1 {main}
-  thrown in C:\xampp\htdocs\dgctransports\api\get_trips.php on line 64
-[20-Oct-2025 12:28:00 Europe/Berlin] get_trips.php inputs: pickup_city_id=1, dropoff_city_id=2, vehicle_type_id=1, trip_date=2025-10-21
-[20-Oct-2025 12:28:00 Europe/Berlin] get_trips.php results count: 0
-[20-Oct-2025 12:28:09 Europe/Berlin] get_trips.php inputs: pickup_city_id=1, dropoff_city_id=2, vehicle_type_id=1, trip_date=2025-10-23
-[20-Oct-2025 12:28:09 Europe/Berlin] get_trips.php results count: 0
-[20-Oct-2025 12:30:01 Europe/Berlin] get_trips.php inputs: pickup_city_id=1, dropoff_city_id=2, vehicle_type_id=1, trip_date=2025-10-22
-[20-Oct-2025 12:30:01 Europe/Berlin] get_trips.php results count: 3
-[20-Oct-2025 12:30:39 Europe/Berlin] get_trips.php inputs: pickup_city_id=2, dropoff_city_id=1, vehicle_type_id=1, trip_date=2025-10-30
-[20-Oct-2025 12:30:39 Europe/Berlin] get_trips.php results count: 3
-[20-Oct-2025 12:31:04 Europe/Berlin] get_trips.php inputs: pickup_city_id=2, dropoff_city_id=1, vehicle_type_id=1, trip_date=2025-10-30
-[20-Oct-2025 12:31:04 Europe/Berlin] get_trips.php results count: 3
-[20-Oct-2025 12:38:54 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function time_elapsed_string() in C:\xampp\htdocs\dgctransports\admin\view_bookings.php:633
-Stack trace:
-#0 {main}
-  thrown in C:\xampp\htdocs\dgctransports\admin\view_bookings.php on line 633
-[20-Oct-2025 12:42:49 Europe/Berlin] PHP Fatal error:  Uncaught ArgumentCountError: The number of variables must match the number of parameters in the prepared statement in C:\xampp\htdocs\dgctransports\admin\view_bookings.php:175
-Stack trace:
-#0 C:\xampp\htdocs\dgctransports\admin\view_bookings.php(175): mysqli_stmt->bind_param('isiiii', 13, '2025-10-22', 20, 0, 20, 0)
-#1 {main}
-  thrown in C:\xampp\htdocs\dgctransports\admin\view_bookings.php on line 175
-[20-Oct-2025 17:04:21 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Table 'dgctransports.trips' doesn't exist in C:\xampp\htdocs\dgctransports\staff\bookings.php:55
-Stack trace:
-#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(55): mysqli->prepare('\r\n    SELECT b....')
-#1 {main}
-  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 55
-[20-Oct-2025 17:09:20 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'tt.departure_time' in 'field list' in C:\xampp\htdocs\dgctransports\staff\bookings.php:54
-Stack trace:
-#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(54): mysqli->prepare('\r\n    SELECT b....')
-#1 {main}
-  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 54
-[20-Oct-2025 17:09:22 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'tt.departure_time' in 'field list' in C:\xampp\htdocs\dgctransports\staff\bookings.php:54
-Stack trace:
-#0 C:\xampp\htdocs\dgctransports\staff\bookings.php(54): mysqli->prepare('\r\n    SELECT b....')
-#1 {main}
-  thrown in C:\xampp\htdocs\dgctransports\staff\bookings.php on line 54
-[20-Oct-2025 17:22:43 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[20-Oct-2025 17:22:43 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[20-Oct-2025 17:23:04 Europe/Berlin] PHPMailer Error (booking_confirmation): SMTP Error: Could not connect to SMTP host. Failed to connect to server
-[20-Oct-2025 17:24:01 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[20-Oct-2025 17:24:01 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[20-Oct-2025 17:24:22 Europe/Berlin] PHPMailer Error (booking_confirmation): SMTP Error: Could not connect to SMTP host. Failed to connect to server
-[23-Oct-2025 12:06:53 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[23-Oct-2025 12:06:53 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"zigamakinde@gmail.com","passenger_name":"VICTOR OLUWASEGUN MAKINDE","pnr":"DGC9945CD4","trip":{"pickup_city":"Jos","dropoff_city":"Abuja","trip_date":"2025-10-30","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"JOS-ABJ1","driver_name":null},"seat_number":3,"total_amount":"16000.00","payment_method":"Manual Entry","payment_reference":"MANUAL-69C836FF3F2B","payment_status":"paid"}
-[23-Oct-2025 12:06:58 Europe/Berlin] Booking confirmation sent for PNR: DGC9945CD4 to: zigamakinde@gmail.com
+[01-Dec-2025 01:46:50 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\passenger_details.php on line 324
+[01-Dec-2025 01:46:50 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\passenger_details.php on line 324
+[01-Dec-2025 01:46:50 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\passenger_details.php on line 369
+[01-Dec-2025 01:46:50 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\passenger_details.php on line 370
+[01-Dec-2025 01:52:50 Europe/Berlin] Round trip seats stored successfully:
+[01-Dec-2025 01:52:50 Europe/Berlin] Outbound seats: 1
+[01-Dec-2025 01:52:50 Europe/Berlin] Return seats: 5
+[01-Dec-2025 01:52:58 Europe/Berlin] process_booking.php accessed - Method: POST
+[01-Dec-2025 01:52:58 Europe/Berlin] Passenger POST data structure:
+[01-Dec-2025 01:52:58 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, outbound_seat, return_seat, email, phone, emergency_contact
+[01-Dec-2025 01:52:58 Europe/Berlin]   - outbound_seat: 1
+[01-Dec-2025 01:52:58 Europe/Berlin]   - return_seat: 5
+[01-Dec-2025 01:52:58 Europe/Berlin] Round trip validation - Passenger 0: outbound_seat=1, return_seat=5
+[01-Dec-2025 01:52:58 Europe/Berlin] Seats validated for passenger 0: outbound=1, return=5
+[01-Dec-2025 01:52:58 Europe/Berlin] Successfully created 2 bookings
+[01-Dec-2025 01:52:58 Europe/Berlin] Missing one-way session data
+[01-Dec-2025 01:55:36 Europe/Berlin] Round trip seats stored successfully:
+[01-Dec-2025 01:55:36 Europe/Berlin] Outbound seats: 1
+[01-Dec-2025 01:55:37 Europe/Berlin] Return seats: 3
+[01-Dec-2025 01:55:47 Europe/Berlin] process_booking.php accessed - Method: POST
+[01-Dec-2025 01:55:47 Europe/Berlin] Passenger POST data structure:
+[01-Dec-2025 01:55:47 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, outbound_seat, return_seat, email, phone, emergency_contact
+[01-Dec-2025 01:55:47 Europe/Berlin]   - outbound_seat: 1
+[01-Dec-2025 01:55:47 Europe/Berlin]   - return_seat: 3
+[01-Dec-2025 01:55:47 Europe/Berlin] Round trip validation - Passenger 0: outbound_seat=1, return_seat=3
+[01-Dec-2025 01:55:47 Europe/Berlin] Seats validated for passenger 0: outbound=1, return=3
+[01-Dec-2025 01:55:47 Europe/Berlin] Successfully created 2 bookings
+[01-Dec-2025 01:55:47 Europe/Berlin] Missing one-way session data
+[01-Dec-2025 02:06:26 Europe/Berlin] Round trip seats stored successfully:
+[01-Dec-2025 02:06:26 Europe/Berlin] Outbound seats: 3
+[01-Dec-2025 02:06:26 Europe/Berlin] Return seats: 5
+[01-Dec-2025 02:06:36 Europe/Berlin] process_booking.php accessed - Method: POST
+[01-Dec-2025 02:06:36 Europe/Berlin] Passenger POST data structure:
+[01-Dec-2025 02:06:36 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, outbound_seat, return_seat, email, phone, emergency_contact
+[01-Dec-2025 02:06:36 Europe/Berlin]   - outbound_seat: 3
+[01-Dec-2025 02:06:36 Europe/Berlin]   - return_seat: 5
+[01-Dec-2025 02:06:36 Europe/Berlin] Round trip validation - Passenger 0: outbound_seat=3, return_seat=5
+[01-Dec-2025 02:06:36 Europe/Berlin] Seats validated for passenger 0: outbound=3, return=5
+[01-Dec-2025 02:06:36 Europe/Berlin] Successfully created 2 bookings
+[01-Dec-2025 02:10:10 Europe/Berlin] verify_payment.php accessed - Method: POST
+[01-Dec-2025 02:10:10 Europe/Berlin] POST data: Array
+(
+    [reference] => DGC_692cea1cb4973_1764551196
+)
+
+[01-Dec-2025 02:10:11 Europe/Berlin] Updated booking ID 271 to paid and confirmed (ref: DGC_692cea1cb4973_1764551196)
+[01-Dec-2025 02:10:11 Europe/Berlin] Updated booking ID 272 to paid and confirmed (ref: DGC_692cea1cb4973_1764551196)
+[01-Dec-2025 02:10:11 Europe/Berlin] Inserted payment for booking ID 271: method=card, ref=DGC_692cea1cb4973_1764551196, amount=32000
+[01-Dec-2025 02:10:11 Europe/Berlin] Inserted payment for booking ID 272: method=card, ref=DGC_692cea1cb4973_1764551196, amount=32000
+[01-Dec-2025 02:10:11 Europe/Berlin] Round trip booking confirmed - PNRs: D17543Q, D92809Y
+[01-Dec-2025 02:10:11 Europe/Berlin] PHP Warning:  Undefined array key "linked_booking_id" in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 98
+[01-Dec-2025 02:10:11 Europe/Berlin] PHP Warning:  Undefined array key "linked_booking_id" in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 98
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 356
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Warning:  Trying to access array offset on value of type null in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 356
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 356
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Warning:  Undefined array key 0 in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 360
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Warning:  Trying to access array offset on value of type null in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 360
+[01-Dec-2025 02:10:12 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 360
+[01-Dec-2025 02:35:38 Europe/Berlin] PHP Deprecated:  Constant FILTER_SANITIZE_STRING is deprecated in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 53

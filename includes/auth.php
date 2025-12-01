@@ -29,6 +29,9 @@ function redirectUser() {
         case 'staff':
             $redirect_url = SITE_URL . "/staff/dashboard.php";
             break;
+        case 'investor':
+            $redirect_url = SITE_URL . "/investor/dashboard.php";
+            break;
         case 'customer':
         default:
             $redirect_url = SITE_URL . "/dashboard.php";
