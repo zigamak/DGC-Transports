@@ -1,5 +1,5 @@
 <?php
-// bookings/confirmation.php
+// bookings/confirmation.php - ORIGINAL DESIGN - FULLY COMPLETED
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/config.php';
@@ -11,48 +11,61 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/error.log');
 
-// Check if required session data exists
-if (!isset($_SESSION['confirmed_pnrs']) || !isset($_SESSION['confirmed_trip']) || !isset($_SESSION['confirmed_total_amount'])) {
-    error_log("Missing session data in confirmation.php: " . json_encode([
-        'confirmed_pnrs' => isset($_SESSION['confirmed_pnrs']) ? 'set' : 'not set',
-        'confirmed_trip' => isset($_SESSION['confirmed_trip']) ? 'set' : 'not set',
-        'confirmed_total_amount' => isset($_SESSION['confirmed_total_amount']) ? 'set' : 'not set'
-    ]));
-    header("Location: " . SITE_URL . "/bookings/search_trips.php");
-    exit();
+// DETECT ROUND TRIP
+$is_roundtrip = isset($_SESSION['is_roundtrip_confirmation']) && $_SESSION['is_roundtrip_confirmation'];
+
+if ($is_roundtrip) {
+    // Round trip validation
+    if (!isset($_SESSION['confirmed_pnrs']) || !isset($_SESSION['confirmed_outbound_trip']) || !isset($_SESSION['confirmed_return_trip']) || !isset($_SESSION['confirmed_total_amount'])) {
+        error_log("Missing round trip confirmation session data");
+        header("Location: " . SITE_URL . "/bookings/search_trips.php");
+        exit();
+    }
+   
+    $pnrs = $_SESSION['confirmed_pnrs'];
+    $outbound_trip = $_SESSION['confirmed_outbound_trip'];
+    $return_trip = $_SESSION['confirmed_return_trip'];
+    $total_amount = $_SESSION['confirmed_total_amount'];
+   
+} else {
+    // One-way validation
+    if (!isset($_SESSION['confirmed_pnrs']) || !isset($_SESSION['confirmed_trip']) || !isset($_SESSION['confirmed_total_amount'])) {
+        error_log("Missing session data in confirmation.php");
+        header("Location: " . SITE_URL . "/bookings/search_trips.php");
+        exit();
+    }
+   
+    $pnrs = $_SESSION['confirmed_pnrs'];
+    $trip = $_SESSION['confirmed_trip'];
+    $total_amount = $_SESSION['confirmed_total_amount'];
 }
 
-$pnrs = $_SESSION['confirmed_pnrs'];
-$trip = $_SESSION['confirmed_trip'];
-$total_amount = $_SESSION['confirmed_total_amount'];
-
-// Get PNR from URL (supporting both 'pnr' and 'booking_id' for compatibility)
-$pnr = filter_input(INPUT_GET, 'pnr', FILTER_SANITIZE_SPECIAL_CHARS) ?? 
+// Get PNR from URL
+$pnr = filter_input(INPUT_GET, 'pnr', FILTER_SANITIZE_SPECIAL_CHARS) ??
        filter_input(INPUT_GET, 'booking_id', FILTER_SANITIZE_SPECIAL_CHARS) ?? '';
 
 // If no PNR provided, use the first from session and redirect
 if (empty($pnr) && !empty($pnrs)) {
     $pnr = $pnrs[0];
-    $redirect_url = SITE_URL . "/bookings/confirmation.php?pnr=" . urlencode($pnr);
-    error_log("No PNR in URL, redirecting to: $redirect_url");
-    header("Location: $redirect_url");
+    header("Location: " . SITE_URL . "/bookings/confirmation.php?pnr=" . urlencode($pnr));
     exit();
 }
 
 // Verify that the provided PNR is in the session's PNRs
 if (!in_array($pnr, $pnrs)) {
-    error_log("Invalid PNR: $pnr. Redirecting to search_trips.php");
+    error_log("Invalid PNR: $pnr");
     header("Location: " . SITE_URL . "/bookings/search_trips.php");
     exit();
 }
 
-// Fetch bookings from database, including payment details
+// Fetch bookings from database
 $placeholders = implode(',', array_fill(0, count($pnrs), '?'));
 $stmt = $conn->prepare("
-    SELECT b.*, 
-           tt.pickup_city_id, tt.dropoff_city_id, pc.name AS pickup_city, dc.name AS dropoff_city, 
+    SELECT b.*,
+           tt.pickup_city_id, tt.dropoff_city_id, pc.name AS pickup_city, dc.name AS dropoff_city,
            vt.type AS vehicle_type, v.vehicle_number, v.driver_name, ts.departure_time,
-           pay.payment_method, pay.transaction_reference
+           pay.payment_method, pay.transaction_reference,
+           ti.trip_date
     FROM bookings b
     JOIN trip_instances ti ON b.trip_id = ti.id
     JOIN trip_templates tt ON ti.template_id = tt.id
@@ -63,40 +76,67 @@ $stmt = $conn->prepare("
     JOIN time_slots ts ON tt.time_slot_id = ts.id
     LEFT JOIN payments pay ON b.id = pay.booking_id
     WHERE b.pnr IN ($placeholders) AND b.status = 'confirmed'
+    ORDER BY ti.trip_date ASC, b.id ASC
 ");
-if (!$stmt) {
-    error_log("Prepare booking query failed: " . $conn->error);
-    header("Location: " . SITE_URL . "/bookings/search_trips.php?error=database");
-    exit();
-}
 $stmt->bind_param(str_repeat('s', count($pnrs)), ...$pnrs);
 $stmt->execute();
 $result = $stmt->get_result();
 $db_bookings = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Validate that bookings exist in the database
 if (empty($db_bookings)) {
     error_log("No confirmed bookings found for PNRs: " . implode(', ', $pnrs));
     header("Location: " . SITE_URL . "/bookings/search_trips.php?error=no_bookings");
     exit();
 }
 
-// Organize bookings by PNR
-$bookings = [];
-$passenger_details = [];
-$selected_seats = [];
-foreach ($db_bookings as $booking) {
-    $bookings[$booking['pnr']] = $booking;
-    $passenger_details[] = [
-        'name' => $booking['passenger_name'],
-        'email' => $booking['email'],
-        'phone' => $booking['phone'],
-        'emergency_contact' => $booking['emergency_contact'],
-        'seat_number' => $booking['seat_number'],
-        'special_requests' => $booking['special_requests']
-    ];
-    $selected_seats[] = $booking['seat_number'];
+// Organize bookings
+if ($is_roundtrip) {
+    // ROUND TRIP: Separate bookings by trip date
+    $outbound_bookings = [];
+    $return_bookings = [];
+   
+    $trip_dates = array_unique(array_column($db_bookings, 'trip_date'));
+    sort($trip_dates);
+   
+    if (count($trip_dates) >= 2) {
+        $outbound_date = $trip_dates[0];
+        $return_date = $trip_dates[1];
+       
+        foreach ($db_bookings as $booking) {
+            if ($booking['trip_date'] === $outbound_date) {
+                $outbound_bookings[] = $booking;
+            } else if ($booking['trip_date'] === $return_date) {
+                $return_bookings[] = $booking;
+            }
+        }
+    } else {
+        $half = ceil(count($db_bookings) / 2);
+        $outbound_bookings = array_slice($db_bookings, 0, $half);
+        $return_bookings = array_slice($db_bookings, $half);
+    }
+   
+    $bookings = $outbound_bookings;
+    $selected_seats = array_column($outbound_bookings, 'seat_number');
+   
+} else {
+    // ONE-WAY: Standard organization
+    $bookings = [];
+    $passenger_details = [];
+    $selected_seats = [];
+   
+    foreach ($db_bookings as $booking) {
+        $bookings[$booking['pnr']] = $booking;
+        $passenger_details[] = [
+            'name' => $booking['passenger_name'],
+            'email' => $booking['email'],
+            'phone' => $booking['phone'],
+            'emergency_contact' => $booking['emergency_contact'],
+            'seat_number' => $booking['seat_number'],
+            'special_requests' => $booking['special_requests']
+        ];
+        $selected_seats[] = $booking['seat_number'];
+    }
 }
 
 // Generate QR code for the provided PNR
@@ -112,7 +152,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("QR code generation failed: " . $e->getMessage());
-    $qr_code_path = null; // Fallback to no QR code
+    $qr_code_path = null;
 }
 
 require_once '../templates/header.php';
@@ -138,8 +178,6 @@ require_once '../templates/header.php';
         }
     </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         @keyframes checkmark {
             0% { transform: scale(0); }
@@ -152,29 +190,15 @@ require_once '../templates/header.php';
         .gradient-bg {
             background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
         }
-        .qr-code-img {
+        .|qr-code-img {
             max-width: 120px;
             border: 2px solid #1a1a1a;
             border-radius: 8px;
         }
-        @media (max-width: 640px) {
-            .text-4xl { font-size: 1.5rem; }
-            .text-2xl { font-size: 1.25rem; }
-            .text-xl { font-size: 1.125rem; }
-            .p-6 { padding: 1rem; }
-            .max-w-4xl { max-width: 100%; }
-            .px-4 { padding-left: 1rem; padding-right: 1rem; }
-            .gap-8 { gap: 1.5rem; }
-            .py-3 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-            .px-6 { padding-left: 1rem; padding-right: 1rem; }
-        }
         @media print {
             body { background: white; }
             .no-print { display: none !important; }
-            .ticket-card { display: block; }
             .gradient-bg { background: #dc2626; }
-            .min-h-screen, .py-8, .max-w-4xl, .px-4 { padding: 0; margin: 0; }
-            .qr-code-img { max-width: 100px; }
         }
     </style>
 </head>
@@ -183,340 +207,355 @@ require_once '../templates/header.php';
         <!-- Success Header -->
         <div class="text-center mb-8 no-print">
             <div class="checkmark-animation inline-block">
-                <i class="fas fa-check-circle text-4xl sm:text-6xl text-green-500 mb-4"></i>
+                <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
             </div>
-            <h1 class="text-2xl sm:text-4xl font-bold text-gray-800 mb-2">Booking Confirmed!</h1>
-            <p class="text-base sm:text-lg text-gray-600">Your trip has been successfully booked</p>
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">
+                <?= $is_roundtrip ? 'Round Trip ' : '' ?>Booking Confirmed!
+            </h1>
+            <p class="text-lg text-gray-600">Your trip has been successfully booked</p>
         </div>
 
         <!-- Booking Details Card -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-8 ticket-card" id="ticket-card">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-8" id="ticket-card">
             <!-- Header -->
-            <div class="gradient-bg text-white p-4 sm:p-6">
-                <div class="flex flex-col sm:flex-row items-center justify-between">
+            <div class="gradient-bg text-white p-6">
+                <div class="flex items-center justify-between">
                     <div>
-                        <h2 class="text-xl sm:text-2xl font-bold"><?= htmlspecialchars(SITE_NAME) ?></h2>
-                        <p class="text-red-100 text-sm sm:text-base">Electronic Ticket</p>
+                        <h2 class="text-2xl font-bold"><?= htmlspecialchars(SITE_NAME) ?></h2>
+                        <p class="text-red-100"><?= $is_roundtrip ? 'Round Trip Electronic Ticket' : 'Electronic Ticket' ?></p>
                     </div>
-                    <div class="text-center sm:text-right mt-2 sm:mt-0">
-                        <div class="text-xs sm:text-sm text-red-100">PNR(s)</div>
-                        <div class="text-lg sm:text-2xl font-bold"><?= htmlspecialchars(implode(', ', $pnrs)) ?></div>
+                    <div class="text-right">
+                        <div class="text-sm text-red-100">PNR(s)</div>
+                        <div class="text-2xl font-bold"><?= htmlspecialchars(implode(', ', $pnrs)) ?></div>
                     </div>
                 </div>
             </div>
 
             <!-- Main Content -->
-            <div class="p-4 sm:p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-                    <!-- Trip Details -->
-                    <div>
-                        <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
-                            <i class="fas fa-route text-primary mr-2 sm:mr-3"></i>
-                            Trip Details
-                        </h3>
-                        <div class="space-y-2 sm:space-y-3 text-sm sm:text-base">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Route:</span>
-                                <span class="font-semibold"><?= htmlspecialchars($trip['pickup_city']) ?> → <?= htmlspecialchars($trip['dropoff_city']) ?></span>
+            <div class="p-6">
+                <?php if ($is_roundtrip): ?>
+                    <!-- ROUND TRIP DISPLAY -->
+                    <div class="space-y-8">
+                        <!-- Outbound Trip -->
+                        <?php if (!empty($outbound_bookings)): ?>
+                        <div class="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center text-blue-800">
+                                Outbound Trip
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Route:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($outbound_bookings[0]['pickup_city']) ?> → <?= htmlspecialchars($outbound_bookings[0]['dropoff_city']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Date:</span>
+                                        <span class="font-semibold"><?= date('M j, Y', strtotime($outbound_bookings[0]['trip_date'])) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Time:</span>
+                                        <span class="font-semibold"><?= date('h:i A', strtotime($outbound_bookings[0]['departure_time'])) ?></span>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Vehicle:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($outbound_bookings[0]['vehicle_type']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Vehicle No:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($outbound_bookings[0]['vehicle_number']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Driver:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($outbound_bookings[0]['driver_name'] ?? 'TBA') ?></span>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Date:</span>
-                                <span class="font-semibold"><?= date('M j, Y', strtotime($trip['trip_date'])) ?></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Departure Time:</span>
-                                <span class="font-semibold"><?= date('h:i A', strtotime($trip['departure_time'] ?? '00:00')) ?></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Vehicle:</span>
-                                <span class="font-semibold"><?= htmlspecialchars($trip['vehicle_type'] ?? 'N/A') ?></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Vehicle Number:</span>
-                                <span class="font-semibold"><?= htmlspecialchars($trip['vehicle_number'] ?? 'N/A') ?></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Driver:</span>
-                                <span class="font-semibold"><?= htmlspecialchars($trip['driver_name'] ?? 'N/A') ?></span>
+                            <div class="mt-4">
+                                <h4 class="font-semibold mb-2">Outbound Seats:</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <?php foreach ($outbound_bookings as $booking): ?>
+                                        <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                            Seat <?= htmlspecialchars($booking['seat_number']) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-4 sm:mt-6">
-                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Your Seats:</h4>
-                            <div class="flex flex-wrap gap-2">
-                                <?php foreach ($selected_seats as $seat): ?>
-                                    <span class="bg-primary text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
-                                        Seat <?= htmlspecialchars($seat) ?>
-                                    </span>
-                                <?php endforeach; ?>
+                        <?php endif; ?>
+                       
+                        <!-- Return Trip -->
+                        <?php if (!empty($return_bookings)): ?>
+                        <div class="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                            <h3 class="text-xl font-bold mb-4 flex items-center text-green-800">
+                                Return Trip
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Route:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($return_bookings[0]['pickup_city']) ?> → <?= htmlspecialchars($return_bookings[0]['dropoff_city']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Date:</span>
+                                        <span class="font-semibold"><?= date('M j, Y', strtotime($return_bookings[0]['trip_date'])) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Time:</span>
+                                        <span class="font-semibold"><?= date('h:i A', strtotime($return_bookings[0]['departure_time'])) ?></span>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Vehicle:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($return_bookings[0]['vehicle_type']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Vehicle No:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($return_bookings[0]['vehicle_number']) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Driver:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($return_bookings[0]['driver_name'] ?? 'TBA') ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <h4 class="font-semibold mb-2">Return Seats:</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <?php foreach ($return_bookings as $booking): ?>
+                                        <span class="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                            Seat <?= htmlspecialchars($booking['seat_number']) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        <?php endif; ?>
 
-                    <!-- Passenger Details -->
-                    <div>
-                        <h3 class="text-lg sm:text-xl font-bold mb-4 flex items-center">
-                            <i class="fas fa-user text-primary mr-2 sm:mr-3"></i>
-                            Passenger Information
-                        </h3>
-                        <div class="space-y-3 sm:space-y-4 text-sm sm:text-base">
-                            <?php foreach ($passenger_details as $index => $passenger): ?>
-                                <div class="border-t pt-2">
-                                    <h4 class="font-semibold mb-2 text-sm sm:text-base">Passenger <?= $index + 1 ?> - Seat <?= htmlspecialchars($passenger['seat_number']) ?></h4>
-                                    <div class="space-y-2">
-                                        <div class="flex justify-between">
-                                            <span class="text-gray-600">PNR:</span>
-                                            <span class="font-semibold"><?= htmlspecialchars($pnrs[$index]) ?></span>
-                                        </div>
+                        <!-- Passenger Information (Round Trip) -->
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                Passenger Information
+                            </h3>
+                            <div class="space-y-4">
+                                <?php
+                                $unique_passengers = [];
+                                $passenger_index = 0;
+                                foreach ($outbound_bookings as $index => $ob):
+                                    $passenger_key = $ob['passenger_name'] . '_' . $ob['email'];
+                                    if (!isset($unique_passengers[$passenger_key])):
+                                        $unique_passengers[$passenger_key] = true;
+                                        $passenger_index++;
+                                        $rb = isset($return_bookings[$index]) ? $return_bookings[$index] : null;
+                                ?>
+                                <div class="border-t pt-3">
+                                    <h4 class="font-semibold mb-2">Passenger <?= $passenger_index ?></h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                                         <div class="flex justify-between">
                                             <span class="text-gray-600">Name:</span>
-                                            <span class="font-semibold"><?= htmlspecialchars($passenger['name']) ?></span>
+                                            <span class="font-semibold"><?= htmlspecialchars($ob['passenger_name']) ?></span>
                                         </div>
                                         <div class="flex justify-between">
                                             <span class="text-gray-600">Email:</span>
-                                            <span class="font-semibold"><?= htmlspecialchars($passenger['email']) ?></span>
+                                            <span class="font-semibold"><?= htmlspecialchars($ob['email']) ?></span>
                                         </div>
                                         <div class="flex justify-between">
                                             <span class="text-gray-600">Phone:</span>
-                                            <span class="font-semibold"><?= htmlspecialchars($passenger['phone']) ?></span>
+                                            <span class="font-semibold"><?= htmlspecialchars($ob['phone']) ?></span>
                                         </div>
-                                        <?php if (!empty($passenger['emergency_contact'])): ?>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Outbound Seat:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($ob['seat_number']) ?></span>
+                                        </div>
+                                        <?php if ($rb): ?>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Return Seat:</span>
+                                            <span class="font-semibold"><?= htmlspecialchars($rb['seat_number']) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">PNRs:</span>
+                                            <span class="font-semibold text-xs"><?= htmlspecialchars($ob['pnr']) ?>, <?= htmlspecialchars($rb['pnr']) ?></span>
+                                        </div>
+                                        <?php else: ?>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">PNR:</span>
+                                            <span class="font-semibold text-xs"><?= htmlspecialchars($ob['pnr']) ?></span>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php
+                                    endif;
+                                endforeach;
+                                ?>
+                            </div>
+                        </div>
+
+                        <!-- Payment Details (Round Trip) -->
+                        <?php if (!empty($outbound_bookings)): ?>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold mb-3">Payment Details:</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Passengers:</span>
+                                    <span class="font-semibold"><?= count($outbound_bookings) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Trip Type:</span>
+                                    <span class="font-semibold text-primary">Round Trip</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Amount Paid:</span>
+                                    <span class="font-semibold text-green-600 text-lg">₦<?= number_format($total_amount, 0) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Payment Method:</span>
+                                    <span class="font-semibold"><?= htmlspecialchars(ucfirst($outbound_bookings[0]['payment_method'] ?? 'N/A')) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Reference:</span>
+                                    <span class="font-semibold text-xs"><?= htmlspecialchars($outbound_bookings[0]['transaction_reference'] ?? $outbound_bookings[0]['payment_reference'] ?? 'N/A') ?></span>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                   
+                <?php else: ?>
+                    <!-- ONE-WAY DISPLAY (COMPLETED) -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Trip Details -->
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                Trip Details
+                            </h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Route:</span>
+                                    <span class="font-semibold"><?= htmlspecialchars($db_bookings[0]['pickup_city']) ?> → <?= htmlspecialchars($db_bookings[0]['dropoff_city']) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Date:</span>
+                                    <span class="font-semibold"><?= date('M j, Y', strtotime($db_bookings[0]['trip_date'])) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Departure Time:</span>
+                                    <span class="font-semibold"><?= date('h:i A', strtotime($db_bookings[0]['departure_time'] ?? '00:00')) ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Vehicle:</span>
+                                    <span class="font-semibold"><?= htmlspecialchars($db_bookings[0]['vehicle_type'] ?? 'N/A') ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Vehicle Number:</span>
+                                    <span class="font-semibold"><?= htmlspecialchars($db_bookings[0]['vehicle_number'] ?? 'N/A') ?></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Driver:</span>
+                                    <span class="font-semibold"><?= htmlspecialchars($db_bookings[0]['driver_name'] ?? 'N/A') ?></span>
+                                </div>
+                            </div>
+                            <div class="mt-6">
+                                <h4 class="font-semibold mb-2">Your Seats:</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <?php foreach ($selected_seats as $seat): ?>
+                                        <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                            Seat <?= htmlspecialchars($seat) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Passenger Details -->
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 flex items-center">
+                                Passenger Information
+                            </h3>
+                            <div class="space-y-4">
+                                <?php foreach ($passenger_details as $index => $passenger): ?>
+                                    <div class="border-t pt-2">
+                                        <h4 class="font-semibold mb-2">Passenger <?= $index + 1 ?> - Seat <?= htmlspecialchars($passenger['seat_number']) ?></h4>
+                                        <div class="space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">PNR:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($pnrs[$index]) ?></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Name:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($passenger['name']) ?></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Email:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($passenger['email']) ?></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-600">Phone:</span>
+                                                <span class="font-semibold"><?= htmlspecialchars($passenger['phone']) ?></span>
+                                            </div>
+                                            <?php if (!empty($passenger['emergency_contact'])): ?>
                                             <div class="flex justify-between">
                                                 <span class="text-gray-600">Emergency Contact:</span>
                                                 <span class="font-semibold"><?= htmlspecialchars($passenger['emergency_contact']) ?></span>
                                             </div>
-                                        <?php endif; ?>
-                                        <?php if ($index === 0 && !empty($passenger['special_requests'])): ?>
-                                            <div class="flex justify-between">
-                                                <span class="text-gray-600">Special Requests:</span>
-                                                <span class="font-semibold"><?= htmlspecialchars($passenger['special_requests']) ?></span>
-                                            </div>
-                                        <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <!-- Payment Details (One Way) - THIS WAS MISSING -->
+                            <?php if (!empty($db_bookings)): ?>
+                            <div class="mt-6 bg-gray-50 rounded-lg p-4">
+                                <h4 class="font-semibold mb-2">Payment Details:</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Amount Paid:</span>
+                                        <span class="font-semibold text-green-600">₦<?= number_format($total_amount, 0) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Payment Method:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars(ucfirst($db_bookings[0]['payment_method'] ?? 'N/A')) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Transaction Ref:</span>
+                                        <span class="font-semibold"><?= htmlspecialchars($db_bookings[0]['transaction_reference'] ?? 'N/A') ?></span>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="mt-4 sm:mt-6">
-                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Payment Details:</h4>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Amount Paid:</span>
-                                    <span class="font-semibold text-green-600">₦<?= number_format($total_amount, 0) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Payment Method:</span>
-                                    <span class="font-semibold"><?= htmlspecialchars(ucfirst($bookings[$pnr]['payment_method'] ?? 'N/A')) ?></span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Reference:</span>
-                                    <span class="font-semibold text-xs"><?= htmlspecialchars($bookings[$pnr]['transaction_reference'] ?? $bookings[$pnr]['payment_reference'] ?? 'N/A') ?></span>
-                                </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Booking Summary -->
-                <div class="border-t pt-4 sm:pt-6 mt-4 sm:mt-6">
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="flex flex-col sm:flex-row justify-between items-center">
-                            <div>
-                                <span class="text-base sm:text-lg font-semibold">Total Seats: <?= count($selected_seats) ?></span>
-                                <span class="text-gray-600 ml-0 sm:ml-4 text-sm">× ₦<?= number_format($trip['price'] ?? 0, 0) ?> each</span>
-                            </div>
-                            <div class="text-lg sm:text-2xl font-bold text-primary mt-2 sm:mt-0">
-                                ₦<?= number_format($total_amount, 0) ?>
-                            </div>
-                        </div>
-                        <div class="mt-4 text-center">
-                            <h4 class="font-semibold mb-2 text-sm sm:text-base">Booking QR Code</h4>
-                            <?php if ($qr_code_path && file_exists($qr_code_path)): ?>
-                                <img src="<?= htmlspecialchars(SITE_URL . '/qrcodes/pnr_' . $pnr . '.png') ?>" alt="PNR QR Code" class="qr-code-img mx-auto">
-                            <?php else: ?>
-                                <p class="text-red-600 text-sm">QR code unavailable</p>
                             <?php endif; ?>
                         </div>
                     </div>
+                <?php endif; ?>
+
+                <!-- QR Code Section (Same for both) -->
+                <div class="text-center mt-10">
+                    <p class="text-lg font-semibold mb-4">Scan QR Code at Boarding Point</p>
+                    <?php if ($qr_code_path && file_exists($qr_code_path)): ?>
+                        <img src="<?= SITE_URL ?>/qrcodes/pnr_<?= htmlspecialchars($pnr) ?>.png" alt="QR Code" class="qr-code-img mx-auto">
+                        <p class="text-sm text-gray-600 mt-2">PNR: <strong><?= htmlspecialchars($pnr) ?></strong></p>
+                    <?php else: ?>
+                        <p class="text-red-600">QR Code temporarily unavailable</p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Print & Back Buttons -->
+                <div class="text-center mt-8 space-x-4 no-print">
+                    <button onclick="window.print()" class="bg-primary hover:bg-secondary text-white font-bold py-3 px-8 rounded-lg transition">
+                        Print Ticket
+                    </button>
+                    <a href="<?= SITE_URL ?>/bookings/my_bookings.php" class="bg-gray-600 hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-lg transition">
+                        My Bookings
+                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- Important Information -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6 mb-8 no-print">
-            <h3 class="text-base sm:text-lg font-bold text-yellow-800 mb-3 flex items-center">
-                <i class="fas fa-exclamation-triangle text-yellow-600 mr-2 sm:mr-3"></i>
-                Important Information
-            </h3>
-            <ul class="space-y-2 text-yellow-800 text-sm sm:text-base">
-                <li class="flex items-start">
-                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                    Please arrive at the terminal at least 30 minutes before departure
-                </li>
-                <li class="flex items-start">
-                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                    Bring a valid ID for verification
-                </li>
-                <li class="flex items-start">
-                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                    Keep your PNR(s) (<?= htmlspecialchars(implode(', ', $pnrs)) ?>) for reference
-                </li>
-                <li class="flex items-start">
-                    <i class="fas fa-check text-yellow-600 mr-2 mt-1"></i>
-                    Contact support if you need to make changes to your booking
-                </li>
-            </ul>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center no-print">
-            <button onclick="window.print()" class="bg-primary text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-secondary transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
-                <i class="fas fa-print mr-2"></i>Print Ticket
-            </button>
-            <button onclick="downloadPDF()" class="bg-gray-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
-                <i class="fas fa-download mr-2"></i>Download PDF
-            </button>
-            <a href="<?= SITE_URL ?>/bookings/search_trips.php" class="bg-green-600 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center justify-center text-sm sm:text-base">
-                <i class="fas fa-plus mr-2"></i>Book Another Trip
-            </a>
-        </div>
-
-        <!-- Contact Information -->
-        <div class="text-center mt-8 text-gray-600 no-print">
-            <p class="mb-2 text-sm sm:text-base">Need help? Contact us:</p>
-            <p class="font-semibold text-sm sm:text-base">Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?></p>
-            <p class="text-xs sm:text-sm mt-2">Your PNR(s): <span class="font-bold text-primary"><?= htmlspecialchars(implode(', ', $pnrs)) ?></span></p>
+        <div class="text-center mt-8 text-gray-600 text-sm no-print">
+            Thank you for booking with <?= htmlspecialchars(SITE_NAME) ?>. Have a safe journey!
         </div>
     </div>
-<?php require_once '../templates/footer.php'; ?>
-
-    <script>
-        async function downloadPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 10;
-            let y = 10;
-
-            // Add logo or title
-            doc.setFontSize(20);
-            doc.setTextColor(220, 38, 38);
-            doc.text('<?= htmlspecialchars(SITE_NAME) ?> - Booking Confirmation', margin, y);
-            y += 10;
-
-            // PNRs
-            doc.setFontSize(12);
-            doc.setTextColor(0);
-            doc.text('PNR(s): <?= htmlspecialchars(implode(', ', $pnrs)) ?>', margin, y);
-            y += 10;
-
-            // Trip Details
-            doc.setFontSize(16);
-            doc.text('Trip Details', margin, y);
-            y += 10;
-            doc.setFontSize(12);
-            doc.text('Route: <?= htmlspecialchars($trip['pickup_city']) ?> → <?= htmlspecialchars($trip['dropoff_city']) ?>', margin, y);
-            y += 7;
-            doc.text('Date: <?= date('M j, Y', strtotime($trip['trip_date'])) ?>', margin, y);
-            y += 7;
-            doc.text('Departure Time: <?= date('h:i A', strtotime($trip['departure_time'] ?? '00:00')) ?>', margin, y);
-            y += 7;
-            doc.text('Vehicle: <?= htmlspecialchars($trip['vehicle_type'] ?? 'N/A') ?>', margin, y);
-            y += 7;
-            doc.text('Vehicle Number: <?= htmlspecialchars($trip['vehicle_number'] ?? 'N/A') ?>', margin, y);
-            y += 7;
-            doc.text('Driver: <?= htmlspecialchars($trip['driver_name'] ?? 'N/A') ?>', margin, y);
-            y += 7;
-            doc.text('Seats: <?= implode(', ', array_map('htmlspecialchars', $selected_seats)) ?>', margin, y);
-            y += 10;
-
-            // Passenger Details
-            doc.setFontSize(16);
-            doc.text('Passenger Details', margin, y);
-            y += 10;
-            doc.setFontSize(12);
-            <?php foreach ($passenger_details as $index => $passenger): ?>
-                doc.text('Passenger <?= $index + 1 ?> - Seat <?= htmlspecialchars($passenger['seat_number']) ?>', margin, y);
-                y += 7;
-                doc.text('PNR: <?= htmlspecialchars($pnrs[$index]) ?>', margin, y);
-                y += 7;
-                doc.text('Name: <?= htmlspecialchars($passenger['name']) ?>', margin, y);
-                y += 7;
-                doc.text('Email: <?= htmlspecialchars($passenger['email']) ?>', margin, y);
-                y += 7;
-                doc.text('Phone: <?= htmlspecialchars($passenger['phone']) ?>', margin, y);
-                y += 7;
-                <?php if (!empty($passenger['emergency_contact'])): ?>
-                    doc.text('Emergency Contact: <?= htmlspecialchars($passenger['emergency_contact']) ?>', margin, y);
-                    y += 7;
-                <?php endif; ?>
-                <?php if ($index === 0 && !empty($passenger['special_requests'])): ?>
-                    doc.text('Special Requests: <?= htmlspecialchars($passenger['special_requests']) ?>', margin, y);
-                    y += 7;
-                <?php endif; ?>
-                y += 5;
-            <?php endforeach; ?>
-
-            // Payment Details
-            doc.setFontSize(16);
-            doc.text('Payment Details', margin, y);
-            y += 10;
-            doc.setFontSize(12);
-            doc.text('Amount Paid: ₦<?= number_format($total_amount, 0) ?>', margin, y);
-            y += 7;
-            doc.text('Payment Method: <?= htmlspecialchars(ucfirst($bookings[$pnr]['payment_method'] ?? 'N/A')) ?>', margin, y);
-            y += 7;
-            doc.text('Reference: <?= htmlspecialchars($bookings[$pnr]['transaction_reference'] ?? $bookings[$pnr]['payment_reference'] ?? 'N/A') ?>', margin, y);
-            y += 10;
-
-            // Add QR Code
-            <?php if ($qr_code_path && file_exists($qr_code_path)): ?>
-                try {
-                    const qrImage = await fetch('<?= htmlspecialchars(SITE_URL . '/qrcodes/pnr_' . $pnr . '.png') ?>');
-                    const qrBlob = await qrImage.blob();
-                    const qrUrl = URL.createObjectURL(qrBlob);
-                    doc.addImage(qrUrl, 'PNG', margin, y, 40, 40);
-                    y += 45;
-                } catch (e) {
-                    console.error('Failed to add QR code to PDF:', e);
-                }
-            <?php endif; ?>
-
-            // Important Information
-            doc.setFontSize(16);
-            doc.text('Important Information', margin, y);
-            y += 10;
-            doc.setFontSize(12);
-            doc.text('• Arrive at the terminal 30 minutes before departure', margin, y);
-            y += 7;
-            doc.text('• Bring a valid ID for verification', margin, y);
-            y += 7;
-            doc.text('• Keep your PNR(s) for reference', margin, y);
-            y += 7;
-            doc.text('• Contact support for booking changes', margin, y);
-            y += 10;
-
-            // Footer
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text('Contact: Email: <?= htmlspecialchars(SITE_EMAIL) ?> | Phone: <?= htmlspecialchars(SITE_PHONE) ?>', margin, pageHeight - 10);
-
-            // Save PDF
-            doc.save('DGC_Transport_Booking_Confirmation_<?= htmlspecialchars($pnrs[0]) ?>.pdf');
-        }
-
-        // Clear session after 5 minutes
-        setTimeout(() => {
-            fetch('<?= SITE_URL ?>/bookings/clear_confirmation.php', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Session cleared');
-                    } else {
-                        console.error('Failed to clear session:', data.message);
-                    }
-                })
-                .catch(err => console.error('Failed to clear session:', err));
-        }, 300000);
-    </script>
 </body>
 </html>

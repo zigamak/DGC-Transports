@@ -14,29 +14,121 @@ try {
     echo '<div class="error-message"><i class="fas fa-exclamation-circle"></i>Failed to load header. Please contact support.</div>';
 }
 
-// Check if trip and seats are selected
-if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_seats'])) {
-    header("Location: " . SITE_URL . "/bookings/search_trips.php");
-    exit();
+// Clear conflicting session data based on what's actually set - DO THIS FIRST!
+if (isset($_SESSION['selected_trip'])) {
+    // This is one-way, clear round trip data
+    unset($_SESSION['roundtrip']);
+    unset($_SESSION['is_roundtrip']);
+    unset($_SESSION['roundtrip_seats']);
 }
 
-$trip = $_SESSION['selected_trip'];
-$selected_seats = $_SESSION['selected_seats'];
-$num_seats = count($selected_seats);
-$total_amount = $num_seats * $trip['price'];
+// NOW detect if this is a round trip booking
+$is_roundtrip = isset($_SESSION['roundtrip']) && 
+                 isset($_SESSION['roundtrip']['outbound']) && 
+                 isset($_SESSION['roundtrip']['return']);
 
-// Validate selected seats count matches required seats
-if ($num_seats !== $trip['num_seats']) {
-    header("Location: " . SITE_URL . "/bookings/seat_selection.php");
-    exit();
+if ($is_roundtrip) {
+    // Store round trip flag in session for process_booking.php
+    $_SESSION['is_roundtrip'] = true;
+    
+    // Round trip data
+    $roundtrip = $_SESSION['roundtrip'];
+    $outbound = $roundtrip['outbound'];
+    $return = $roundtrip['return'];
+    $outbound_seats = $_SESSION['roundtrip_seats']['outbound'] ?? [];
+    $return_seats = $_SESSION['roundtrip_seats']['return'] ?? [];
+    $num_seats = $roundtrip['num_seats'];
+    
+    // Validate that seats were actually selected
+    if (empty($outbound_seats) || empty($return_seats)) {
+        $_SESSION['error'] = 'Please select seats for your round trip.';
+        header("Location: " . SITE_URL . "/bookings/roundtrip_seat_selection.php");
+        exit();
+    }
+    
+    // Validate seat count matches
+    if (count($outbound_seats) !== $num_seats || count($return_seats) !== $num_seats) {
+        $_SESSION['error'] = 'Seat selection mismatch. Please select seats again.';
+        header("Location: " . SITE_URL . "/bookings/roundtrip_seat_selection.php");
+        exit();
+    }
+    
+    // Fetch outbound trip details from database
+    $stmt = $conn->prepare("
+        SELECT 
+            tt.*,
+            pc.name as pickup_city,
+            dc.name as dropoff_city,
+            vt.type as vehicle_type,
+            v.vehicle_number,
+            ts.departure_time
+        FROM trip_templates tt
+        JOIN cities pc ON tt.pickup_city_id = pc.id
+        JOIN cities dc ON tt.dropoff_city_id = dc.id
+        JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+        JOIN vehicles v ON tt.vehicle_id = v.id
+        JOIN time_slots ts ON tt.time_slot_id = ts.id
+        WHERE tt.id = ?
+    ");
+    $stmt->bind_param("i", $outbound['templateId']);
+    $stmt->execute();
+    $outbound_trip = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    // Fetch return trip details from database
+    $stmt = $conn->prepare("
+        SELECT 
+            tt.*,
+            pc.name as pickup_city,
+            dc.name as dropoff_city,
+            vt.type as vehicle_type,
+            v.vehicle_number,
+            ts.departure_time
+        FROM trip_templates tt
+        JOIN cities pc ON tt.pickup_city_id = pc.id
+        JOIN cities dc ON tt.dropoff_city_id = dc.id
+        JOIN vehicle_types vt ON tt.vehicle_type_id = vt.id
+        JOIN vehicles v ON tt.vehicle_id = v.id
+        JOIN time_slots ts ON tt.time_slot_id = ts.id
+        WHERE tt.id = ?
+    ");
+    $stmt->bind_param("i", $return['templateId']);
+    $stmt->execute();
+    $return_trip = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    $total_amount = ($outbound['price'] + $return['price']) * $num_seats;
+    
+    // Set display data for compatibility
+    $trip = $outbound_trip;
+    $trip['price'] = $outbound['price'] + $return['price'];
+    $selected_seats = $outbound_seats; // For display
+    
+} else {
+    // Regular one-way trip (existing code)
+    if (!isset($_SESSION['selected_trip']) || !isset($_SESSION['selected_seats'])) {
+        header("Location: " . SITE_URL . "/bookings/search_trips.php");
+        exit();
+    }
+    
+    $trip = $_SESSION['selected_trip'];
+    $selected_seats = $_SESSION['selected_seats'];
+    $num_seats = count($selected_seats);
+    $total_amount = $num_seats * $trip['price'];
+    
+    // Validate selected seats count matches required seats
+    if ($num_seats !== $trip['num_seats']) {
+        header("Location: " . SITE_URL . "/bookings/seat_selection.php");
+        exit();
+    }
 }
 
 // Check if user is logged in
 $is_logged_in = isLoggedIn();
 
-// Check for free booking eligibility
+// Check for free booking eligibility (only for one-way trips)
 $free_booking = false;
-if ($is_logged_in) {
+if ($is_logged_in && !$is_roundtrip) {
     $user_id = $_SESSION['user']['id'];
     $query = "SELECT COUNT(*) as booking_count, MAX(free_booking_used) as free_booking_used 
               FROM bookings 
@@ -96,13 +188,21 @@ if (isset($_SESSION['referral_message'])) {
             <!-- Header -->
             <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
-                    <h1 class="text-3xl font-bold text-black">Passenger Details</h1>
+                    <h1 class="text-3xl font-bold text-black">
+                        <?= $is_roundtrip ? 'Round Trip ' : '' ?>Passenger Details
+                    </h1>
                     <button onclick="goBack()" class="text-primary hover:text-secondary font-semibold">
                         <i class="fas fa-arrow-left mr-2"></i>Back to Seat Selection
                     </button>
                 </div>
                 <div class="text-sm text-gray-600">
-                    Please provide passenger information for <?= $num_seats ?> seat(s): <?= implode(', ', array_map(function($seat) { return "Seat $seat"; }, $selected_seats)) ?>
+                    <?php if ($is_roundtrip): ?>
+                        Please provide passenger information for <?= $num_seats ?> seat(s). 
+                        <br><strong>Outbound:</strong> Seats <?= implode(', ', $outbound_seats) ?> 
+                        | <strong>Return:</strong> Seats <?= implode(', ', $return_seats) ?>
+                    <?php else: ?>
+                        Please provide passenger information for <?= $num_seats ?> seat(s): <?= implode(', ', array_map(function($seat) { return "Seat $seat"; }, $selected_seats)) ?>
+                    <?php endif; ?>
                 </div>
                 <?php if ($free_booking): ?>
                     <div class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
@@ -213,13 +313,21 @@ if (isset($_SESSION['referral_message'])) {
 
                 <!-- Passenger Forms -->
                 <div class="lg:col-span-2">
-                    <form id="passengerForm" action="<?= $free_booking ? SITE_URL . '/bookings/free_booking_confirmation.php' : SITE_URL . '/bookings/process_booking.php' ?>" method="POST" class="space-y-6">
+                    <form id="passengerForm" action="<?= SITE_URL ?>/bookings/process_booking.php" method="POST" class="space-y-6">
+                        <!-- Hidden fields -->
+                        <input type="hidden" name="is_roundtrip" value="<?= $is_roundtrip ? '1' : '0' ?>">
                         <input type="hidden" name="free_booking" value="<?= $free_booking ? '1' : '0' ?>">
+                        
                         <?php for ($i = 0; $i < $num_seats; $i++): ?>
                             <div class="bg-white rounded-xl shadow-lg p-6 passenger-card">
                                 <h3 class="text-xl font-bold mb-6 flex items-center">
                                     <i class="fas fa-user-circle text-primary mr-3"></i>
-                                    Passenger <?= $i + 1 ?> - Seat <?= $selected_seats[$i] ?>
+                                    Passenger <?= $i + 1 ?> - 
+                                    <?php if ($is_roundtrip): ?>
+                                        Outbound Seat <?= $outbound_seats[$i] ?> / Return Seat <?= $return_seats[$i] ?>
+                                    <?php else: ?>
+                                        Seat <?= $selected_seats[$i] ?>
+                                    <?php endif; ?>
                                 </h3>
                                 
                                 <div class="space-y-4">
@@ -258,7 +366,14 @@ if (isset($_SESSION['referral_message'])) {
                                     
                                     <!-- Hidden field to combine first and last name for backward compatibility -->
                                     <input type="hidden" id="passenger_name_<?= $i ?>" name="passengers[<?= $i ?>][name]" value="">
-                                    <input type="hidden" name="passengers[<?= $i ?>][seat_number]" value="<?= $selected_seats[$i] ?>">
+                                    
+                                    <!-- Hidden fields for seat numbers -->
+                                    <?php if ($is_roundtrip): ?>
+                                        <input type="hidden" name="passengers[<?= $i ?>][outbound_seat]" value="<?= $outbound_seats[$i] ?>">
+                                        <input type="hidden" name="passengers[<?= $i ?>][return_seat]" value="<?= $return_seats[$i] ?>">
+                                    <?php else: ?>
+                                        <input type="hidden" name="passengers[<?= $i ?>][seat_number]" value="<?= $selected_seats[$i] ?>">
+                                    <?php endif; ?>
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -352,6 +467,9 @@ if (isset($_SESSION['referral_message'])) {
                                     I agree to the <a href="#" class="text-primary hover:underline font-semibold">Terms and Conditions</a> 
                                     and <a href="#" class="text-primary hover:underline font-semibold">Privacy Policy</a>. 
                                     I understand that this booking is subject to availability and payment confirmation.
+                                    <?php if ($is_roundtrip): ?>
+                                        <strong>This is a round trip booking.</strong>
+                                    <?php endif; ?>
                                 </label>
                             </div>
                         </div>
@@ -360,7 +478,13 @@ if (isset($_SESSION['referral_message'])) {
                             <button type="submit" 
                                     class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 px-6 rounded-xl hover:from-secondary hover:to-primary transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
                                 <i class="fas fa-credit-card mr-2"></i>
-                                <?= $free_booking ? 'Confirm Free Booking' : 'Proceed to Payment - ₦' . number_format($total_amount, 0) ?>
+                                <?php if ($free_booking): ?>
+                                    Confirm Free Booking
+                                <?php elseif ($is_roundtrip): ?>
+                                    Proceed to Payment - ₦<?= number_format($total_amount, 0) ?> (Round Trip)
+                                <?php else: ?>
+                                    Proceed to Payment - ₦<?= number_format($total_amount, 0) ?>
+                                <?php endif; ?>
                             </button>
                         </div>
                     </form>
@@ -374,69 +498,142 @@ if (isset($_SESSION['referral_message'])) {
                             Booking Summary
                         </h3>
                         
-                        <div class="space-y-3 mb-6">
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 flex items-center">
-                                    <i class="fas fa-route text-xs mr-2"></i>Route:
-                                </span>
-                                <span class="font-semibold text-right"><?= htmlspecialchars($trip['pickup_city']) ?> → <?= htmlspecialchars($trip['dropoff_city']) ?></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 flex items-center">
-                                    <i class="fas fa-calendar text-xs mr-2"></i>Date:
-                                </span>
-                                <span class="font-semibold"><?= date('M j, Y', strtotime($trip['trip_date'])) ?></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 flex items-center">
-                                    <i class="fas fa-clock text-xs mr-2"></i>Time:
-                                </span>
-                                <span class="font-semibold"><?= date('h:i A', strtotime($trip['departure_time'])) ?></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 flex items-center">
-                                    <i class="fas fa-bus text-xs mr-2"></i>Vehicle:
-                                </span>
-                                <span class="font-semibold text-right"><?= htmlspecialchars($trip['vehicle_type']) ?></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 flex items-center">
-                                    <i class="fas fa-id-badge text-xs mr-2"></i>Vehicle No:
-                                </span>
-                                <span class="font-semibold"><?= htmlspecialchars($trip['vehicle_number']) ?></span>
-                            </div>
-                        </div>
+                        <?php if ($is_roundtrip): ?>
+                            <!-- ROUND TRIP SUMMARY -->
+                            <div class="space-y-4">
+                                <!-- Outbound Section -->
+                                <div class="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                                    <h4 class="font-bold text-blue-800 mb-3 flex items-center">
+                                        <i class="fas fa-arrow-right mr-2"></i>Outbound Trip
+                                    </h4>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Route:</span>
+                                            <span class="font-semibold text-right"><?= htmlspecialchars($outbound_trip['pickup_city']) ?> → <?= htmlspecialchars($outbound_trip['dropoff_city']) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Date:</span>
+                                            <span class="font-semibold"><?= date('M j, Y', strtotime($outbound['tripDate'])) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Time:</span>
+                                            <span class="font-semibold"><?= date('h:i A', strtotime($outbound_trip['departure_time'])) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Seats:</span>
+                                            <span class="font-semibold"><?= implode(', ', $outbound_seats) ?></span>
+                                        </div>
+                                        <div class="flex justify-between border-t pt-2">
+                                            <span class="text-gray-600">Price:</span>
+                                            <span class="font-semibold">₦<?= number_format($outbound['price'] * $num_seats, 0) ?></span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                        <div class="border-t pt-4">
-                            <div class="mb-4">
-                                <h4 class="font-semibold mb-2 flex items-center">
-                                    <i class="fas fa-chair text-primary mr-2"></i>Selected Seats:
-                                </h4>
-                                <div class="flex flex-wrap gap-2">
-                                    <?php foreach ($selected_seats as $seat): ?>
-                                        <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-medium">
-                                            <?= $seat ?>
-                                        </span>
-                                    <?php endforeach; ?>
+                                <!-- Return Section -->
+                                <div class="p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
+                                        <i class="fas fa-arrow-left mr-2"></i>Return Trip
+                                    </h4>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Route:</span>
+                                            <span class="font-semibold text-right"><?= htmlspecialchars($return_trip['pickup_city']) ?> → <?= htmlspecialchars($return_trip['dropoff_city']) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Date:</span>
+                                            <span class="font-semibold"><?= date('M j, Y', strtotime($return['tripDate'])) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Time:</span>
+                                            <span class="font-semibold"><?= date('h:i A', strtotime($return_trip['departure_time'])) ?></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-gray-600">Seats:</span>
+                                            <span class="font-semibold"><?= implode(', ', $return_seats) ?></span>
+                                        </div>
+                                        <div class="flex justify-between border-t pt-2">
+                                            <span class="text-gray-600">Price:</span>
+                                            <span class="font-semibold">₦<?= number_format($return['price'] * $num_seats, 0) ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Total Section -->
+                                <div class="border-t-2 pt-4">
+                                    <div class="flex justify-between items-center text-lg font-bold">
+                                        <span>Total Amount:</span>
+                                        <span class="text-primary text-xl">₦<?= number_format($total_amount, 0) ?></span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2"><?= $num_seats ?> passenger(s) × 2 trips</p>
                                 </div>
                             </div>
-                            
-                            <div class="space-y-2 mb-4">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Price per seat:</span>
-                                    <span class="font-semibold"><?= $free_booking ? 'Free' : '₦' . number_format($trip['price'], 0) ?></span>
+                        <?php else: ?>
+                            <!-- ONE-WAY TRIP SUMMARY -->
+                            <div class="space-y-3 mb-6">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        <i class="fas fa-route text-xs mr-2"></i>Route:
+                                    </span>
+                                    <span class="font-semibold text-right"><?= htmlspecialchars($trip['pickup_city']) ?> → <?= htmlspecialchars($trip['dropoff_city']) ?></span>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Number of seats:</span>
-                                    <span class="font-semibold"><?= $num_seats ?></span>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        <i class="fas fa-calendar text-xs mr-2"></i>Date:
+                                    </span>
+                                    <span class="font-semibold"><?= date('M j, Y', strtotime($trip['trip_date'])) ?></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        <i class="fas fa-clock text-xs mr-2"></i>Time:
+                                    </span>
+                                    <span class="font-semibold"><?= date('h:i A', strtotime($trip['departure_time'])) ?></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        <i class="fas fa-bus text-xs mr-2"></i>Vehicle:
+                                    </span>
+                                    <span class="font-semibold text-right"><?= htmlspecialchars($trip['vehicle_type']) ?></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 flex items-center">
+                                        <i class="fas fa-id-badge text-xs mr-2"></i>Vehicle No:
+                                    </span>
+                                    <span class="font-semibold"><?= htmlspecialchars($trip['vehicle_number']) ?></span>
                                 </div>
                             </div>
-                            
-                            <div class="flex justify-between items-center text-lg font-bold border-t pt-3">
-                                <span>Total Amount:</span>
-                                <span class="text-primary text-xl"><?= $free_booking ? 'Free' : '₦' . number_format($total_amount, 0) ?></span>
+
+                            <div class="border-t pt-4">
+                                <div class="mb-4">
+                                    <h4 class="font-semibold mb-2 flex items-center">
+                                        <i class="fas fa-chair text-primary mr-2"></i>Selected Seats:
+                                    </h4>
+                                    <div class="flex flex-wrap gap-2">
+                                        <?php foreach ($selected_seats as $seat): ?>
+                                            <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-medium">
+                                                <?= $seat ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-2 mb-4">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Price per seat:</span>
+                                        <span class="font-semibold"><?= $free_booking ? 'Free' : '₦' . number_format($trip['price'], 0) ?></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Number of seats:</span>
+                                        <span class="font-semibold"><?= $num_seats ?></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex justify-between items-center text-lg font-bold border-t pt-3">
+                                    <span>Total Amount:</span>
+                                    <span class="text-primary text-xl"><?= $free_booking ? 'Free' : '₦' . number_format($total_amount, 0) ?></span>
+                                </div>
                             </div>
-                        </div>
+                        <?php endif; ?>
 
                         <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div class="flex items-start text-sm text-blue-700">
@@ -460,13 +657,17 @@ if (isset($_SESSION['referral_message'])) {
     <script>
         function goBack() {
             if (confirm('Are you sure you want to go back? Your seat selection will be cleared.')) {
-                fetch('<?= SITE_URL ?>/bookings/clear_seats.php', { method: 'POST' })
-                    .then(() => {
-                        window.location.href = '<?= SITE_URL ?>/bookings/seat_selection.php';
-                    })
-                    .catch(() => {
-                        window.location.href = '<?= SITE_URL ?>/bookings/seat_selection.php';
-                    });
+                <?php if ($is_roundtrip): ?>
+                    window.location.href = '<?= SITE_URL ?>/bookings/roundtrip_seat_selection.php';
+                <?php else: ?>
+                    fetch('<?= SITE_URL ?>/bookings/clear_seats.php', { method: 'POST' })
+                        .then(() => {
+                            window.location.href = '<?= SITE_URL ?>/bookings/seat_selection.php';
+                        })
+                        .catch(() => {
+                            window.location.href = '<?= SITE_URL ?>/bookings/seat_selection.php';
+                        });
+                <?php endif; ?>
             }
         }
 

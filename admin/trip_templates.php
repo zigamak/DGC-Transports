@@ -216,24 +216,23 @@ while ($row = $result->fetch_assoc()) {
                     </div>
                 </div>
             </div>
-
-            <!-- Trip Templates Section -->
-            <div class="bg-white rounded-xl card-shadow">
-                <div class="p-4 md:p-6 border-b border-gray-200">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-lg md:text-xl font-bold text-gray-900">
-                                <i class="fas fa-route text-primary-red mr-2"></i>
-                                All Trip Templates
-                            </h2>
-                            <p class="text-sm text-gray-600 mt-1">Active trip schedules</p>
-                        </div>
-                        <a href="add_trip.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition-colors duration-200">
-                            <i class="fas fa-plus mr-2"></i>
-                            Add New Template
-                        </a>
-                    </div>
-                </div>
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div>
+        <h2 class="text-lg md:text-xl font-bold text-gray-900">
+            <i class="fas fa-route text-primary-red mr-2"></i>
+            All Trip Templates
+        </h2>
+        <p class="text-sm text-gray-600 mt-1">Active trip schedules</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="add_trip.php" class="inline-flex items-center px-4 py-2 bg-primary-red text-white text-sm font-medium rounded-lg hover:bg-dark-red transition">
+            <i class="fas fa-plus mr-2"></i>Add New Template
+        </a>
+        <a href="city.php" class="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition">
+            <i class="fas fa-city mr-2"></i>Add City
+        </a>
+    </div>
+</div>
 
                 <div class="p-4 md:p-6">
                     <?php if (isset($success)): ?>

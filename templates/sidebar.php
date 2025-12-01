@@ -11,7 +11,10 @@ try {
     require_once __DIR__ . '/../includes/config.php';
 } catch (Exception $e) {
     error_log("Failed to include config.php: " . $e->getMessage());
-    define('SITE_URL', 'https://booking.dgctransports.com'); // Fallback
+    // Fallback definition for SITE_URL
+    if (!defined('SITE_URL')) {
+        define('SITE_URL', 'https://booking.dgctransports.com'); 
+    }
 }
 
 try {
@@ -29,39 +32,34 @@ try {
 if (function_exists('isLoggedIn') && isLoggedIn()): ?>
     <link rel="icon" type="image/png" href="<?= SITE_URL ?>/assets/images/icon-2.png" sizes="32x32">
 <link rel="shortcut icon" href="<?= SITE_URL ?>/assets/images/icon.png" type="image/png">
-    <!-- Mobile Header (visible only on mobile) -->
+    
     <header class="md:hidden fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200">
         <div class="flex items-center justify-between h-16 px-4">
-            <!-- Menu Toggle Button -->
             <button id="sidebar-toggle" class="p-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
                 <i class="fas fa-bars text-xl"></i>
             </button>
             
-            <!-- Logo (centered) -->
             <div class="flex-1 flex justify-center">
                 <a href="<?= SITE_URL ?>/index.php" class="flex items-center">
                     <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="DGC Transports Logo" class="h-8" onerror="this.src='https://via.placeholder.com/120x32?text=DGC';">
                 </a>
             </div>
             
-            <!-- User Avatar/Profile (placeholder for future use) -->
             <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                 <i class="fas fa-user text-red-600 text-sm"></i>
             </div>
         </div>
     </header>
 
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-white text-red-600 shadow-xl z-40 transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:shadow-2xl">
-        <!-- Sidebar Header (desktop only) -->
-        <div class="hidden md:flex items-center justify-center py-6 px-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white">
+    <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-white text-red-600 shadow-xl z-40 transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:shadow-2xl flex flex-col overflow-hidden">
+        
+        <div class="hidden md:flex items-center justify-center py-6 px-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white flex-shrink-0">
             <a href="<?= SITE_URL ?>/index.php" class="flex items-center">
                 <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="DGC Transports Logo" class="h-10" onerror="this.src='https://via.placeholder.com/150x40?text=DGC+Transports';">
             </a>
         </div>
         
-        <!-- Mobile Sidebar Header -->
-        <div class="md:hidden flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white">
+        <div class="md:hidden flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white flex-shrink-0">
             <a href="<?= SITE_URL ?>/index.php" class="flex items-center">
                 <img src="<?= SITE_URL ?>/assets/images/logo-3.png" alt="DGC Transports Logo" class="h-8" onerror="this.src='https://via.placeholder.com/120x32?text=DGC';">
             </a>
@@ -70,95 +68,131 @@ if (function_exists('isLoggedIn') && isLoggedIn()): ?>
             </button>
         </div>
 
-        <!-- Navigation -->
-        <nav class="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
+        <nav class="flex-1 py-4 px-4 space-y-1 overflow-y-auto">
             <?php if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin'): ?>
-                <a href="<?= SITE_URL ?>/admin/dashboard.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/admin/dashboard.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-tachometer-alt text-sm"></i>
                     </div>
                     <span>Dashboard</span>
                 </a>
                 
-                <a href="<?= SITE_URL ?>/admin/trips.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/admin/trips.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-road text-sm"></i>
                     </div>
                     <span>Manage Trips</span>
                 </a>
-                      
-                <a href="<?= SITE_URL ?>/admin/trip_templates.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                
+                <a href="<?= SITE_URL ?>/admin/trip_templates.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
-                        <i class="fas fa-road text-sm"></i>
+                        <i class="fas fa-route text-sm"></i>
                     </div>
                     <span>Manage Trip Route</span>
                 </a>
+                <a href="<?= SITE_URL ?>/admin/city.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
+                        <i class="fas fa-route text-sm"></i>
+                    </div>
+                    <span>Manage Cities</span>
+                </a>
                 
-                <a href="<?= SITE_URL ?>/admin/vehicles.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/admin/vehicles.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-bus text-sm"></i>
                     </div>
                     <span>Manage Vehicles</span>
                 </a>
-             <a href="<?= SITE_URL ?>/admin/manual_bookings.php" 
-   class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl 
+                <a href="<?= SITE_URL ?>/admin/review.php" 
+   class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl 
           hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 
           transition-all duration-200 border border-transparent hover:border-red-200">
+       
     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
-        <i class="fas fa-pen-to-square text-sm"></i>
+        <i class="fas fa-star text-sm"></i>
     </div>
-    <span>Manual Bookings</span>
+
+    <span>Manage Reviews</span>
 </a>
 
                 
-               
+                <a href="<?= SITE_URL ?>/admin/manual_bookings.php" 
+                   class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl 
+                        hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 
+                        transition-all duration-200 border border-transparent hover:border-red-200">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
+                        <i class="fas fa-pen-to-square text-sm"></i>
+                    </div>
+                    <span>Manual Bookings</span>
+                </a>
                 
-                <a href="<?= SITE_URL ?>/admin/bookings.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/admin/bookings.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-ticket-alt text-sm"></i>
                     </div>
                     <span>View Bookings</span>
                 </a>
                 
-                <a href="<?= SITE_URL ?>/admin/users.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/admin/users.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-users-cog text-sm"></i>
                     </div>
                     <span>Manage Users</span>
                 </a>
+                          <a href="<?= SITE_URL ?>/admin/investors.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
+                        <i class="fas fa-users-cog text-sm"></i>
+                    </div>
+                    <span>Investors</span>
+                </a>
                 
             <?php elseif (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'staff'): ?>
-                <a href="<?= SITE_URL ?>/staff/dashboard.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/staff/dashboard.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-tachometer-alt text-sm"></i>
                     </div>
                     <span>Dashboard</span>
                 </a>
                 
-                <a href="<?= SITE_URL ?>/staff/pnr.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/staff/pnr.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-ticket-alt text-sm"></i>
                     </div>
                     <span>Check PNR</span>
                 </a>
-                 <a href="<?= SITE_URL ?>/staff/bookings.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                
+                <a href="<?= SITE_URL ?>/staff/bookings.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
-                        <i class="fas fa-ticket-alt text-sm"></i>
+                        <i class="fas fa-receipt text-sm"></i>
                     </div>
                     <span>Bookings</span>
                 </a>
                 
-                <a href="<?= SITE_URL ?>/staff/profile.php" class="group flex items-center px-3 py-3 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                <a href="<?= SITE_URL ?>/staff/profile.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
                     <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
                         <i class="fas fa-user text-sm"></i>
                     </div>
                     <span>Profile</span>
                 </a>
+            
+            <?php elseif (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'investor'): ?>
+                <a href="<?= SITE_URL ?>/investor/dashboard.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
+                        <i class="fas fa-tachometer-alt text-sm"></i>
+                    </div>
+                    <span>Dashboard</span>
+                </a>
+                
+                <a href="<?= SITE_URL ?>/investor/expenses.php" class="group flex items-center px-3 py-2 text-sm font-medium rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 border border-transparent hover:border-red-200">
+                    <div class="p-2 bg-red-100 rounded-lg mr-3 group-hover:bg-red-200 transition-colors duration-200">
+                        <i class="fas fa-file-invoice-dollar text-sm"></i>
+                    </div>
+                    <span>Expenses</span>
+                </a>
             <?php endif; ?>
         </nav>
 
-        <!-- Logout Button (at bottom) -->
-        <div class="p-4 border-t border-gray-200 bg-gray-50">
+        <div class="p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
             <a href="<?= SITE_URL ?>/logout.php" class="group flex items-center w-full px-3 py-3 text-sm font-medium rounded-xl bg-red-600 text-white hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
                 <div class="p-2 bg-red-500 rounded-lg mr-3 group-hover:bg-red-600 transition-colors duration-200">
                     <i class="fas fa-sign-out-alt text-sm"></i>
@@ -168,11 +202,10 @@ if (function_exists('isLoggedIn') && isLoggedIn()): ?>
         </div>
     </aside>
     
-    <!-- Overlay for mobile sidebar -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden transition-opacity duration-300"></div>
 
     <style>
-        /* Custom scrollbar for sidebar */
+        /* Custom scrollbar for sidebar - targeting the nav element for scrolling */
         #sidebar nav::-webkit-scrollbar {
             width: 4px;
         }
@@ -272,8 +305,11 @@ if (function_exists('isLoggedIn') && isLoggedIn()): ?>
             const navLinks = document.querySelectorAll('#sidebar nav a');
             
             navLinks.forEach(link => {
-                const linkPath = new URL(link.href).pathname;
-                if (currentPath === linkPath || (currentPath.includes(linkPath) && linkPath !== '/')) {
+                // Ensure the path comparison is robust for index.php or directory index
+                const linkPath = new URL(link.href).pathname.replace(/\/$/, '/index.php');
+                const cleanCurrentPath = currentPath.replace(/\/$/, '/index.php');
+                
+                if (cleanCurrentPath === linkPath || (cleanCurrentPath.startsWith(linkPath.substring(0, linkPath.lastIndexOf('/')) + '/') && linkPath.lastIndexOf('/') > 0)) {
                     link.classList.add('nav-active');
                 }
             });
