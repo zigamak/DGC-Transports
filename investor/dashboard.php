@@ -127,82 +127,82 @@ $stmt->close();
         .table-hover:hover { background-color: #f9fafb; }
         .profit-positive { color: #10b981; }
         .profit-negative { color: #ef4444; }
+        
+        @media (max-width: 768px) {
+            .mobile-card {
+                background: white;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 12px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <?php include '../templates/sidebar.php'; ?>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ml-0 md:ml-64 pt-16 md:pt-0">
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ml-0 md:ml-64 pt-16 md:pt-8 pb-24">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
                 My Investment Dashboard
             </h1>
-            <p class="text-gray-600">Track your fleet performance, revenue, and expenses</p>
-        </div>
-
-        <!-- Date Filter -->
-        <div class="bg-white rounded-xl shadow-md mb-6 p-6">
-            <form method="GET" class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">From Date</label>
-                    <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" class="w-full px-4 py-2 border rounded-lg focus:ring-primary-red focus:border-primary-red">
-                </div>
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">To Date</label>
-                    <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" class="w-full px-4 py-2 border rounded-lg focus:ring-primary-red focus:border-primary-red">
-                </div>
-                <button type="submit" class="px-6 py-2 bg-primary-red text-white rounded-lg hover:bg-dark-red transition">
-                    Filter
-                </button>
-            </form>
+            <p class="text-sm md:text-base text-gray-600">
+                Track your fleet performance, revenue, and expenses
+            </p>
+            <p class="text-xs md:text-sm text-gray-500 mt-2">
+                <i class="fas fa-calendar-alt mr-1"></i>
+                <?= date('M j, Y', strtotime($date_from)) ?> - <?= date('M j, Y', strtotime($date_to)) ?>
+            </p>
         </div>
 
         <!-- Summary Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-xl shadow-md p-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+            <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
                 <div class="flex items-center">
-                    <div class="bg-green-500 p-4 rounded-xl">
-                        <i class="fas fa-money-bill-wave text-white text-2xl"></i>
+                    <div class="bg-green-500 p-3 md:p-4 rounded-xl">
+                        <i class="fas fa-money-bill-wave text-white text-xl md:text-2xl"></i>
                     </div>
-                    <div class="ml-5">
-                        <p class="text-sm font-medium text-gray-600 uppercase">Total Revenue</p>
-                        <p class="text-3xl font-bold text-gray-900">₦<?= number_format($total_revenue) ?></p>
+                    <div class="ml-3 md:ml-5">
+                        <p class="text-xs md:text-sm font-medium text-gray-600 uppercase">Total Revenue</p>
+                        <p class="text-xl md:text-3xl font-bold text-gray-900">₦<?= number_format($total_revenue) ?></p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
                 <div class="flex items-center">
-                    <div class="bg-red-500 p-4 rounded-xl">
-                        <i class="fas fa-receipt text-white text-2xl"></i>
+                    <div class="bg-red-500 p-3 md:p-4 rounded-xl">
+                        <i class="fas fa-receipt text-white text-xl md:text-2xl"></i>
                     </div>
-                    <div class="ml-5">
-                        <p class="text-sm font-medium text-gray-600 uppercase">Total Expenses</p>
-                        <p class="text-3xl font-bold text-gray-900">₦<?= number_format($total_expenses) ?></p>
+                    <div class="ml-3 md:ml-5">
+                        <p class="text-xs md:text-sm font-medium text-gray-600 uppercase">Total Expenses</p>
+                        <p class="text-xl md:text-3xl font-bold text-gray-900">₦<?= number_format($total_expenses) ?></p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
                 <div class="flex items-center">
-                    <div class="<?= $total_profit >= 0 ? 'bg-blue-500' : 'bg-orange-500' ?> p-4 rounded-xl">
-                        <i class="fas fa-chart-line text-white text-2xl"></i>
+                    <div class="<?= $total_profit >= 0 ? 'bg-blue-500' : 'bg-orange-500' ?> p-3 md:p-4 rounded-xl">
+                        <i class="fas fa-chart-line text-white text-xl md:text-2xl"></i>
                     </div>
-                    <div class="ml-5">
-                        <p class="text-sm font-medium text-gray-600 uppercase">Net Profit/Loss</p>
-                        <p class="text-3xl font-bold <?= $total_profit >= 0 ? 'profit-positive' : 'profit-negative' ?>">₦<?= number_format($total_profit) ?></p>
+                    <div class="ml-3 md:ml-5">
+                        <p class="text-xs md:text-sm font-medium text-gray-600 uppercase">Net Profit/Loss</p>
+                        <p class="text-xl md:text-3xl font-bold <?= $total_profit >= 0 ? 'profit-positive' : 'profit-negative' ?>">₦<?= number_format($total_profit) ?></p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="bg-white rounded-xl shadow-md p-4 md:p-6">
                 <div class="flex items-center">
-                    <div class="bg-purple-500 p-4 rounded-xl">
-                        <i class="fas fa-bus text-white text-2xl"></i>
+                    <div class="bg-purple-500 p-3 md:p-4 rounded-xl">
+                        <i class="fas fa-bus text-white text-xl md:text-2xl"></i>
                     </div>
-                    <div class="ml-5">
-                        <p class="text-sm font-medium text-gray-600 uppercase">Active Vehicles</p>
-                        <p class="text-3xl font-bold text-gray-900"><?= count($vehicles) ?></p>
+                    <div class="ml-3 md:ml-5">
+                        <p class="text-xs md:text-sm font-medium text-gray-600 uppercase">Active Vehicles</p>
+                        <p class="text-xl md:text-3xl font-bold text-gray-900"><?= count($vehicles) ?></p>
                     </div>
                 </div>
             </div>
@@ -210,30 +210,31 @@ $stmt->close();
 
         <!-- Revenue Trend Chart -->
         <?php if (!empty($revenue_trend)): ?>
-        <div class="bg-white rounded-xl shadow-md mb-8">
-            <div class="p-6 border-b">
-                <h2 class="text-xl font-bold text-gray-900">Revenue Trend (Last 6 Months)</h2>
+        <div class="bg-white rounded-xl shadow-md mb-6 md:mb-8">
+            <div class="p-4 md:p-6 border-b">
+                <h2 class="text-lg md:text-xl font-bold text-gray-900">Revenue Trend (Last 6 Months)</h2>
             </div>
-            <div class="p-6">
+            <div class="p-4 md:p-6">
                 <canvas id="revenueTrendChart" height="100"></canvas>
             </div>
         </div>
         <?php endif; ?>
 
         <!-- Vehicle Performance Table -->
-        <div class="bg-white rounded-xl shadow-md mb-8">
-            <div class="p-6 border-b">
-                <h2 class="text-xl font-bold text-gray-900">Vehicle Performance</h2>
+        <div class="bg-white rounded-xl shadow-md mb-6 md:mb-8">
+            <div class="p-4 md:p-6 border-b">
+                <h2 class="text-lg md:text-xl font-bold text-gray-900">Vehicle Performance</h2>
             </div>
-            <div class="p-6">
+            <div class="p-4 md:p-6">
                 <?php if (empty($vehicles)): ?>
-                    <div class="text-center py-16">
-                        <i class="fas fa-bus text-gray-400 text-6xl mb-4"></i>
-                        <h3 class="text-2xl font-bold text-gray-800">No Vehicles Assigned</h3>
-                        <p class="text-gray-600 mt-2">Contact admin to link vehicles to your investor account.</p>
+                    <div class="text-center py-12 md:py-16">
+                        <i class="fas fa-bus text-gray-400 text-4xl md:text-6xl mb-4"></i>
+                        <h3 class="text-xl md:text-2xl font-bold text-gray-800">No Vehicles Assigned</h3>
+                        <p class="text-sm md:text-base text-gray-600 mt-2">Contact admin to link vehicles to your investor account.</p>
                     </div>
                 <?php else: ?>
-                    <div class="overflow-x-auto">
+                    <!-- Desktop Table -->
+                    <div class="hidden md:block overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -283,6 +284,70 @@ $stmt->close();
                             </tfoot>
                         </table>
                     </div>
+
+                    <!-- Mobile Cards -->
+                    <div class="md:hidden space-y-3">
+                        <?php foreach ($vehicles as $v): ?>
+                        <div class="mobile-card border border-gray-200">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <div class="text-sm font-bold text-gray-900"><?= htmlspecialchars($v['vehicle_type']) ?></div>
+                                    <div class="text-xs text-gray-500"><?= htmlspecialchars($v['vehicle_number']) ?></div>
+                                    <div class="text-xs text-gray-600 mt-1">
+                                        <i class="fas fa-user mr-1"></i><?= htmlspecialchars($v['driver_name'] ?? 'Not Assigned') ?>
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-xs text-gray-500">Bookings</div>
+                                    <div class="text-lg font-bold text-gray-900"><?= $v['total_bookings'] ?></div>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-2 mb-3 pt-3 border-t">
+                                <div>
+                                    <div class="text-xs text-gray-500">Revenue</div>
+                                    <div class="text-sm font-semibold text-green-600">₦<?= number_format($v['revenue']) ?></div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Expenses</div>
+                                    <div class="text-sm font-semibold text-red-600">₦<?= number_format($v['expenses']) ?></div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Profit</div>
+                                    <div class="text-sm font-bold <?= $v['profit'] >= 0 ? 'text-green-600' : 'text-red-600' ?>">
+                                        ₦<?= number_format($v['profit']) ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button onclick="openExpensesModal(<?= $v['id'] ?>, '<?= htmlspecialchars($v['vehicle_number'], ENT_QUOTES) ?>')"
+                                    class="w-full py-2 text-sm font-semibold text-primary-red border border-primary-red rounded-lg hover:bg-primary-red hover:text-white transition">
+                                View Expenses
+                            </button>
+                        </div>
+                        <?php endforeach; ?>
+                        
+                        <!-- Mobile Total Card -->
+                        <div class="mobile-card bg-gray-50 border-2 border-gray-300">
+                            <div class="text-sm font-bold text-gray-900 mb-3">TOTAL</div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div>
+                                    <div class="text-xs text-gray-500">Revenue</div>
+                                    <div class="text-sm font-bold text-green-600">₦<?= number_format($total_revenue) ?></div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Expenses</div>
+                                    <div class="text-sm font-bold text-red-600">₦<?= number_format($total_expenses) ?></div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500">Profit</div>
+                                    <div class="text-sm font-bold <?= $total_profit >= 0 ? 'text-green-600' : 'text-red-600' ?>">
+                                        ₦<?= number_format($total_profit) ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -290,11 +355,12 @@ $stmt->close();
         <!-- Recent Expenses -->
         <?php if (!empty($recent_expenses)): ?>
         <div class="bg-white rounded-xl shadow-md">
-            <div class="p-6 border-b">
-                <h2 class="text-xl font-bold text-gray-900">Recent Expenses (Last 10)</h2>
+            <div class="p-4 md:p-6 border-b">
+                <h2 class="text-lg md:text-xl font-bold text-gray-900">Recent Expenses (Last 10)</h2>
             </div>
-            <div class="p-6">
-                <div class="overflow-x-auto">
+            <div class="p-4 md:p-6">
+                <!-- Desktop Table -->
+                <div class="hidden md:block overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -332,27 +398,100 @@ $stmt->close();
                         </tbody>
                     </table>
                 </div>
+                
+                <!-- Mobile Cards -->
+                <div class="md:hidden space-y-3">
+                    <?php foreach ($recent_expenses as $e): ?>
+                    <div class="mobile-card border border-gray-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <div class="text-xs text-gray-500"><?= date('M j, Y', strtotime($e['expense_date'])) ?></div>
+                                <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($e['vehicle_number']) ?></div>
+                            </div>
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                <?= ucfirst($e['expense_type']) ?>
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2"><?= htmlspecialchars($e['description'] ?: '-') ?></div>
+                        <div class="flex justify-between items-center pt-2 border-t">
+                            <div class="text-lg font-bold text-red-600">₦<?= number_format($e['amount']) ?></div>
+                            <?php if ($e['receipt_path']): ?>
+                                <a href="../<?= htmlspecialchars($e['receipt_path']) ?>" target="_blank" 
+                                   class="text-xs text-primary-red hover:text-dark-red font-semibold">
+                                    <i class="fas fa-receipt mr-1"></i>View Receipt
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
         </div>
         <?php endif; ?>
     </div>
 
+    <!-- Sticky Filter Button (Bottom Right) -->
+    <button onclick="openFilterModal()" 
+            class="fixed bottom-6 right-6 bg-primary-red text-white p-4 rounded-full shadow-2xl hover:bg-dark-red transition-all z-40 hover:scale-110">
+        <i class="fas fa-filter text-xl"></i>
+    </button>
+
+    <!-- Filter Modal -->
+    <div id="filterModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b bg-gray-50">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-900">
+                        <i class="fas fa-calendar-alt text-primary-red mr-2"></i>Filter by Date
+                    </h3>
+                    <button onclick="closeFilterModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        ×
+                    </button>
+                </div>
+            </div>
+            <form method="GET" class="p-6">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">From Date</label>
+                        <input type="date" name="date_from" value="<?= htmlspecialchars($date_from) ?>" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-red focus:border-primary-red">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">To Date</label>
+                        <input type="date" name="date_to" value="<?= htmlspecialchars($date_to) ?>" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-red focus:border-primary-red">
+                    </div>
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button type="button" onclick="closeFilterModal()" 
+                            class="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-6 py-3 bg-primary-red text-white rounded-lg hover:bg-dark-red transition font-semibold">
+                        <i class="fas fa-search mr-2"></i>Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Expenses Modal -->
     <div id="expensesModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div class="p-6 border-b flex justify-between items-center bg-gray-50">
-                <h3 class="text-2xl font-bold text-gray-900">
+            <div class="p-4 md:p-6 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg md:text-2xl font-bold text-gray-900">
                     Expenses — <span id="modalVehicleNumber" class="text-primary-red"></span>
                 </h3>
                 <button onclick="closeExpensesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
                     ×
                 </button>
             </div>
-            <div id="expensesContent" class="p-6 flex-1 overflow-y-auto">
+            <div id="expensesContent" class="p-4 md:p-6 flex-1 overflow-y-auto">
                 <p class="text-center text-gray-500 py-12">Loading expenses...</p>
             </div>
-            <div class="p-6 border-t bg-gray-50 text-right">
-                <button onclick="closeExpensesModal()" class="px-8 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
+            <div class="p-4 md:p-6 border-t bg-gray-50 text-right">
+                <button onclick="closeExpensesModal()" class="px-6 md:px-8 py-2 md:py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition">
                     Close
                 </button>
             </div>
@@ -360,13 +499,147 @@ $stmt->close();
     </div>
 
     <!-- Scripts -->
+    <script>
+        // Filter Modal Functions
+        function openFilterModal() {
+            document.getElementById('filterModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFilterModal() {
+            document.getElementById('filterModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Expenses Modal Functions
+        function openExpensesModal(vehicleId, vehicleNumber) {
+            document.getElementById('modalVehicleNumber').textContent = vehicleNumber;
+            document.getElementById('expensesModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            // Reset content to "Loading"
+            const content = document.getElementById('expensesContent');
+            content.innerHTML = `<p class="text-center text-gray-500 py-12"><i class="fas fa-spinner fa-spin text-3xl mb-3"></i><br>Loading expenses...</p>`;
+
+            fetch(`get_vehicle_expenses.php?vehicle_id=${vehicleId}&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>`)
+                .then(r => r.json())
+                .then(data => {
+                    const content = document.getElementById('expensesContent');
+                    
+                    if (data.success && data.expenses.length > 0) {
+                        const total = data.expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
+                        
+                        // Desktop Table
+                        const desktopRows = data.expenses.map(e => `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm">${new Date(e.expense_date).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}</td>
+                                <td class="px-4 py-3"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100">${e.expense_type.charAt(0).toUpperCase() + e.expense_type.slice(1)}</span></td>
+                                <td class="px-4 py-3 text-sm text-gray-700">${e.description || '-'}</td>
+                                <td class="px-4 py-3 text-right font-medium text-red-600">₦${parseFloat(e.amount).toLocaleString()}</td>
+                                <td class="px-4 py-3 text-center">
+                                    ${e.receipt_path ? `<a href="../${e.receipt_path}" target="_blank" class="text-primary-red hover:underline">View</a>` : '-'}
+                                </td>
+                            </tr>
+                        `).join('');
+
+                        // Mobile Cards
+                        const mobileCards = data.expenses.map(e => `
+                            <div class="bg-white rounded-lg border border-gray-200 p-4 mb-3">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="text-xs text-gray-500">${new Date(e.expense_date).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}</div>
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100">
+                                        ${e.expense_type.charAt(0).toUpperCase() + e.expense_type.slice(1)}
+                                    </span>
+                                </div>
+                                <div class="text-sm text-gray-700 mb-2">${e.description || '-'}</div>
+                                <div class="flex justify-between items-center pt-2 border-t">
+                                    <div class="text-lg font-bold text-red-600">₦${parseFloat(e.amount).toLocaleString()}</div>
+                                    ${e.receipt_path ? `<a href="../${e.receipt_path}" target="_blank" class="text-xs text-primary-red hover:text-dark-red font-semibold"><i class="fas fa-receipt mr-1"></i>View</a>` : ''}
+                                </div>
+                            </div>
+                        `).join('');
+
+                        content.innerHTML = `
+                            <div class="mb-6 flex justify-between items-center">
+                                <span class="text-lg md:text-xl font-bold text-red-600">Total: ₦${total.toLocaleString()}</span>
+                                <span class="text-sm text-gray-500">${data.expenses.length} expense${data.expenses.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            
+                            <!-- Desktop Table -->
+                            <div class="hidden md:block">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Date</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Type</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Description</th>
+                                            <th class="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase">Amount</th>
+                                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase">Receipt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">${desktopRows}</tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Mobile Cards -->
+                            <div class="md:hidden">${mobileCards}</div>
+                        `;
+                    } else if (data.success && data.expenses.length === 0) {
+                        content.innerHTML = `
+                            <div class="text-center py-16 text-gray-500">
+                                <i class="fas fa-receipt text-6xl mb-4 text-gray-300"></i>
+                                <p class="text-lg font-semibold">No expenses recorded</p>
+                                <p class="text-sm mt-2">No expenses found for this vehicle in the selected period.</p>
+                            </div>`;
+                    } else {
+                        content.innerHTML = `
+                            <div class="text-center py-16">
+                                <i class="fas fa-exclamation-circle text-red-500 text-6xl mb-4"></i>
+                                <p class="text-red-600 font-semibold">Error: ${data.message || 'Failed to load expenses'}</p>
+                            </div>`;
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('expensesContent').innerHTML = `
+                        <div class="text-center py-16">
+                            <i class="fas fa-wifi text-gray-400 text-6xl mb-4"></i>
+                            <p class="text-red-600 font-semibold">Connection Error</p>
+                            <p class="text-sm text-gray-600 mt-2">Failed to load expenses. Please check your connection.</p>
+                        </div>`;
+                });
+        }
+
+        function closeExpensesModal() {
+            document.getElementById('expensesModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modals on background click
+        document.getElementById('filterModal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeFilterModal();
+        });
+
+        document.getElementById('expensesModal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeExpensesModal();
+        });
+
+        // Close modals on Escape key
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeFilterModal();
+                closeExpensesModal();
+            }
+        });
+    </script>
+
     <?php if (!empty($revenue_trend)): ?>
     <script>
+        // Revenue Trend Chart
         const ctx = document.getElementById('revenueTrendChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-labels: <?= json_encode(array_map(fn($m) => date('M Y', strtotime($m . '-01')), array_column($revenue_trend, 'month'))) ?>,
+                labels: <?= json_encode(array_map(fn($m) => date('M Y', strtotime($m . '-01')), array_column($revenue_trend, 'month'))) ?>,
                 datasets: [{
                     label: 'Revenue',
                     data: <?= json_encode(array_column($revenue_trend, 'revenue')) ?>,
@@ -375,94 +648,34 @@ labels: <?= json_encode(array_map(fn($m) => date('M Y', strtotime($m . '-01')), 
                     tension: 0.4,
                     fill: true,
                     pointBackgroundColor: '#e30613',
-                    pointRadius: 5
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 }]
             },
             options: {
                 responsive: true,
-                plugins: { legend: { display: false } },
+                maintainAspectRatio: true,
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Revenue: ₦' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: { callback: v => '₦' + v.toLocaleString() }
+                        ticks: { 
+                            callback: v => '₦' + v.toLocaleString()
+                        }
                     }
                 }
             }
         });
     </script>
     <?php endif; ?>
-<script>
-    function openExpensesModal(vehicleId, vehicleNumber) {
-        document.getElementById('modalVehicleNumber').textContent = vehicleNumber;
-        document.getElementById('expensesModal').classList.remove('hidden');
-
-        // Reset content to "Loading"
-        const content = document.getElementById('expensesContent');
-        content.innerHTML = `<p class="text-center text-gray-500 py-12">Loading expenses...</p>`;
-
-        fetch(`get_vehicle_expenses.php?vehicle_id=${vehicleId}&date_from=<?= urlencode($date_from) ?>&date_to=<?= urlencode($date_to) ?>`)
-            .then(r => r.json())
-            .then(data => {
-                const content = document.getElementById('expensesContent');
-                
-                // Corrected logic: Check for successful response AND if there are expenses
-                if (data.success && data.expenses.length > 0) {
-                    const total = data.expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-                    const rows = data.expenses.map(e => `
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3 text-sm">${new Date(e.expense_date).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}</td>
-                            <td class="px-4 py-3"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100">${e.expense_type.charAt(0).toUpperCase() + e.expense_type.slice(1)}</span></td>
-                            <td class="px-4 py-3 text-sm text-gray-700">${e.description || '-'}</td>
-                            <td class="px-4 py-3 text-right font-medium text-red-600">₦${parseFloat(e.amount).toLocaleString()}</td>
-                            <td class="px-4 py-3 text-center">
-                                ${e.receipt_path ? `<a href="../${e.receipt_path}" target="_blank" class="text-primary-red hover:underline">View</a>` : '-'}
-                            </td>
-                        </tr>
-                    `).join('');
-
-                    content.innerHTML = `
-                        <div class="mb-6 text-right">
-                            <span class="text-xl font-bold text-red-600">Total: ₦${total.toLocaleString()}</span>
-                        </div>
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Date</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Type</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Description</th>
-                                    <th class="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase">Amount</th>
-                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-600 uppercase">Receipt</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-                        </table>
-                    `;
-                } else if (data.success && data.expenses.length === 0) {
-                    // This block runs when 'success' is true but the expenses list is empty
-                    content.innerHTML = `
-                        <div class="text-center py-16 text-gray-500">
-                            <i class="fas fa-receipt text-6xl mb-4 text-gray-300"></i>
-                            <p>No expenses recorded for this vehicle in the selected period.</p>
-                        </div>`;
-                } else {
-                    // This block handles explicit API failure messages (e.g., Unauthorized)
-                    content.innerHTML = `<p class="text-red-600 text-center py-16">Error: ${data.message || 'Failed to load expenses due to an unknown error.'}</p>`;
-                }
-            })
-            .catch(() => {
-                // This block handles network errors or invalid JSON response
-                document.getElementById('expensesContent').innerHTML = `<p class="text-red-600 text-center py-16">Failed to load expenses. Please check your network connection.</p>`;
-            });
-    }
-
-    function closeExpensesModal() {
-        document.getElementById('expensesModal').classList.add('hidden');
-    }
-
-    // Close on background click
-    document.getElementById('expensesModal').addEventListener('click', e => {
-        if (e.target === e.currentTarget) closeExpensesModal();
-    });
-</script>
 </body>
 </html>

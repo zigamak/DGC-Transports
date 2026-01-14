@@ -512,3 +512,5 @@ $revenue_trend = array_reverse($revenue_trend);
     <?php endif; ?>
 </body>
 </html>
+
+Fix this dashbaord it should show all reveiwnus made from th vhciles so all payments made to that vehcil and not currnt date and more and add th filter but mak it a popup and add it to a button to sticky right 

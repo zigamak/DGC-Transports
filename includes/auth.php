@@ -8,7 +8,6 @@ require_once __DIR__ . '/config.php';
 function isLoggedIn() {
     return isset($_SESSION['user']);
 }
-
 /**
  * Redirects user based on their role.
  * Assumes the session variable 'user' contains a 'role' key.
@@ -30,6 +29,7 @@ function redirectUser() {
             $redirect_url = SITE_URL . "/staff/dashboard.php";
             break;
         case 'investor':
+            // Updated to go to investor/dashboard.php
             $redirect_url = SITE_URL . "/investor/dashboard.php";
             break;
         case 'customer':

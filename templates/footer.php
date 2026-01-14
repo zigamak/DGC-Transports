@@ -26,6 +26,9 @@
                   <span class="block mt-2 md:mt-0 md:ml-3 text-gray-400">
                     Abuja Address: Beside Kwalika Park, Area 1, after Pedestrian Bridge.
                 </span>
+                  <span class="block mt-2 md:mt-0 md:ml-3 text-gray-400">
+                   14, Bukuru Express, Jos Plateau State before New ERA hotel Adjacent Firstbank Secretariat Branch
+                </span>
             </div>
 
             <div class="space-y-6">

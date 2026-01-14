@@ -57,3 +57,6 @@
 [01-Dec-2025 02:10:12 Europe/Berlin] PHP Warning:  Trying to access array offset on value of type null in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 360
 [01-Dec-2025 02:10:12 Europe/Berlin] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 360
 [01-Dec-2025 02:35:38 Europe/Berlin] PHP Deprecated:  Constant FILTER_SANITIZE_STRING is deprecated in C:\xampp\htdocs\dgctransports\bookings\confirmation.php on line 53
+[18-Dec-2025 01:14:32 Europe/Berlin] get_trips.php inputs: pickup_city_id=1, dropoff_city_id=2, vehicle_type_id=2, trip_date=2025-12-19
+[18-Dec-2025 01:14:32 Europe/Berlin] get_trips.php results count: 0
+[18-Dec-2025 01:14:32 Europe/Berlin] No trips found. Check if trip_templates exist for this route and if recurrence conditions match.
