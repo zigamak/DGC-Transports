@@ -4,7 +4,7 @@ ini_set('error_log', __DIR__ . '/../logs/error.log'); // Custom log file
 $servername = "localhost";
 $username = "root";
 $password = "";
-$dbname = "dgctransports";
+$dbname = "dgctransport";
 
 try {
     $conn = new mysqli($servername, $username, $password, $dbname);

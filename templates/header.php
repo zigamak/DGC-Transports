@@ -45,14 +45,28 @@ if ($is_logged_in) {
         theme: {
             extend: {
                 colors: {
-                    // Ensure primary-red and dark-red are accessible via standard Tailwind classes too
-                    primary: '#dc2626',
-                    secondary: '#991b1b',
-                    'primary-red': '#e30613',
-                    'dark-red': '#c70410',
+                    // Primary/secondary used across all pages (login, signup, etc.)
+                    'primary':        '#990b0a',
+                    'secondary':      '#7a0908',
+                    // Explicit brand names
+                    'brand-red':      '#990b0a',
+                    'brand-red-dark': '#7a0908',
                 }
             }
-        }
+        },
+        safelist: [
+            'bg-primary', 'bg-secondary',
+            'text-primary', 'text-secondary',
+            'border-primary', 'border-secondary',
+            'from-primary', 'to-primary',
+            'from-secondary', 'to-secondary',
+            'hover:from-primary', 'hover:to-primary',
+            'hover:from-secondary', 'hover:to-secondary',
+            'focus:ring-primary',
+            'bg-[#990b0a]', 'bg-[#7a0908]',
+            'text-[#990b0a]', 'hover:bg-[#7a0908]',
+            'border-[#990b0a]',
+        ]
     }
 </script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -78,8 +92,8 @@ if ($is_logged_in) {
             <nav class="hidden md:flex space-x-8" aria-label="Primary Navigation">
                 <?php foreach ($nav_links as $link): ?>
                     <?php 
-                        $text_color_class = isset($link['is_logout']) ? 'text-red-600' : 'text-gray-900';
-                        $hover_color_class = 'hover:text-primary-red';
+                        $text_color_class = isset($link['is_logout']) ? 'text-[#990b0a]' : 'text-gray-900';
+                        $hover_color_class = 'hover:text-[#990b0a]';
                     ?>
                     <a href="<?= $link['url'] ?>" class="font-semibold transition <?= $text_color_class ?> <?= $hover_color_class ?>">
                         <?= htmlspecialchars($link['text']) ?>
@@ -89,7 +103,7 @@ if ($is_logged_in) {
 
             <div class="md:hidden">
                 <button id="mobile-menu-button" 
-                        class="text-gray-900 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-red" 
+                        class="text-gray-900 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#990b0a]" 
                         aria-controls="mobile-menu" 
                         aria-expanded="false">
                     <i class="fas fa-bars text-2xl" id="menu-icon"></i>
@@ -105,8 +119,8 @@ if ($is_logged_in) {
         <nav class="px-4 py-4 space-y-3">
             <?php foreach ($nav_links as $link): ?>
                 <?php 
-                    $text_color_class = isset($link['is_logout']) ? 'text-red-600' : 'text-gray-900';
-                    $hover_color_class = 'hover:text-primary-red';
+                    $text_color_class = isset($link['is_logout']) ? 'text-[#990b0a]' : 'text-gray-900';
+                    $hover_color_class = 'hover:text-[#990b0a]';
                 ?>
                 <a href="<?= $link['url'] ?>" 
                    class="block py-2 text-lg font-medium border-b border-gray-100 last:border-b-0 <?= $text_color_class ?> <?= $hover_color_class ?>" 

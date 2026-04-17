@@ -13,19 +13,36 @@ require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/send_email.php';
 
-header('Content-Type: application/json');
-
 error_log("verify_payment.php accessed - Method: " . $_SERVER['REQUEST_METHOD']);
-error_log("POST data: " . print_r($_POST, true));
+
+// ---------------------------------------------------------------------------
+// Determine the request mode:
+//   GET  = redirect back from Paystack's hosted page  (redirect flow)
+//   POST = legacy inline/popup AJAX call              (kept for compatibility)
+// ---------------------------------------------------------------------------
+$is_redirect = ($_SERVER['REQUEST_METHOD'] === 'GET');
+
+if ($is_redirect) {
+    // Paystack sends back ?reference=... or ?trxref=...
+    $reference = trim($_GET['reference'] ?? $_GET['trxref'] ?? '');
+    error_log("Redirect-flow verify: reference=$reference");
+} else {
+    header('Content-Type: application/json');
+    error_log("POST data: " . print_r($_POST, true));
+    $reference = trim($_POST['reference'] ?? '');
+}
 
 // Check if payment reference is provided
-if (!isset($_POST['reference']) || empty(trim($_POST['reference']))) {
+if (empty($reference)) {
     error_log("Missing or empty payment reference");
+    if ($is_redirect) {
+        $_SESSION['error'] = 'Invalid payment reference. Please contact support.';
+        header("Location: ../index.php");
+        exit();
+    }
     echo json_encode(['success' => false, 'message' => 'Invalid payment reference']);
     exit();
 }
-
-$reference = trim($_POST['reference']);
 
 // DETECT ROUND TRIP vs ONE-WAY (updated to match process_booking.php)
 $is_roundtrip = isset($_SESSION['is_roundtrip']) && $_SESSION['is_roundtrip'] === true;
@@ -34,6 +51,11 @@ if ($is_roundtrip) {
     // Round trip validation (using standard session keys now)
     if (!isset($_SESSION['booking_ids']) || !isset($_SESSION['total_amount']) || !isset($_SESSION['roundtrip'])) {
         error_log("Missing round trip session data");
+        if ($is_redirect) {
+            $_SESSION['error'] = 'Booking session expired. Please start a new booking.';
+            header("Location: ../index.php");
+            exit();
+        }
         echo json_encode(['success' => false, 'message' => 'Booking session expired. Please start a new booking.']);
         exit();
     }
@@ -51,6 +73,11 @@ if ($is_roundtrip) {
             'passenger_details' => isset($_SESSION['passenger_details']) ? 'set' : 'not set',
             'total_amount' => isset($_SESSION['total_amount']) ? 'set' : 'not set'
         ]));
+        if ($is_redirect) {
+            $_SESSION['error'] = 'Booking session expired. Please start a new booking.';
+            header("Location: ../index.php");
+            exit();
+        }
         echo json_encode(['success' => false, 'message' => 'Booking session expired. Please start a new booking.']);
         exit();
     }
@@ -63,15 +90,35 @@ if ($is_roundtrip) {
 $user_id = isLoggedIn() ? $_SESSION['user']['id'] : null;
 
 // Verify payment with Paystack
+// Detect localhost/dev environment to avoid cacert.pem SSL errors (e.g. XAMPP)
+$is_local = (
+    defined('APP_ENV') && APP_ENV === 'local'
+) || in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1'])
+  || str_starts_with($_SERVER['HTTP_HOST'] ?? '', 'localhost:');
+
 $curl = curl_init();
-curl_setopt_array($curl, [
-    CURLOPT_URL => "https://api.paystack.co/transaction/verify/" . urlencode($reference),
+$curl_options = [
+    CURLOPT_URL            => "https://api.paystack.co/transaction/verify/" . urlencode($reference),
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
+    CURLOPT_HTTPHEADER     => [
         "Authorization: Bearer " . PAYSTACK_SECRET_KEY,
         "Content-Type: application/json",
     ],
-]);
+    CURLOPT_TIMEOUT        => 30,
+];
+
+if ($is_local) {
+    // Skip SSL verification on localhost to avoid cacert.pem errors
+    $curl_options[CURLOPT_SSL_VERIFYPEER] = false;
+    $curl_options[CURLOPT_SSL_VERIFYHOST] = false;
+    error_log("verify_payment: running in LOCAL mode — SSL verification disabled.");
+} else {
+    // Enforce SSL on production
+    $curl_options[CURLOPT_SSL_VERIFYPEER] = true;
+    $curl_options[CURLOPT_SSL_VERIFYHOST] = 2;
+}
+
+curl_setopt_array($curl, $curl_options);
 
 $response = curl_exec($curl);
 $err = curl_error($curl);
@@ -79,6 +126,11 @@ curl_close($curl);
 
 if ($err) {
     error_log("Paystack API error: $err");
+    if ($is_redirect) {
+        $_SESSION['error'] = 'Failed to verify payment. Please contact support.';
+        header("Location: ../index.php");
+        exit();
+    }
     echo json_encode(['success' => false, 'message' => 'Failed to verify payment. Please contact support.']);
     exit();
 }
@@ -87,6 +139,11 @@ $tranx = json_decode($response, true);
 
 if (!$tranx['status'] || $tranx['data']['status'] !== 'success') {
     error_log("Paystack verification failed: " . json_encode($tranx));
+    if ($is_redirect) {
+        $_SESSION['error'] = 'Payment verification failed. Please try again or contact support.';
+        header("Location: passenger_details.php");
+        exit();
+    }
     echo json_encode(['success' => false, 'message' => 'Payment verification failed.']);
     exit();
 }
@@ -95,6 +152,11 @@ if (!$tranx['status'] || $tranx['data']['status'] !== 'success') {
 $amount_paid = $tranx['data']['amount'] / 100; // Convert from kobo to naira
 if (abs($amount_paid - $total_amount) > 0.01) {
     error_log("Amount mismatch: Paid $amount_paid, Expected $total_amount");
+    if ($is_redirect) {
+        $_SESSION['error'] = 'Payment amount mismatch. Please contact support.';
+        header("Location: ../index.php");
+        exit();
+    }
     echo json_encode(['success' => false, 'message' => 'Payment amount mismatch. Please contact support.']);
     exit();
 }
@@ -378,9 +440,16 @@ try {
     unset($_SESSION['total_amount']);
     unset($_SESSION['payment_reference']);
 
-    // Redirect to confirmation with first PNR
+    // Build confirmation URL
     $redirect_url = SITE_URL . '/bookings/confirmation.php?pnr=' . urlencode($confirmed_pnrs[0] ?? '');
 
+    if ($is_redirect) {
+        // Redirect flow: send user straight to confirmation page
+        header("Location: " . $redirect_url);
+        exit();
+    }
+
+    // POST/AJAX flow: return JSON for JS to handle
     echo json_encode([
         'success' => true,
         'message' => 'Payment verified successfully!',
@@ -390,6 +459,11 @@ try {
 } catch (Exception $e) {
     $conn->rollback();
     error_log("Payment verification failed: " . $e->getMessage());
+    if ($is_redirect) {
+        $_SESSION['error'] = 'Payment verification failed: ' . $e->getMessage();
+        header("Location: ../index.php");
+        exit();
+    }
     echo json_encode(['success' => false, 'message' => 'Payment verification failed: ' . $e->getMessage()]);
     exit();
 }

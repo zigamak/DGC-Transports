@@ -476,7 +476,8 @@ if (isset($_SESSION['referral_message'])) {
 
                         <div class="bg-white rounded-xl shadow-lg p-6">
                             <button type="submit" 
-                                    class="w-full bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 px-6 rounded-xl hover:from-secondary hover:to-primary transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+                                    style="background-color: #dc2626 !important; color: #ffffff !important; border: none !important; cursor: pointer !important; display: block !important; visibility: visible !important; opacity: 1 !important;"
+                                    class="w-full font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200">
                                 <i class="fas fa-credit-card mr-2"></i>
                                 <?php if ($free_booking): ?>
                                     Confirm Free Booking
@@ -753,6 +754,8 @@ if (isset($_SESSION['referral_message'])) {
                 if (submitBtn && !submitBtn.name) {
                     submitBtn.innerHTML = '<i class="fas fa-credit-card mr-2"></i><?= $free_booking ? "Confirm Free Booking" : "Proceed to Payment - ₦" . number_format($total_amount, 0) ?>';
                     submitBtn.disabled = false;
+                    submitBtn.style.backgroundColor = '#dc2626';
+                    submitBtn.style.opacity = '1';
                 }
                 return false;
             }

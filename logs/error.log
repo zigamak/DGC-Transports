@@ -60,3 +60,46 @@
 [18-Dec-2025 01:14:32 Europe/Berlin] get_trips.php inputs: pickup_city_id=1, dropoff_city_id=2, vehicle_type_id=2, trip_date=2025-12-19
 [18-Dec-2025 01:14:32 Europe/Berlin] get_trips.php results count: 0
 [18-Dec-2025 01:14:32 Europe/Berlin] No trips found. Check if trip_templates exist for this route and if recurrence conditions match.
+[17-Apr-2026 16:51:17 Europe/Berlin] Database connection error: Unknown database 'dgctransports'
+[17-Apr-2026 17:04:41 Europe/Berlin] Database connection error: Unknown database 'dgctransports'
+[17-Apr-2026 17:06:05 Europe/Berlin] process_booking.php accessed - Method: POST
+[17-Apr-2026 17:06:05 Europe/Berlin] Processing referral code from form submission: RERUM MOLESTIAS ALIQ
+[17-Apr-2026 17:06:05 Europe/Berlin] Invalid referral code from form: RERUM MOLESTIAS ALIQ
+[17-Apr-2026 17:06:05 Europe/Berlin] Passenger POST data structure:
+[17-Apr-2026 17:06:05 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, seat_number, email, phone, emergency_contact
+[17-Apr-2026 17:06:05 Europe/Berlin]   - seat_number: 1
+[17-Apr-2026 17:06:05 Europe/Berlin] Successfully created 1 bookings
+[17-Apr-2026 17:06:05 Europe/Berlin] Paystack initialize API error: error setting certificate file: C:/xampp/php/extras/ssl/cacert.pem
+[17-Apr-2026 17:13:49 Europe/Berlin] process_booking.php accessed - Method: POST
+[17-Apr-2026 17:13:49 Europe/Berlin] Processing referral code from form submission: LABORIOSAM AB CONSE
+[17-Apr-2026 17:13:49 Europe/Berlin] Invalid referral code from form: LABORIOSAM AB CONSE
+[17-Apr-2026 17:13:49 Europe/Berlin] Passenger POST data structure:
+[17-Apr-2026 17:13:49 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, seat_number, email, phone, emergency_contact
+[17-Apr-2026 17:13:49 Europe/Berlin]   - seat_number: 1
+[17-Apr-2026 17:13:49 Europe/Berlin] Successfully created 1 bookings
+[17-Apr-2026 17:13:49 Europe/Berlin] Paystack: running in LOCAL mode — SSL verification disabled.
+[17-Apr-2026 17:13:57 Europe/Berlin] verify_payment.php accessed - Method: GET
+[17-Apr-2026 17:13:57 Europe/Berlin] Redirect-flow verify: reference=DGC_69e24e2d1b12c_1776438829
+[17-Apr-2026 17:13:58 Europe/Berlin] Paystack API error: error setting certificate file: C:/xampp/php/extras/ssl/cacert.pem
+[17-Apr-2026 17:16:02 Europe/Berlin] process_booking.php accessed - Method: POST
+[17-Apr-2026 17:16:02 Europe/Berlin] Processing referral code from form submission: VOLUPTAS BLANDITIIS
+[17-Apr-2026 17:16:02 Europe/Berlin] Invalid referral code from form: VOLUPTAS BLANDITIIS
+[17-Apr-2026 17:16:02 Europe/Berlin] Passenger POST data structure:
+[17-Apr-2026 17:16:02 Europe/Berlin] Passenger 0 keys: first_name, last_name, name, seat_number, email, phone, emergency_contact
+[17-Apr-2026 17:16:02 Europe/Berlin]   - seat_number: 1
+[17-Apr-2026 17:16:02 Europe/Berlin] Successfully created 1 bookings
+[17-Apr-2026 17:16:02 Europe/Berlin] Paystack: running in LOCAL mode — SSL verification disabled.
+[17-Apr-2026 17:16:10 Europe/Berlin] verify_payment.php accessed - Method: GET
+[17-Apr-2026 17:16:10 Europe/Berlin] Redirect-flow verify: reference=DGC_69e24eb220996_1776438962
+[17-Apr-2026 17:16:10 Europe/Berlin] verify_payment: running in LOCAL mode — SSL verification disabled.
+[17-Apr-2026 17:16:11 Europe/Berlin] Updated booking ID 1911 to paid and confirmed (ref: DGC_69e24eb220996_1776438962)
+[17-Apr-2026 17:16:11 Europe/Berlin] Inserted payment for booking ID 1911: method=card, ref=DGC_69e24eb220996_1776438962, amount=20000
+[17-Apr-2026 17:16:11 Europe/Berlin] Preparing to send passenger email with data: {"email":"pykit@mailinator.com","passenger_name":"Lael Hardin","pnr":"D05117C","seat_number":"1","total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962","phone":"08055614455","emergency_contact":"Excepturi officiis d","special_requests":"Nisi in earum proide","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2026-04-19","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"ABU-JOS","driver_name":"PILOT 03"}}
+[17-Apr-2026 17:16:11 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_booking_confirmation.php: {"email":"pykit@mailinator.com","passenger_name":"Lael Hardin","pnr":"D05117C","seat_number":"1","total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962","phone":"08055614455","emergency_contact":"Excepturi officiis d","special_requests":"Nisi in earum proide","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2026-04-19","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"ABU-JOS","driver_name":"PILOT 03"}}
+[17-Apr-2026 17:16:11 Europe/Berlin] email_booking_confirmation.php received template_data: {"email":"pykit@mailinator.com","passenger_name":"Lael Hardin","pnr":"D05117C","seat_number":"1","total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962","phone":"08055614455","emergency_contact":"Excepturi officiis d","special_requests":"Nisi in earum proide","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2026-04-19","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"ABU-JOS","driver_name":"PILOT 03"}}
+[17-Apr-2026 17:16:14 Europe/Berlin] PHPMailer Error (booking_confirmation): SMTP Error: Could not connect to SMTP host. Connection failed. failed loading cafile stream: `C:/xampp/php/extras/ssl/cacert.pem'
+[17-Apr-2026 17:16:14 Europe/Berlin] Failed to send confirmation email to pykit@mailinator.com for PNR D05117C
+[17-Apr-2026 17:16:14 Europe/Berlin] sendEmail: Passing template_data to C:\xampp\htdocs\dgctransports\includes/templates/email_admin_booking_notification.php: {"bookings":[{"email":"pykit@mailinator.com","passenger_name":"Lael Hardin","pnr":"D05117C","seat_number":"1","total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962","phone":"08055614455","emergency_contact":"Excepturi officiis d","special_requests":"Nisi in earum proide","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2026-04-19","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"ABU-JOS","driver_name":"PILOT 03"}}],"total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962"}
+[17-Apr-2026 17:16:14 Europe/Berlin] email_admin_booking_notification.php received template_data: {"bookings":[{"email":"pykit@mailinator.com","passenger_name":"Lael Hardin","pnr":"D05117C","seat_number":"1","total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962","phone":"08055614455","emergency_contact":"Excepturi officiis d","special_requests":"Nisi in earum proide","trip":{"pickup_city":"Abuja","dropoff_city":"Jos","trip_date":"2026-04-19","departure_time":"07:00:00","vehicle_type":"5 Seater Car","vehicle_number":"ABU-JOS","driver_name":"PILOT 03"}}],"total_amount":20000,"payment_method":"card","payment_reference":"DGC_69e24eb220996_1776438962"}
+[17-Apr-2026 17:16:16 Europe/Berlin] PHPMailer Error (admin_booking_notification): SMTP Error: Could not connect to SMTP host. Connection failed. failed loading cafile stream: `C:/xampp/php/extras/ssl/cacert.pem'
+[17-Apr-2026 17:16:16 Europe/Berlin] Failed to send admin booking notification email for PNR D05117C
